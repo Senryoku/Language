@@ -120,15 +120,16 @@ struct fmt::formatter<AST::Node> {
     auto format(const AST::Node& t, FormatContext& ctx) {
         auto r = ctx.out();
         for(size_t i = 1; i < indent; ++i)
-            r = format_to(ctx.out(), "\t");
+            r = format_to(ctx.out(), "   ");
         if(indent > 0)
-            r = format_to(ctx.out(), " -> ");
-        r = format_to(ctx.out(), "Node({}) : {}\n", t.type, t.token);
-        // auto indent_str = fmt::format("{}", indent + 1);
-        // fmt::print(format);
+            r = format_to(ctx.out(), "|- ");
+        if(t.token.type == Tokenizer::Token::Type::Unknown)
+            r = format_to(ctx.out(), "Node({})\n", t.type);
+        else
+            r = format_to(ctx.out(), "Node({}) : {}\n", t.type, t.token);
+
         for(const auto c : t.children)
             r = format_to(r, "{:" + std::to_string(indent + 1) + "}", *c);
-        // r = format_to(r, "{}", *c);
 
         return r;
     }
@@ -147,28 +148,28 @@ struct fmt::formatter<AST::Node::Type> {
     auto format(const AST::Node::Type& t, FormatContext& ctx) {
         switch(t) {
             case AST::Node::Type::Root:
-                return format_to(ctx.out(), "Root");
+                return format_to(ctx.out(), "{}", "Root");
             case AST::Node::Type::Expression:
-                return format_to(ctx.out(), "Expression");
+                return format_to(ctx.out(), "{}", "Expression");
             case AST::Node::Type::IfStatement:
-                return format_to(ctx.out(), "IfStatement");
+                return format_to(ctx.out(), "{}", "IfStatement");
             case AST::Node::Type::ElseStatement:
-                return format_to(ctx.out(), "ElseStatement");
+                return format_to(ctx.out(), "{}", "ElseStatement");
             case AST::Node::Type::WhileStatement:
-                return format_to(ctx.out(), "WhileStatement");
+                return format_to(ctx.out(), "{}", "WhileStatement");
             case AST::Node::Type::Scope:
-                return format_to(ctx.out(), "Scope {");
+                return format_to(ctx.out(), "{}", "Scope {");
             case AST::Node::Type::VariableDeclaration:
-                return format_to(ctx.out(), "VariableDeclaration");
+                return format_to(ctx.out(), "{}", "VariableDeclaration");
             case AST::Node::Type::Variable:
-                return format_to(ctx.out(), "Variable");
+                return format_to(ctx.out(), "{}", "Variable");
             case AST::Node::Type::Digits:
-                return format_to(ctx.out(), "Digits");
+                return format_to(ctx.out(), "{}", "Digits");
             case AST::Node::Type::BinaryOperator:
-                return format_to(ctx.out(), "BinaryOperator");
+                return format_to(ctx.out(), "{}", "BinaryOperator");
             default:
                 assert(false);
-                return format_to(ctx.out(), "MissingFormat for AST::Node::Type!");
+                return format_to(ctx.out(), "{}", "MissingFormat for AST::Node::Type!");
         }
     }
 };

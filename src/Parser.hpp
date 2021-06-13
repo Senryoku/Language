@@ -22,6 +22,52 @@ class Parser {
         return r;
     }
 
+    bool parse_next_scope(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode) {
+        if(it == tokens.end() || it->value != "{") {
+            return false;
+        }
+        auto begin = it + 1;
+        auto end = begin + 1;
+        while(end != tokens.end() && end->value != "}")
+            ++end;
+        if(end == tokens.end()) {
+            fmt::print("Syntax error: no matching 'closing bracket'.\n");
+            return false;
+        }
+
+        auto scope = currNode->add_child(new AST::Node(AST::Node::Type::Scope)); // FIXME: push_scope ? (has to handle variable declaration)
+        bool r = parse({begin, end}, scope);
+
+        it = end + 1;
+        return r;
+    }
+
+    // FIXME
+    inline static const std::unordered_map<char, uint8_t> operator_precedence{
+        {'=', 0}, {'*', 1}, {'/', 1}, {'+', 2}, {'-', 2},
+    };
+
+    bool parse_next_expression(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode, uint8_t precedence) {
+        const auto& begin = it;
+        auto end = begin + 1;
+        while(end != tokens.end() && end->value != ";") {
+            // TODO: Check other types!
+            if(end->type == Tokenizer::Token::Type::Operator && operator_precedence.at(end->value[0]) <= precedence)
+                break;
+            ++end;
+        }
+
+        auto exprNode = currNode->add_child(new AST::Node(AST::Node::Type::Expression));
+        parse({begin, end}, exprNode);
+
+        if(end == tokens.end())
+            it = end;
+        else
+            it = end + 1;
+
+        return true;
+    }
+
     bool parse(const std::span<Tokenizer::Token>& tokens, AST::Node* currNode) {
         auto it = tokens.begin();
         while(it != tokens.end()) {
@@ -70,29 +116,17 @@ class Parser {
                         return false;
                     }
 
-                    currNode = currNode->add_child(new AST::Node(AST::Node::Type::IfStatement));
-                    auto expr = currNode->add_child(new AST::Node(AST::Node::Type::Expression)); // TODO: Should be re-using something else
+                    auto ifNode = currNode->add_child(new AST::Node(AST::Node::Type::IfStatement));
+                    auto expr = ifNode->add_child(new AST::Node(AST::Node::Type::Expression)); // TODO: Should be re-using something else
                     parse({begin + 1, end}, expr);
 
-                    // TODO: Abstract this ("parse_next_expression"?)
                     it = end + 1;
-                    if(it == tokens.end() || it->value != "{") {
+
+                    if(!parse_next_scope(tokens, it, ifNode)) {
                         fmt::print("Syntax error: expected 'new scope' after 'if'.\n");
                         return false;
                     }
-                    begin = it + 1;
-                    end = begin + 1;
-                    while(end != tokens.end() && end->value != "}")
-                        ++end;
-                    if(end == tokens.end()) {
-                        fmt::print("Syntax error: no matching 'closing bracket'.\n");
-                        return false;
-                    }
-                    auto scope = currNode->add_child(new AST::Node(AST::Node::Type::Scope)); // FIXME: push_scope ? (has to handle variable declaration)
-                    parse({begin, end}, scope);
-                    it = end + 1;
-
-                    currNode = currNode->parent;
+                    // TODO: Handle Else here?
 
                     break;
                 }
@@ -104,7 +138,9 @@ class Parser {
                     auto next = *(it + 1);
                     switch(next.type) {
                         case Tokenizer::Token::Type::Identifier: {
-                            currNode->add_child(new AST::Node(AST::Node::Type::VariableDeclaration, next));
+                            currNode->add_child(new AST::Node(AST::Node::Type::VariableDeclaration, *it));
+                            // FIXME: Where do we store the identifier?
+                            // TODO: Actually declare the variable for syntax checking :)
                             it += 2;
                             // Also push a variable identifier for initialisation
                             if(it != tokens.end() && it->value != ";") // FIXME: Better check for initialisation ("= | {" I guess?)
@@ -129,26 +165,19 @@ class Parser {
                     }
                     AST::Node* prevExpr = currNode->pop_child();
                     // TODO: Test type of previous node! (Must be an expression resolving to something operable)
-                    AST::Node* newNode = currNode->add_child(new AST::Node(AST::Node::Type::BinaryOperator, *it));
+                    AST::Node* binaryOperatorNode = currNode->add_child(new AST::Node(AST::Node::Type::BinaryOperator, *it));
 
-                    newNode->add_child(prevExpr);
+                    binaryOperatorNode->add_child(prevExpr);
 
-                    // FIXME: This is broken.
-                    // TODO: Abstract this ("parse_next_expression"?)
-                    auto begin = it + 1;
-                    auto end = begin + 1;
-                    while(end != tokens.end() && end->value != ";")
-                        ++end;
-                    if(end == tokens.end()) {
-                        fmt::print("Syntax error: no matching ';'.\n"); // FIXME
-                        return false;
-                    }
-                    parse({begin, end + 1}, newNode);
+                    auto precedence = operator_precedence.at(it->value[0]);
+                    ++it;
+                    // Lookahead for rhs
+                    parse_next_expression(tokens, it, binaryOperatorNode, precedence);
 
-                    it = end + 1;
                     break;
                 }
                 case Tokenizer::Token::Type::Identifier: {
+                    // TODO: Check variable declaration
                     currNode->add_child(new AST::Node(AST::Node::Type::Variable, *it));
                     ++it;
                     break;
