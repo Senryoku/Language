@@ -1,0 +1,8 @@
+BasedOnStyle: Microsoft
+IndentWidth: 4
+SpaceBeforeParens: Never
+BreakBeforeBraces: Attach
+ColumnLimit: 180
+PointerAlignment: Left
+AlwaysBreakTemplateDeclarations: Yes
+IndentCaseLabels: true
