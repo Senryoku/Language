@@ -26,14 +26,18 @@ class Tokenizer {
 
         Token() = default;
 
-        Token(Type type, const std::string_view val) : type(type), value(val) {
+        Token(Type type, const std::string_view val, size_t line) : type(type), value(val), line(line) {
         }
 
-        Type type = Type::Unknown;
+        Type             type = Type::Unknown;
         std::string_view value;
+
+        // Debug Info
+        size_t line = 0;
     };
 
     Tokenizer(const std::string& source) : _source(source) {
+        advance_ptr(_current_pos);
     }
 
     Token next() const {
@@ -44,8 +48,7 @@ class Tokenizer {
     Token consume() {
         auto t = search_next(_current_pos);
         // Skip discardable characters immediatly (avoid ending empty token)
-        while(is_discardable(_source[_current_pos]) && _current_pos < _source.length())
-            ++_current_pos;
+        advance_ptr(_current_pos);
         return t;
     }
 
@@ -64,6 +67,15 @@ class Tokenizer {
 
     bool is_digit(char c) const {
         return c >= '0' && c <= '9';
+    }
+
+    void advance_ptr(size_t& pointer) {
+        // Skip discardable characters
+        while(is_discardable(_source[pointer]) && pointer < _source.length()) {
+            if(_source[pointer] == '\n')
+                ++_current_line;
+            ++pointer;
+        }
     }
 
     constexpr static std::array<char, 6> binary_operators{'=', '*', '+', '-', '/', '^'};
@@ -86,12 +98,8 @@ class Tokenizer {
     };
 
     Token search_next(size_t& pointer) const {
-        // Skip discardable characters
-        while(is_discardable(_source[pointer]) && pointer < _source.length())
-            ++pointer;
-
-        auto type = Token::Type::Unknown;
-        auto begin = pointer;
+        auto type       = Token::Type::Unknown;
+        auto begin      = pointer;
         auto first_char = _source[pointer];
 
         if(is(first_char, binary_operators)) {
@@ -114,11 +122,12 @@ class Tokenizer {
             else
                 type = Token::Type::Identifier;
         }
-        return Token{type, std::string_view{_source.begin() + begin, _source.begin() + pointer}};
+        return Token{type, std::string_view{_source.begin() + begin, _source.begin() + pointer}, _current_line};
     }
 
     const std::string& _source;
-    size_t _current_pos = 0;
+    size_t             _current_pos  = 0;
+    size_t             _current_line = 0;
 };
 
 template <>
@@ -153,7 +162,7 @@ struct fmt::formatter<Tokenizer::Token> {
     auto format(const Tokenizer::Token& t, FormatContext& ctx) {
         // auto format(const point &p, FormatContext &ctx) -> decltype(ctx.out()) // c++11
         // ctx.out() is an output iterator to write to.
-        return format_to(ctx.out(), "Token({}, {})", t.type, t.value);
+        return format_to(ctx.out(), "Token({}, '{}', Ln: {})", t.type, t.value, t.line);
     }
 };
 
@@ -182,7 +191,7 @@ struct fmt::formatter<Tokenizer::Token::Type> {
                 return format_to(ctx.out(), "{}", "Identifier");
             default:
             case Tokenizer::Token::Type::Unknown:
-                return format_to(ctx.out(), "{}", "Unknown Tokenizer::Token::Type");
+                return format_to(ctx.out(), "{}", "Unknown");
         }
     }
 };

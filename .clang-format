@@ -6,3 +6,5 @@ ColumnLimit: 180
 PointerAlignment: Left
 AlwaysBreakTemplateDeclarations: Yes
 IndentCaseLabels: true
+AlignConsecutiveAssignments: true
+AlignConsecutiveDeclarations: true

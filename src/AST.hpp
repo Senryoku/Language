@@ -2,6 +2,7 @@
 
 #include <cassert>
 #include <charconv>
+#include <stack>
 #include <vector>
 
 #include <Tokenizer.hpp>
@@ -33,11 +34,10 @@ class AST {
         Node(Type type, Tokenizer::Token token) : type(type), token(token) {
         }
 
-        Type type;
-        Node* parent = nullptr;
+        Type               type;
+        Node*              parent = nullptr;
+        Tokenizer::Token   token;
         std::vector<Node*> children;
-
-        Tokenizer::Token token;
 
         Node* add_child(Node* n) {
             assert(n->parent == nullptr);
@@ -58,15 +58,6 @@ class AST {
                 delete pNode;
         }
     };
-
-    // Should be Node&
-    Node push_node(Node::Type type) {
-        // TODO
-        return Node{type};
-    }
-
-    void close_scope() {
-    }
 
     Node& getRoot() {
         return _root;

@@ -4,19 +4,24 @@
 #include <charconv>
 #include <span>
 
+#include <fmt/color.h>
+
 #include <AST.hpp>
+#include <Logger.hpp>
 #include <Tokenizer.hpp>
 
 class Parser {
   public:
-    enum class State
-    {};
+    Parser() {
+        // FIXME: Pushing an empty scope for now, we'll probably use that to provide some built-ins
+        push_scope();
+    }
 
     bool parse(const std::span<Tokenizer::Token>& tokens) {
-        AST ast;
+        AST  ast;
         bool r = parse(tokens, &ast.getRoot());
         if(!r)
-            fmt::print("Error while parsing!");
+            error("Error while parsing!");
         else
             fmt::print("{}", ast);
         return r;
@@ -27,7 +32,7 @@ class Parser {
             return false;
         }
         auto begin = it + 1;
-        auto end = begin + 1;
+        auto end   = begin + 1;
         while(end != tokens.end() && end->value != "}")
             ++end;
         if(end == tokens.end()) {
@@ -35,9 +40,10 @@ class Parser {
             return false;
         }
 
-        auto scope = currNode->add_child(new AST::Node(AST::Node::Type::Scope)); // FIXME: push_scope ? (has to handle variable declaration)
+        auto scope = currNode->add_child(new AST::Node(AST::Node::Type::Scope));
+        push_scope();
         bool r = parse({begin, end}, scope);
-
+        pop_scope();
         it = end + 1;
         return r;
     }
@@ -49,7 +55,7 @@ class Parser {
 
     bool parse_next_expression(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode, uint8_t precedence) {
         const auto& begin = it;
-        auto end = begin + 1;
+        auto        end   = begin + 1;
         while(end != tokens.end() && end->value != ";") {
             // TODO: Check other types!
             if(end->type == Tokenizer::Token::Type::Operator && operator_precedence.at(end->value[0]) <= precedence)
@@ -58,12 +64,12 @@ class Parser {
         }
 
         auto exprNode = currNode->add_child(new AST::Node(AST::Node::Type::Expression));
-        parse({begin, end}, exprNode);
+        auto result   = parse({begin, end}, exprNode);
         // TODO: Simplify by removing the Expression node if it has only one child? (and bring the child up in its place, ofc)
 
         it = end;
 
-        return true;
+        return result;
     }
 
     bool parse(const std::span<Tokenizer::Token>& tokens, AST::Node* currNode) {
@@ -73,26 +79,29 @@ class Parser {
             switch(token.type) {
                 case Tokenizer::Token::Type::Control: {
                     switch(token.value[0]) {
-                        case '{': {
-                            auto newNode = currNode->add_child(new AST::Node(AST::Node::Type::Scope, *it));
-                            currNode = newNode;
+                        case '{': { // Open a new scope
+                            currNode = currNode->add_child(new AST::Node(AST::Node::Type::Scope, *it));
+                            push_scope();
                             ++it;
                             break;
                         }
-                        case '}': {
-                            // Close nearest scope
+                        case '}': { // Close nearest scope
                             while(currNode->type != AST::Node::Type::Scope && currNode->parent != nullptr)
                                 currNode = currNode->parent;
                             if(currNode->type != AST::Node::Type::Scope) {
-                                fmt::print("Syntax error: Unmatched '{'.\n"); // TODO: Do better.
+                                error("Syntax error: Unmatched '{'.\n"); // TODO: Do better.
                                 return false;
                             }
                             currNode = currNode->parent;
+                            pop_scope();
                             ++it;
                             break;
                         }
+                        case ';': // Just do nothing
+                            ++it;
+                            break;
                         default:
-                            fmt::print("Unused token: {}.\n", *it);
+                            warn("Unused token: {}.\n", *it);
                             ++it;
                             break;
                     }
@@ -100,28 +109,29 @@ class Parser {
                 }
                 case Tokenizer::Token::Type::If: {
                     if(it + 1 == tokens.end() || (it + 1)->value != "(") {
-                        fmt::print("Syntax error: expected '(' after 'if'.\n");
+                        error("Syntax error: expected '(' after 'if'.\n");
                         return false;
                     }
 
                     // TODO: Abstract this ("parse_next_expression"?)
                     auto begin = it + 1;
-                    auto end = begin + 1;
+                    auto end   = begin + 1;
                     while(end != tokens.end() && end->value != ")")
                         ++end;
                     if(end == tokens.end()) {
-                        fmt::print("Syntax error: no matching ')'.\n");
+                        error("Syntax error: no matching ')'.\n");
                         return false;
                     }
 
                     auto ifNode = currNode->add_child(new AST::Node(AST::Node::Type::IfStatement));
-                    auto expr = ifNode->add_child(new AST::Node(AST::Node::Type::Expression)); // TODO: Should be re-using something else
-                    parse({begin + 1, end}, expr);
+                    auto expr   = ifNode->add_child(new AST::Node(AST::Node::Type::Expression)); // TODO: Should be re-using something else
+                    if(!parse({begin + 1, end}, expr))
+                        return false;
 
                     it = end + 1;
 
                     if(!parse_next_scope(tokens, it, ifNode)) {
-                        fmt::print("Syntax error: expected 'new scope' after 'if'.\n");
+                        error("Syntax error: expected 'new scope' after 'if'.\n");
                         return false;
                     }
                     // TODO: Handle Else here?
@@ -130,15 +140,15 @@ class Parser {
                 }
                 case Tokenizer::Token::Type::BuiltInType: {
                     if(it + 1 == tokens.end()) {
-                        fmt::print("Syntax error: expected Identifier for variable declaration, got Nothing.\n");
+                        error("Syntax error: expected Identifier for variable declaration, got Nothing.\n");
                         return false;
                     }
-                    auto next = *(it + 1);
+                    auto next = *(it + 1); // Hopefully a name
                     switch(next.type) {
                         case Tokenizer::Token::Type::Identifier: {
                             currNode->add_child(new AST::Node(AST::Node::Type::VariableDeclaration, *it));
                             // FIXME: Where do we store the identifier?
-                            // TODO: Actually declare the variable for syntax checking :)
+                            get_scope().declare_variable(*it, next);
                             it += 2;
                             // Also push a variable identifier for initialisation
                             if(it != tokens.end() && it->value != ";") // FIXME: Better check for initialisation ("= | {" I guess?)
@@ -146,7 +156,7 @@ class Parser {
                             break;
                         }
                         default:
-                            fmt::print("Syntax error: expected Identifier for variable declaration, got {}.\n", next);
+                            error("Syntax error: expected Identifier for variable declaration, got {}.\n", next);
                             return false;
                     }
                     break;
@@ -158,7 +168,7 @@ class Parser {
                 }
                 case Tokenizer::Token::Type::Operator: {
                     if(currNode->children.empty()) {
-                        fmt::print("Syntax error: unexpected binary operator: {}.\n", *it);
+                        error("Syntax error: unexpected binary operator: {}.\n", *it);
                         return false;
                     }
                     AST::Node* prevExpr = currNode->pop_child();
@@ -175,16 +185,96 @@ class Parser {
                     break;
                 }
                 case Tokenizer::Token::Type::Identifier: {
-                    // TODO: Check variable declaration
+                    if(!get_scope().is_declared(it->value)) {
+                        error("Syntax Error: Variable '{}' has not been declared.\n", it->value);
+                        return false;
+                    }
+
                     currNode->add_child(new AST::Node(AST::Node::Type::Variable, *it));
                     ++it;
                     break;
                 }
                 default:
-                    fmt::print("Unused token: {}.\n", *it);
+                    warn("Unused token: {}.\n", *it);
                     ++it;
                     break;
             }
         }
     }
+
+    class Variable {
+      public:
+        enum class Type
+        { Integer };
+
+        Type type = Type::Integer;
+
+      private:
+    };
+
+    // Hash & Comparison to let unordered_map find work with string_views (Heterogeneous Lookup)
+    struct TransparentEqual : public std::equal_to<> {
+        using is_transparent = void;
+    };
+    struct string_hash {
+        using is_transparent = void;
+        using key_equal      = std::equal_to<>;             // Pred to use
+        using hash_type      = std::hash<std::string_view>; // just a helper local type
+        size_t operator()(std::string_view txt) const {
+            return hash_type{}(txt);
+        }
+        size_t operator()(const std::string& txt) const {
+            return hash_type{}(txt);
+        }
+        size_t operator()(const char* txt) const {
+            return hash_type{}(txt);
+        }
+    };
+
+    class Scope {
+      public:
+        bool declare_variable(Tokenizer::Token type, Tokenizer::Token name) {
+            if(is_declared(name.value)) {
+                error("Error on line {}: Variable '{}' already declared.\n", type.line, name.value);
+                return false;
+            }
+            if(type.value == "int")
+                _variables[std::string{name.value}] = Variable{Variable::Type::Integer};
+            else
+                error("Error on line {}: Unimplemented type '{}'.\n", type.line, type.value);
+            return true;
+        }
+
+        bool is_declared(const std::string_view& name) const {
+            return _variables.contains(std::string{name});
+            // return _variables.find(name) != _variables.end();
+        }
+
+        const std::unordered_map<std::string, Variable, string_hash, TransparentEqual>& get_variables() const {
+            return _variables;
+        }
+
+      private:
+        // FIXME: At some point we'll have ton consolidate these string_view to their final home... Maybe the lexer should have done it already.
+        std::unordered_map<std::string, Variable, string_hash, TransparentEqual> _variables;
+    };
+
+    Scope& get_scope() {
+        return _scopes.top();
+    }
+    const Scope& get_scope() const {
+        return _scopes.top();
+    }
+
+    Scope& push_scope() {
+        _scopes.push(Scope{});
+        return get_scope();
+    }
+
+    void pop_scope() {
+        _scopes.pop();
+    }
+
+  private:
+    std::stack<Scope> _scopes;
 };

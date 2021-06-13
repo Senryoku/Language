@@ -18,17 +18,14 @@ int main() {
         std::vector<Tokenizer::Token> tokens;
 
         Tokenizer tokenizer(source);
-        while(tokenizer.has_more()) {
-            const auto token = tokenizer.consume();
-            tokens.push_back(token);
-            fmt::print("Found token: '{}'\n", token);
-        }
+        while(tokenizer.has_more())
+            tokens.push_back(tokenizer.consume());
 
         Parser parser;
         parser.parse(tokens);
     }
 
-    if(true || all_tests) {
+    if(false || all_tests) {
         const std::string source{R"(
         int b = 2 * 2 + 3 + 8 * 6;
 	)"};
@@ -36,11 +33,8 @@ int main() {
         std::vector<Tokenizer::Token> tokens;
 
         Tokenizer tokenizer(source);
-        while(tokenizer.has_more()) {
-            const auto token = tokenizer.consume();
-            tokens.push_back(token);
-            fmt::print("Found token: '{}'\n", token);
-        }
+        while(tokenizer.has_more())
+            tokens.push_back(tokenizer.consume());
 
         Parser parser;
         parser.parse(tokens);
@@ -57,11 +51,26 @@ int main() {
         std::vector<Tokenizer::Token> tokens;
 
         Tokenizer tokenizer(source);
-        while(tokenizer.has_more()) {
-            const auto token = tokenizer.consume();
-            tokens.push_back(token);
-            fmt::print("Found token: '{}'\n", token);
-        }
+        while(tokenizer.has_more())
+            tokens.push_back(tokenizer.consume());
+
+        Parser parser;
+        parser.parse(tokens);
+    }
+
+    // Already declared
+    if(true || all_tests) {
+        const std::string source{R"(
+	    int a = 0;
+        a = 5;
+        int a = 6;
+	)"};
+
+        std::vector<Tokenizer::Token> tokens;
+
+        Tokenizer tokenizer(source);
+        while(tokenizer.has_more())
+            tokens.push_back(tokenizer.consume());
 
         Parser parser;
         parser.parse(tokens);
