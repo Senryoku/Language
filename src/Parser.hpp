@@ -59,6 +59,7 @@ class Parser {
 
         auto exprNode = currNode->add_child(new AST::Node(AST::Node::Type::Expression));
         parse({begin, end}, exprNode);
+        // TODO: Simplify by removing the Expression node if it has only one child? (and bring the child up in its place, ofc)
 
         it = end;
 
