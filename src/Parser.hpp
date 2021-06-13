@@ -20,10 +20,15 @@ class Parser {
     bool parse(const std::span<Tokenizer::Token>& tokens) {
         AST  ast;
         bool r = parse(tokens, &ast.getRoot());
-        if(!r)
+        if(!r) {
+
             error("Error while parsing!");
-        else
+        } else {
             fmt::print("{}", ast);
+            ast.optimize();
+            fmt::print("Optimized {}", ast);
+        }
+
         return r;
     }
 
@@ -32,7 +37,7 @@ class Parser {
             return false;
         }
         auto begin = it + 1;
-        auto end   = begin + 1;
+        auto end = begin + 1;
         while(end != tokens.end() && end->value != "}")
             ++end;
         if(end == tokens.end()) {
@@ -55,7 +60,7 @@ class Parser {
 
     bool parse_next_expression(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode, uint8_t precedence) {
         const auto& begin = it;
-        auto        end   = begin + 1;
+        auto        end = begin + 1;
         while(end != tokens.end() && end->value != ";") {
             // TODO: Check other types!
             if(end->type == Tokenizer::Token::Type::Operator && operator_precedence.at(end->value[0]) <= precedence)
@@ -64,7 +69,7 @@ class Parser {
         }
 
         auto exprNode = currNode->add_child(new AST::Node(AST::Node::Type::Expression));
-        auto result   = parse({begin, end}, exprNode);
+        auto result = parse({begin, end}, exprNode);
         // TODO: Simplify by removing the Expression node if it has only one child? (and bring the child up in its place, ofc)
 
         it = end;
@@ -115,7 +120,7 @@ class Parser {
 
                     // TODO: Abstract this ("parse_next_expression"?)
                     auto begin = it + 1;
-                    auto end   = begin + 1;
+                    auto end = begin + 1;
                     while(end != tokens.end() && end->value != ")")
                         ++end;
                     if(end == tokens.end()) {
@@ -124,7 +129,7 @@ class Parser {
                     }
 
                     auto ifNode = currNode->add_child(new AST::Node(AST::Node::Type::IfStatement));
-                    auto expr   = ifNode->add_child(new AST::Node(AST::Node::Type::Expression)); // TODO: Should be re-using something else
+                    auto expr = ifNode->add_child(new AST::Node(AST::Node::Type::Expression)); // TODO: Should be re-using something else
                     if(!parse({begin + 1, end}, expr))
                         return false;
 
@@ -155,14 +160,14 @@ class Parser {
                                 currNode->add_child(new AST::Node(AST::Node::Type::Variable, next));
                             break;
                         }
-                        default:
-                            error("Syntax error: expected Identifier for variable declaration, got {}.\n", next);
-                            return false;
+                        default: error("Syntax error: expected Identifier for variable declaration, got {}.\n", next); return false;
                     }
                     break;
                 }
                 case Tokenizer::Token::Type::Digits: {
-                    currNode->add_child(new AST::Node(AST::Node::Type::Digits, *it));
+                    auto integer = currNode->add_child(new AST::Node(AST::Node::Type::ConstantValue, *it));
+                    integer->value_type = AST::Node::ValueType::Integer;
+                    auto result = std::from_chars(&*(it->value.begin()), &*(it->value.begin()) + it->value.length(), integer->value.as_int32_t);
                     ++it;
                     break;
                 }
@@ -218,17 +223,11 @@ class Parser {
     };
     struct string_hash {
         using is_transparent = void;
-        using key_equal      = std::equal_to<>;             // Pred to use
-        using hash_type      = std::hash<std::string_view>; // just a helper local type
-        size_t operator()(std::string_view txt) const {
-            return hash_type{}(txt);
-        }
-        size_t operator()(const std::string& txt) const {
-            return hash_type{}(txt);
-        }
-        size_t operator()(const char* txt) const {
-            return hash_type{}(txt);
-        }
+        using key_equal = std::equal_to<>;             // Pred to use
+        using hash_type = std::hash<std::string_view>; // just a helper local type
+        size_t operator()(std::string_view txt) const { return hash_type{}(txt); }
+        size_t operator()(const std::string& txt) const { return hash_type{}(txt); }
+        size_t operator()(const char* txt) const { return hash_type{}(txt); }
     };
 
     class Scope {
@@ -250,30 +249,22 @@ class Parser {
             // return _variables.find(name) != _variables.end();
         }
 
-        const std::unordered_map<std::string, Variable, string_hash, TransparentEqual>& get_variables() const {
-            return _variables;
-        }
+        const std::unordered_map<std::string, Variable, string_hash, TransparentEqual>& get_variables() const { return _variables; }
 
       private:
         // FIXME: At some point we'll have ton consolidate these string_view to their final home... Maybe the lexer should have done it already.
         std::unordered_map<std::string, Variable, string_hash, TransparentEqual> _variables;
     };
 
-    Scope& get_scope() {
-        return _scopes.top();
-    }
-    const Scope& get_scope() const {
-        return _scopes.top();
-    }
+    Scope&       get_scope() { return _scopes.top(); }
+    const Scope& get_scope() const { return _scopes.top(); }
 
     Scope& push_scope() {
         _scopes.push(Scope{});
         return get_scope();
     }
 
-    void pop_scope() {
-        _scopes.pop();
-    }
+    void pop_scope() { _scopes.pop(); }
 
   private:
     std::stack<Scope> _scopes;

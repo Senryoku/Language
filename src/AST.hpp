@@ -21,23 +21,37 @@ class AST {
             WhileStatement,
             VariableDeclaration,
             Variable,
-            Digits,
-            BinaryOperator
+            ConstantValue,
+            BinaryOperator,
+
+            Undefined
         };
 
-        Node(Type type) : type(type) {
-        }
+        enum class ValueType
+        {
+            Integer,
+            Composite,
+            Undefined
+        };
 
-        Node(Type type, Node& parent) : type(type), parent(&parent) {
-        }
+        Node(Type type) : type(type) {}
 
-        Node(Type type, Tokenizer::Token token) : type(type), token(token) {
-        }
+        Node(Type type, Node& parent) : type(type), parent(&parent) {}
 
-        Type               type;
+        Node(Type type, Tokenizer::Token token) : type(type), token(token) {}
+
+        Type               type = Type::Undefined;
         Node*              parent = nullptr;
         Tokenizer::Token   token;
         std::vector<Node*> children;
+
+        // ConstantValue & Variable
+        ValueType value_type = ValueType::Undefined;
+        // ConstantValue
+        union ValueUnion {
+            int32_t     as_int32_t = 0;
+            const char* as_string; // FIXME: Eewwwww
+        } value;
 
         Node* add_child(Node* n) {
             assert(n->parent == nullptr);
@@ -59,15 +73,16 @@ class AST {
         }
     };
 
-    Node& getRoot() {
-        return _root;
-    }
-    const Node& getRoot() const {
-        return _root;
-    }
+    inline Node&       getRoot() { return _root; }
+    inline const Node& getRoot() const { return _root; }
+
+    // Will perform some really basic optimisations
+    void optimize();
 
   private:
     Node _root{Node::Type::Root};
+
+    Node* optimize(Node*);
 };
 
 template <>
@@ -86,9 +101,7 @@ struct fmt::formatter<AST> {
 
 template <>
 struct fmt::formatter<AST::Node> {
-    constexpr static bool is_digit(char c) {
-        return c >= '0' && c <= '9';
-    }
+    constexpr static bool is_digit(char c) { return c >= '0' && c <= '9'; }
 
     size_t indent = 0;
 
@@ -114,9 +127,15 @@ struct fmt::formatter<AST::Node> {
             r = format_to(ctx.out(), "   ");
         if(indent > 0)
             r = format_to(ctx.out(), "|- ");
-        if(t.token.type == Tokenizer::Token::Type::Unknown)
+
+        if(t.type == AST::Node::Type::ConstantValue) {
+            switch(t.value_type) {
+                case AST::Node::ValueType::Integer: r = format_to(ctx.out(), "Node({}) : {}\n", t.type, t.value.as_int32_t); break;
+                default: r = format_to(ctx.out(), "Node({}) : {}\n", t.type, t.token);
+            }
+        } else if(t.token.type == Tokenizer::Token::Type::Unknown) {
             r = format_to(ctx.out(), "Node({})\n", t.type);
-        else
+        } else
             r = format_to(ctx.out(), "Node({}) : {}\n", t.type, t.token);
 
         for(const auto c : t.children)
@@ -138,29 +157,17 @@ struct fmt::formatter<AST::Node::Type> {
     template <typename FormatContext>
     auto format(const AST::Node::Type& t, FormatContext& ctx) {
         switch(t) {
-            case AST::Node::Type::Root:
-                return format_to(ctx.out(), "{}", "Root");
-            case AST::Node::Type::Expression:
-                return format_to(ctx.out(), "{}", "Expression");
-            case AST::Node::Type::IfStatement:
-                return format_to(ctx.out(), "{}", "IfStatement");
-            case AST::Node::Type::ElseStatement:
-                return format_to(ctx.out(), "{}", "ElseStatement");
-            case AST::Node::Type::WhileStatement:
-                return format_to(ctx.out(), "{}", "WhileStatement");
-            case AST::Node::Type::Scope:
-                return format_to(ctx.out(), "{}", "Scope {");
-            case AST::Node::Type::VariableDeclaration:
-                return format_to(ctx.out(), "{}", "VariableDeclaration");
-            case AST::Node::Type::Variable:
-                return format_to(ctx.out(), "{}", "Variable");
-            case AST::Node::Type::Digits:
-                return format_to(ctx.out(), "{}", "Digits");
-            case AST::Node::Type::BinaryOperator:
-                return format_to(ctx.out(), "{}", "BinaryOperator");
-            default:
-                assert(false);
-                return format_to(ctx.out(), "{}", "MissingFormat for AST::Node::Type!");
+            case AST::Node::Type::Root: return format_to(ctx.out(), "{}", "Root");
+            case AST::Node::Type::Expression: return format_to(ctx.out(), "{}", "Expression");
+            case AST::Node::Type::IfStatement: return format_to(ctx.out(), "{}", "IfStatement");
+            case AST::Node::Type::ElseStatement: return format_to(ctx.out(), "{}", "ElseStatement");
+            case AST::Node::Type::WhileStatement: return format_to(ctx.out(), "{}", "WhileStatement");
+            case AST::Node::Type::Scope: return format_to(ctx.out(), "{}", "Scope {");
+            case AST::Node::Type::VariableDeclaration: return format_to(ctx.out(), "{}", "VariableDeclaration");
+            case AST::Node::Type::Variable: return format_to(ctx.out(), "{}", "Variable");
+            case AST::Node::Type::ConstantValue: return format_to(ctx.out(), "{}", "ConstantValue");
+            case AST::Node::Type::BinaryOperator: return format_to(ctx.out(), "{}", "BinaryOperator");
+            default: assert(false); return format_to(ctx.out(), "{}", "MissingFormat for AST::Node::Type!");
         }
     }
 };

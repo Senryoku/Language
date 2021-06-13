@@ -6,5 +6,13 @@ ColumnLimit: 180
 PointerAlignment: Left
 AlwaysBreakTemplateDeclarations: Yes
 IndentCaseLabels: true
-AlignConsecutiveAssignments: true
+AlignConsecutiveAssignments: false
 AlignConsecutiveDeclarations: true
+AlignConsecutiveBitFields: true
+AlignEscapedNewlines: true
+AlignTrailingComments: true
+AlignOperands: true
+AllowShortBlocksOnASingleLine: true
+AllowShortCaseLabelsOnASingleLine: true
+AllowShortFunctionsOnASingleLine: Inline
+AlignConsecutiveMacros: true

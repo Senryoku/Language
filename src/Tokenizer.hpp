@@ -26,8 +26,7 @@ class Tokenizer {
 
         Token() = default;
 
-        Token(Type type, const std::string_view val, size_t line) : type(type), value(val), line(line) {
-        }
+        Token(Type type, const std::string_view val, size_t line) : type(type), value(val), line(line) {}
 
         Type             type = Type::Unknown;
         std::string_view value;
@@ -36,9 +35,7 @@ class Tokenizer {
         size_t line = 0;
     };
 
-    Tokenizer(const std::string& source) : _source(source) {
-        advance_ptr(_current_pos);
-    }
+    Tokenizer(const std::string& source) : _source(source) { advance_ptr(_current_pos); }
 
     Token next() const {
         auto curr = _current_pos;
@@ -52,22 +49,14 @@ class Tokenizer {
         return t;
     }
 
-    bool has_more() const {
-        return _current_pos < _source.length() - 1;
-    }
+    bool has_more() const { return _current_pos < _source.length() - 1; }
 
   private:
-    bool is_discardable(char c) const {
-        return c == ' ' || c == '\n' || c == '\r' || c == '\t';
-    }
+    bool is_discardable(char c) const { return c == ' ' || c == '\n' || c == '\r' || c == '\t'; }
 
-    bool is_allowed_in_identifiers(char c) const {
-        return c >= 'A' && c <= 'z' || c == '_';
-    }
+    bool is_allowed_in_identifiers(char c) const { return c >= 'A' && c <= 'z' || c == '_'; }
 
-    bool is_digit(char c) const {
-        return c >= '0' && c <= '9';
-    }
+    bool is_digit(char c) const { return c >= '0' && c <= '9'; }
 
     void advance_ptr(size_t& pointer) {
         // Skip discardable characters
@@ -98,8 +87,8 @@ class Tokenizer {
     };
 
     Token search_next(size_t& pointer) const {
-        auto type       = Token::Type::Unknown;
-        auto begin      = pointer;
+        auto type = Token::Type::Unknown;
+        auto begin = pointer;
         auto first_char = _source[pointer];
 
         if(is(first_char, binary_operators)) {
@@ -126,7 +115,7 @@ class Tokenizer {
     }
 
     const std::string& _source;
-    size_t             _current_pos  = 0;
+    size_t             _current_pos = 0;
     size_t             _current_line = 0;
 };
 
@@ -177,21 +166,14 @@ struct fmt::formatter<Tokenizer::Token::Type> {
     template <typename FormatContext>
     auto format(const Tokenizer::Token::Type& t, FormatContext& ctx) {
         switch(t) {
-            case Tokenizer::Token::Type::Control:
-                return format_to(ctx.out(), "{}", "Control");
-            case Tokenizer::Token::Type::Keyword:
-                return format_to(ctx.out(), "{}", "Keyword");
-            case Tokenizer::Token::Type::Digits:
-                return format_to(ctx.out(), "{}", "Digits");
-            case Tokenizer::Token::Type::BuiltInType:
-                return format_to(ctx.out(), "{}", "BuiltInType");
-            case Tokenizer::Token::Type::Operator:
-                return format_to(ctx.out(), "{}", "Operator");
-            case Tokenizer::Token::Type::Identifier:
-                return format_to(ctx.out(), "{}", "Identifier");
+            case Tokenizer::Token::Type::Control: return format_to(ctx.out(), "{}", "Control");
+            case Tokenizer::Token::Type::Keyword: return format_to(ctx.out(), "{}", "Keyword");
+            case Tokenizer::Token::Type::Digits: return format_to(ctx.out(), "{}", "Digits");
+            case Tokenizer::Token::Type::BuiltInType: return format_to(ctx.out(), "{}", "BuiltInType");
+            case Tokenizer::Token::Type::Operator: return format_to(ctx.out(), "{}", "Operator");
+            case Tokenizer::Token::Type::Identifier: return format_to(ctx.out(), "{}", "Identifier");
             default:
-            case Tokenizer::Token::Type::Unknown:
-                return format_to(ctx.out(), "{}", "Unknown");
+            case Tokenizer::Token::Type::Unknown: return format_to(ctx.out(), "{}", "Unknown");
         }
     }
 };

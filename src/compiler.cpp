@@ -8,71 +8,34 @@
 int main() {
     fmt::print("This is a compiler. I swear.\n");
 
-    const bool all_tests = false;
+    const bool all_tests = true;
 
-    if(false || all_tests) {
-        const std::string source{R"(
-	    int a = 1 + 2;
-	)"};
+    struct Test {
+        bool        run = false;
+        std::string source;
+    };
 
-        std::vector<Tokenizer::Token> tokens;
-
-        Tokenizer tokenizer(source);
-        while(tokenizer.has_more())
-            tokens.push_back(tokenizer.consume());
-
-        Parser parser;
-        parser.parse(tokens);
-    }
-
-    if(false || all_tests) {
-        const std::string source{R"(
-        int b = 2 * 2 + 3 + 8 * 6;
-	)"};
-
-        std::vector<Tokenizer::Token> tokens;
-
-        Tokenizer tokenizer(source);
-        while(tokenizer.has_more())
-            tokens.push_back(tokenizer.consume());
-
-        Parser parser;
-        parser.parse(tokens);
-    }
-
-    if(false || all_tests) {
-        const std::string source{R"(
+    std::vector<Test> tests{
+        {false, R"(int a = 1 + 2;)"},
+        {false, R"(int b = 2 * 2 + 3 + 8 * 6;)"},
+        {false, R"(
 	    int a = 0;
         if(a) {
             int b = 0;
         }
-	)"};
+        )"},
+    };
 
-        std::vector<Tokenizer::Token> tokens;
+    for(const auto& t : tests) {
+        if(t.run || all_tests) {
+            std::vector<Tokenizer::Token> tokens;
 
-        Tokenizer tokenizer(source);
-        while(tokenizer.has_more())
-            tokens.push_back(tokenizer.consume());
+            Tokenizer tokenizer(t.source);
+            while(tokenizer.has_more())
+                tokens.push_back(tokenizer.consume());
 
-        Parser parser;
-        parser.parse(tokens);
-    }
-
-    // Already declared
-    if(true || all_tests) {
-        const std::string source{R"(
-	    int a = 0;
-        a = 5;
-        int a = 6;
-	)"};
-
-        std::vector<Tokenizer::Token> tokens;
-
-        Tokenizer tokenizer(source);
-        while(tokenizer.has_more())
-            tokens.push_back(tokenizer.consume());
-
-        Parser parser;
-        parser.parse(tokens);
+            Parser parser;
+            parser.parse(tokens);
+        }
     }
 }
