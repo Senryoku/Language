@@ -44,7 +44,7 @@ class Parser {
 
     // FIXME
     inline static const std::unordered_map<char, uint8_t> operator_precedence{
-        {'=', 0}, {'*', 1}, {'/', 1}, {'+', 2}, {'-', 2},
+        {'=', 0}, {'+', 1}, {'-', 1}, {'*', 2}, {'/', 2},
     };
 
     bool parse_next_expression(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode, uint8_t precedence) {
@@ -60,10 +60,7 @@ class Parser {
         auto exprNode = currNode->add_child(new AST::Node(AST::Node::Type::Expression));
         parse({begin, end}, exprNode);
 
-        if(end == tokens.end())
-            it = end;
-        else
-            it = end + 1;
+        it = end;
 
         return true;
     }
