@@ -35,9 +35,7 @@ class AST {
         };
 
         Node(Type type) : type(type) {}
-
         Node(Type type, Node& parent) : type(type), parent(&parent) {}
-
         Node(Type type, Tokenizer::Token token) : type(type), token(token) {}
 
         Type               type = Type::Undefined;

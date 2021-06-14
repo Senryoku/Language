@@ -14,6 +14,7 @@ class Tokenizer {
         {
             Control,
             Keyword,
+            Return,
             Digits,
             BuiltInType,
             Operator,
@@ -49,7 +50,7 @@ class Tokenizer {
         return t;
     }
 
-    bool has_more() const { return _current_pos < _source.length() - 1; }
+    bool has_more() const { return _current_pos < _source.length(); }
 
   private:
     bool is_discardable(char c) const { return c == ' ' || c == '\n' || c == '\r' || c == '\t'; }
@@ -82,8 +83,9 @@ class Tokenizer {
     }
 
     std::unordered_map<std::string, Token::Type> keywords{
-        {"function", Token::Type::Keyword}, {"if", Token::Type::If},           {"else", Token::Type::Else},         {"while", Token::Type::While},
-        {"bool", Token::Type::BuiltInType}, {"int", Token::Type::BuiltInType}, {"float", Token::Type::BuiltInType}, {"string", Token::Type::BuiltInType},
+        {"function", Token::Type::Keyword}, {"return", Token::Type::Return},     {"if", Token::Type::If},
+        {"else", Token::Type::Else},        {"while", Token::Type::While},       {"bool", Token::Type::BuiltInType},
+        {"int", Token::Type::BuiltInType},  {"float", Token::Type::BuiltInType}, {"string", Token::Type::BuiltInType},
     };
 
     Token search_next(size_t& pointer) const {

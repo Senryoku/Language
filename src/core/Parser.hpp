@@ -22,7 +22,7 @@ class Parser {
         bool r = parse(tokens, &ast.getRoot());
         if(!r) {
 
-            error("Error while parsing!");
+            error("Error while parsing!\n");
         } else {
             fmt::print("{}", ast);
             ast.optimize();
@@ -183,6 +183,10 @@ class Parser {
                     binaryOperatorNode->add_child(prevExpr);
 
                     auto precedence = operator_precedence.at(it->value[0]);
+                    if((it + 1) == tokens.end()) {
+                        error("Syntax error: Reached end of document without a right-hand side operand for {} on line {}.\n", it->value, it->line);
+                        return false;
+                    }
                     ++it;
                     // Lookahead for rhs
                     parse_next_expression(tokens, it, binaryOperatorNode, precedence);
