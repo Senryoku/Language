@@ -58,19 +58,42 @@ class Parser {
         {'=', 0}, {'+', 1}, {'-', 1}, {'*', 2}, {'/', 2},
     };
 
+    // TODO: Formely define wtf is an expression :)
     bool parse_next_expression(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode, uint8_t precedence) {
         const auto& begin = it;
         auto        end = begin + 1;
+
+        bool search_for_matching_bracket = false;
+        if(it->type == Tokenizer::Token::Type::Control && it->value == "(") {
+            precedence = 0;
+            search_for_matching_bracket = true;
+        }
+
+        uint32_t opened_brackets = 0;
         while(end != tokens.end() && end->value != ";") {
             // TODO: Check other types!
             if(end->type == Tokenizer::Token::Type::Operator && operator_precedence.at(end->value[0]) <= precedence)
                 break;
+            if(end->type == Tokenizer::Token::Type::Control && end->value == "(")
+                ++opened_brackets;
+            if(end->type == Tokenizer::Token::Type::Control && end->value == ")") {
+                if(search_for_matching_bracket && opened_brackets == 0)
+                    break;
+                --opened_brackets;
+            }
             ++end;
         }
 
+        if(search_for_matching_bracket && (end == tokens.end() || end->value != ")")) {
+            error("Unmatched '(' on line {}.\n", it->line);
+            return false;
+        }
+
         auto exprNode = currNode->add_child(new AST::Node(AST::Node::Type::Expression));
-        auto result = parse({begin, end}, exprNode);
-        // TODO: Simplify by removing the Expression node if it has only one child? (and bring the child up in its place, ofc)
+        auto result = parse({search_for_matching_bracket ? begin + 1 : begin, end}, exprNode);
+
+        if(search_for_matching_bracket) // Skip ending bracket
+            ++end;
 
         it = end;
 
@@ -102,6 +125,23 @@ class Parser {
                             ++it;
                             break;
                         }
+                        case '(': {
+                            parse_next_expression(tokens, it, currNode, 0);
+                            /*
+                            auto end = it + 1;
+                            while(end != tokens.end() && end->type != Tokenizer::Token::Type::Control && end->value != ")")
+                                ++end;
+                            if(end == tokens.end()) {
+                                error("Unmatched '(' on line {}.\n", it->line);
+                                return false;
+                            }
+                            auto scope = currNode->add_child(new AST::Node(AST::Node::Type::Expression));
+                            bool r = parse({it + 1, end}, scope);
+                            it = end + 1;
+                            */
+                            break;
+                        }
+                        case ')': error("Unmatched ')' on line {}.\n", it->line); return false;
                         case ';': // Just do nothing
                             ++it;
                             break;
@@ -190,6 +230,8 @@ class Parser {
                     ++it;
                     // Lookahead for rhs
                     parse_next_expression(tokens, it, binaryOperatorNode, precedence);
+
+                    // TODO: Test if types are compatible (with the operator and between each other)
 
                     break;
                 }

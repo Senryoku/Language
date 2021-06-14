@@ -47,8 +47,12 @@ class AST {
         ValueType value_type = ValueType::Undefined;
         // ConstantValue
         union ValueUnion {
-            int32_t     as_int32_t = 0;
-            const char* as_string; // FIXME: Eewwwww
+            int32_t as_int32_t;
+            struct {
+                const char* begin;
+                int32_t     size;
+            } as_string; // Not sure if this is the right choice?
+            // const char* as_string; // FIXME: Eewwwww
         } value;
 
         Node* add_child(Node* n) {
