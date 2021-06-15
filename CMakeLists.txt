@@ -1,5 +1,9 @@
-cmake_minimum_required(VERSION 3.2)
+cmake_minimum_required(VERSION 3.20)
 project(Lang)
+
+if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
+    enable_testing()
+endif()
 
 if(CMAKE_BUILD_TYPE STREQUAL "")
   set(CMAKE_BUILD_TYPE Debug)
@@ -18,13 +22,13 @@ else()
     add_compile_options(-Wall -Wextra -pedantic)
 endif()
 
-# Define sources and executable
-set(EXECUTABLE_NAME "compiler")
+# Define sources
 aux_source_directory("src/core" SOURCES)
 file(GLOB HEADERS src/**/*.hpp)
 
 add_executable(compiler ${SOURCES} ${HEADERS} src/compiler.cpp)
 add_executable(prompt ${SOURCES} ${HEADERS} src/prompt.cpp)
+add_executable(tester ${SOURCES} ${HEADERS} test/test.cpp)
 
 # FIXME
 #find_package(fmt)
@@ -33,5 +37,7 @@ add_executable(prompt ${SOURCES} ${HEADERS} src/prompt.cpp)
 
 set_property(TARGET compiler PROPERTY CXX_STANDARD 20)
 set_property(TARGET prompt PROPERTY CXX_STANDARD 20)
+set_property(TARGET tester PROPERTY CXX_STANDARD 20)
 
-target_link_libraries(compiler)
+add_test(NAME arithmeric COMMAND tester "basic/arithmetic.lang" WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/test")
+
