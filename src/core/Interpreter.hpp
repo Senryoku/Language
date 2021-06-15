@@ -70,7 +70,8 @@ class Interpreter : public Scoped {
                     return _return_value;
                 }
 
-                default: error("BinaryOperator: Unsupported operation ('{}') on {} and {}.\n", node.token.value, lhs, rhs); break;
+                error("BinaryOperator: Unsupported operation ('{}') on {} and {}.\n", node.token.value, lhs, rhs);
+                break;
             }
             case ConstantValue: {
                 _return_value = node.value;

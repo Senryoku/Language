@@ -1,3 +1,5 @@
+#include <gtest/gtest.h>
+
 #include <array>
 #include <chrono>
 #include <filesystem>
@@ -11,35 +13,30 @@
 #include <Parser.hpp>
 #include <Tokenizer.hpp>
 
-int main(int argc, char* argv[]) {
-    if(argc <= 1) {
-        error("No test file provided. Usage: tester file.test");
-        return -1;
-    }
+const std::string PathPrefix = "H:/Source/Lang/test/"; // FIXME: This is a workaround for VS not honoring the WORKING_DIRECTORY setup in CMakeLists.txt
 
-    std::ifstream file(argv[1]);
-    if(!file) {
-        error("Could not load {}", argv[1]);
-        return -1;
-    }
-
+TEST(Arithmetic, Basic) {
+    const auto    filepath = "basic/arithmetic.lang";
+    std::ifstream file(PathPrefix + filepath);
+    ASSERT_TRUE(file) << "Couldn't open test file '" << filepath << "' (Run from " << std::filesystem::current_path() << ")";
     std::string source((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
 
     std::vector<Tokenizer::Token> tokens;
-
-    Tokenizer tokenizer(source);
+    Tokenizer                     tokenizer(source);
     while(tokenizer.has_more())
         tokens.push_back(tokenizer.consume());
 
+    EXPECT_GT(tokens.size(), 0);
+
     Parser parser;
     auto   ast = parser.parse(tokens);
+    EXPECT_TRUE(ast.has_value());
     if(ast.has_value()) {
         auto        clock = std::chrono::steady_clock();
         auto        start = clock.now();
         Interpreter interpreter;
         interpreter.execute(*ast);
+        EXPECT_EQ(interpreter.get_return_value().value.as_int32_t, 29); // Actually check :^)
         auto end = clock.now();
     }
-
-    return 0;
 }
