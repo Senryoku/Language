@@ -1,10 +1,10 @@
 #include <AST.hpp>
 
 void AST::optimize() {
-    _root = *optimize(&_root);
+    _root = std::move(*optimize(&_root));
 }
 
-bool compatible(AST::Node::ValueType lhs, AST::Node::ValueType rhs) {
+bool compatible(GenericValue::Type lhs, GenericValue::Type rhs) {
     return lhs == rhs; // TODO
 }
 
@@ -24,26 +24,26 @@ AST::Node* AST::optimize(AST::Node* currNode) {
     if(currNode->type == AST::Node::Type::BinaryOperator && currNode->children.size() == 2) {
         auto lhs = currNode->children[0];
         auto rhs = currNode->children[1];
-        if(lhs->type == AST::Node::Type::ConstantValue && rhs->type == AST::Node::Type::ConstantValue && compatible(lhs->value_type, rhs->value_type)) {
+        if(lhs->type == AST::Node::Type::ConstantValue && rhs->type == AST::Node::Type::ConstantValue && compatible(lhs->value.type, rhs->value.type)) {
             assert(lhs->children.size() == 0);
             assert(rhs->children.size() == 0);
 
-            if(lhs->value_type == AST::Node::ValueType::Integer && rhs->value_type == AST::Node::ValueType::Integer) {
+            if(lhs->value.type == GenericValue::Type::Integer && rhs->value.type == GenericValue::Type::Integer) {
                 constexpr auto apply = [&](int32_t res) {
                     currNode->children.clear();
                     delete currNode;
                     currNode = new AST::Node(AST::Node::Type::ConstantValue);
-                    currNode->value_type = AST::Node::ValueType::Integer;
-                    currNode->value.as_int32_t = res;
+                    currNode->value.type = GenericValue::Type::Integer;
+                    currNode->value.value.as_int32_t = res;
                     delete lhs;
                     delete rhs;
                 };
 
                 switch(currNode->token.value[0]) {
-                    case '+': apply(lhs->value.as_int32_t + rhs->value.as_int32_t); break;
-                    case '-': apply(lhs->value.as_int32_t - rhs->value.as_int32_t); break;
-                    case '*': apply(lhs->value.as_int32_t * rhs->value.as_int32_t); break;
-                    case '/': apply(lhs->value.as_int32_t / rhs->value.as_int32_t); break;
+                    case '+': apply(lhs->value.value.as_int32_t + rhs->value.value.as_int32_t); break;
+                    case '-': apply(lhs->value.value.as_int32_t - rhs->value.value.as_int32_t); break;
+                    case '*': apply(lhs->value.value.as_int32_t * rhs->value.value.as_int32_t); break;
+                    case '/': apply(lhs->value.value.as_int32_t / rhs->value.value.as_int32_t); break;
                     default: break; // Assignment
                 }
             }

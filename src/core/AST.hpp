@@ -5,6 +5,7 @@
 #include <stack>
 #include <vector>
 
+#include <GenericValue.hpp>
 #include <Tokenizer.hpp>
 
 class AST {
@@ -27,16 +28,18 @@ class AST {
             Undefined
         };
 
-        enum class ValueType
-        {
-            Integer,
-            Composite,
-            Undefined
-        };
-
-        Node(Type type) : type(type) {}
-        Node(Type type, Node& parent) : type(type), parent(&parent) {}
-        Node(Type type, Tokenizer::Token token) : type(type), token(token) {}
+        Node(Type type) noexcept : type(type) {}
+        Node(Type type, Node& parent) noexcept : type(type), parent(&parent) {}
+        Node(Type type, Tokenizer::Token token) noexcept : type(type), token(token) {}
+        Node(Node&& o) noexcept : type(o.type), parent(o.parent), token(std::move(o.token)), children(std::move(o.children)), value(o.value) {}
+        Node& operator=(Node&& o) noexcept {
+            type = o.type;
+            parent = o.parent;
+            token = std::move(o.token);
+            children = std::move(o.children);
+            value = o.value;
+            return *this;
+        }
 
         Type               type = Type::Undefined;
         Node*              parent = nullptr;
@@ -44,16 +47,7 @@ class AST {
         std::vector<Node*> children;
 
         // ConstantValue & Variable
-        ValueType value_type = ValueType::Undefined;
-        // ConstantValue
-        union ValueUnion {
-            int32_t as_int32_t;
-            struct {
-                const char* begin;
-                int32_t     size;
-            } as_string; // Not sure if this is the right choice?
-            // const char* as_string; // FIXME: Eewwwww
-        } value;
+        GenericValue value{.type = GenericValue::Type::Undefined, .value{0}};
 
         Node* add_child(Node* n) {
             assert(n->parent == nullptr);
@@ -131,10 +125,9 @@ struct fmt::formatter<AST::Node> {
             r = format_to(ctx.out(), "|- ");
 
         if(t.type == AST::Node::Type::ConstantValue) {
-            switch(t.value_type) {
-                case AST::Node::ValueType::Integer: r = format_to(ctx.out(), "Node({}) : {}\n", t.type, t.value.as_int32_t); break;
-                default: r = format_to(ctx.out(), "Node({}) : {}\n", t.type, t.token);
-            }
+            r = format_to(ctx.out(), "Node({}) : {}\n", t.type, t.value);
+        } else if(t.type == AST::Node::Type::Variable) {
+            r = format_to(ctx.out(), "Node({}:{}) : {}\n", t.type, t.token.value, t.value);
         } else if(t.token.type == Tokenizer::Token::Type::Unknown) {
             r = format_to(ctx.out(), "Node({})\n", t.type);
         } else

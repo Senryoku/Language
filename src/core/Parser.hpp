@@ -2,34 +2,38 @@
 
 #include <cassert>
 #include <charconv>
+#include <optional>
 #include <span>
 
 #include <fmt/color.h>
 
 #include <AST.hpp>
 #include <Logger.hpp>
+#include <Scope.hpp>
 #include <Tokenizer.hpp>
+#include <VariableStore.hpp>
 
-class Parser {
+class Parser : public Scoped {
   public:
     Parser() {
         // FIXME: Pushing an empty scope for now, we'll probably use that to provide some built-ins
         push_scope();
     }
 
-    bool parse(const std::span<Tokenizer::Token>& tokens) {
-        AST  ast;
-        bool r = parse(tokens, &ast.getRoot());
-        if(!r) {
+    std::optional<AST> parse(const std::span<Tokenizer::Token>& tokens) {
+        std::optional<AST> ast(AST{});
 
+        bool r = parse(tokens, &(*ast).getRoot());
+        if(!r) {
             error("Error while parsing!\n");
+            ast.reset();
         } else {
-            fmt::print("{}", ast);
-            ast.optimize();
-            fmt::print("Optimized {}", ast);
+            fmt::print("{}", *ast);
+            ast->optimize();
+            fmt::print("Optimized {}", *ast);
         }
 
-        return r;
+        return ast;
     }
 
     bool parse_next_scope(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode) {
@@ -180,13 +184,17 @@ class Parser {
                     auto next = *(it + 1); // Hopefully a name
                     switch(next.type) {
                         case Tokenizer::Token::Type::Identifier: {
-                            currNode->add_child(new AST::Node(AST::Node::Type::VariableDeclaration, *it));
-                            // FIXME: Where do we store the identifier?
-                            get_scope().declare_variable(*it, next);
+                            auto varDecNode = currNode->add_child(new AST::Node(AST::Node::Type::VariableDeclaration, *it));
+                            varDecNode->value.type = parse_type(it->value);
+                            // FIXME: Storing the variable name in the value... That probably shouldn't be there.
+                            varDecNode->value.value.as_string = {.begin = &*next.value.begin(), .size = static_cast<uint32_t>(next.value.length())};
+                            get_scope().declare_variable(varDecNode->value.type, next.value, it->line);
                             it += 2;
                             // Also push a variable identifier for initialisation
-                            if(it != tokens.end() && it->value != ";") // FIXME: Better check for initialisation ("= | {" I guess?)
-                                currNode->add_child(new AST::Node(AST::Node::Type::Variable, next));
+                            if(it != tokens.end() && it->value != ";") { // FIXME: Better check for initialisation ("= | {" I guess?)
+                                auto varNode = currNode->add_child(new AST::Node(AST::Node::Type::Variable, next));
+                                varNode->value.type = varDecNode->value.type;
+                            }
                             break;
                         }
                         default: error("Syntax error: expected Identifier for variable declaration, got {}.\n", next); return false;
@@ -195,8 +203,8 @@ class Parser {
                 }
                 case Tokenizer::Token::Type::Digits: {
                     auto integer = currNode->add_child(new AST::Node(AST::Node::Type::ConstantValue, *it));
-                    integer->value_type = AST::Node::ValueType::Integer;
-                    auto result = std::from_chars(&*(it->value.begin()), &*(it->value.begin()) + it->value.length(), integer->value.as_int32_t);
+                    integer->value.type = GenericValue::Type::Integer;
+                    auto result = std::from_chars(&*(it->value.begin()), &*(it->value.begin()) + it->value.length(), integer->value.value.as_int32_t);
                     ++it;
                     break;
                 }
@@ -230,7 +238,9 @@ class Parser {
                         return false;
                     }
 
-                    currNode->add_child(new AST::Node(AST::Node::Type::Variable, *it));
+                    const auto& variable = get_scope()[it->value];
+                    auto varNode = currNode->add_child(new AST::Node(AST::Node::Type::Variable, *it));
+                    varNode->value.type = variable.type;
                     ++it;
                     break;
                 }
@@ -241,66 +251,4 @@ class Parser {
             }
         }
     }
-
-    class Variable {
-      public:
-        enum class Type
-        { Integer };
-
-        Type type = Type::Integer;
-
-      private:
-    };
-
-    // Hash & Comparison to let unordered_map find work with string_views (Heterogeneous Lookup)
-    struct TransparentEqual : public std::equal_to<> {
-        using is_transparent = void;
-    };
-    struct string_hash {
-        using is_transparent = void;
-        using key_equal = std::equal_to<>;             // Pred to use
-        using hash_type = std::hash<std::string_view>; // just a helper local type
-        size_t operator()(std::string_view txt) const { return hash_type{}(txt); }
-        size_t operator()(const std::string& txt) const { return hash_type{}(txt); }
-        size_t operator()(const char* txt) const { return hash_type{}(txt); }
-    };
-
-    class Scope {
-      public:
-        bool declare_variable(Tokenizer::Token type, Tokenizer::Token name) {
-            if(is_declared(name.value)) {
-                error("Error on line {}: Variable '{}' already declared.\n", type.line, name.value);
-                return false;
-            }
-            if(type.value == "int")
-                _variables[std::string{name.value}] = Variable{Variable::Type::Integer};
-            else
-                error("Error on line {}: Unimplemented type '{}'.\n", type.line, type.value);
-            return true;
-        }
-
-        bool is_declared(const std::string_view& name) const {
-            return _variables.contains(std::string{name});
-            // return _variables.find(name) != _variables.end();
-        }
-
-        const std::unordered_map<std::string, Variable, string_hash, TransparentEqual>& get_variables() const { return _variables; }
-
-      private:
-        // FIXME: At some point we'll have ton consolidate these string_view to their final home... Maybe the lexer should have done it already.
-        std::unordered_map<std::string, Variable, string_hash, TransparentEqual> _variables;
-    };
-
-    Scope&       get_scope() { return _scopes.top(); }
-    const Scope& get_scope() const { return _scopes.top(); }
-
-    Scope& push_scope() {
-        _scopes.push(Scope{});
-        return get_scope();
-    }
-
-    void pop_scope() { _scopes.pop(); }
-
-  private:
-    std::stack<Scope> _scopes;
 };

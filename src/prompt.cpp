@@ -1,8 +1,10 @@
 #include <array>
+#include <chrono>
 #include <iostream>
 #include <string>
 #include <string_view>
 
+#include <Interpreter.hpp>
 #include <Parser.hpp>
 #include <Tokenizer.hpp>
 
@@ -28,7 +30,16 @@ int main() {
                 tokens.push_back(tokenizer.consume());
 
             Parser parser;
-            parser.parse(tokens);
+            auto   ast = parser.parse(tokens);
+            if(ast.has_value()) {
+                fmt::print("Executing using Interpreter...\n");
+                auto        clock = std::chrono::steady_clock();
+                auto        start = clock.now();
+                Interpreter interpreter;
+                interpreter.execute(*ast);
+                auto end = clock.now();
+                fmt::print("Done in {}ms, returned: '{}'.\n", std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count(), interpreter.get_return_value());
+            }
         }
     } while(true);
 }
