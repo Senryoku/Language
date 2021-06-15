@@ -126,19 +126,8 @@ class Parser {
                             break;
                         }
                         case '(': {
-                            parse_next_expression(tokens, it, currNode, 0);
-                            /*
-                            auto end = it + 1;
-                            while(end != tokens.end() && end->type != Tokenizer::Token::Type::Control && end->value != ")")
-                                ++end;
-                            if(end == tokens.end()) {
-                                error("Unmatched '(' on line {}.\n", it->line);
+                            if(!parse_next_expression(tokens, it, currNode, 0))
                                 return false;
-                            }
-                            auto scope = currNode->add_child(new AST::Node(AST::Node::Type::Expression));
-                            bool r = parse({it + 1, end}, scope);
-                            it = end + 1;
-                            */
                             break;
                         }
                         case ')': error("Unmatched ')' on line {}.\n", it->line); return false;
@@ -229,8 +218,8 @@ class Parser {
                     }
                     ++it;
                     // Lookahead for rhs
-                    parse_next_expression(tokens, it, binaryOperatorNode, precedence);
-
+                    if(!parse_next_expression(tokens, it, binaryOperatorNode, precedence))
+                        return false;
                     // TODO: Test if types are compatible (with the operator and between each other)
 
                     break;
