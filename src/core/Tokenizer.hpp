@@ -13,7 +13,7 @@ class Tokenizer {
         enum class Type
         {
             Control,
-            Keyword,
+            Function,
             Return,
             Digits,
             BuiltInType,
@@ -83,9 +83,9 @@ class Tokenizer {
     }
 
     std::unordered_map<std::string, Token::Type> keywords{
-        {"function", Token::Type::Keyword}, {"return", Token::Type::Return},     {"if", Token::Type::If},
-        {"else", Token::Type::Else},        {"while", Token::Type::While},       {"bool", Token::Type::BuiltInType},
-        {"int", Token::Type::BuiltInType},  {"float", Token::Type::BuiltInType}, {"string", Token::Type::BuiltInType},
+        {"function", Token::Type::Function}, {"return", Token::Type::Return},     {"if", Token::Type::If},
+        {"else", Token::Type::Else},         {"while", Token::Type::While},       {"bool", Token::Type::BuiltInType},
+        {"int", Token::Type::BuiltInType},   {"float", Token::Type::BuiltInType}, {"string", Token::Type::BuiltInType},
     };
 
     Token search_next(size_t& pointer) const {
@@ -156,7 +156,7 @@ struct fmt::formatter<Tokenizer::Token> {
     auto format(const Tokenizer::Token& t, FormatContext& ctx) {
         // auto format(const point &p, FormatContext &ctx) -> decltype(ctx.out()) // c++11
         // ctx.out() is an output iterator to write to.
-        return format_to(ctx.out(), "Token({}, '{}', Ln: {})", t.type, t.value, t.line);
+        return format_to(ctx.out(), fg(fmt::color::gray), "Token({}, '{}', Ln: {})", t.type, t.value, t.line);
     }
 };
 
@@ -172,11 +172,14 @@ struct fmt::formatter<Tokenizer::Token::Type> {
     auto format(const Tokenizer::Token::Type& t, FormatContext& ctx) {
         switch(t) {
             case Tokenizer::Token::Type::Control: return format_to(ctx.out(), "{}", "Control");
-            case Tokenizer::Token::Type::Keyword: return format_to(ctx.out(), "{}", "Keyword");
+            case Tokenizer::Token::Type::Function: return format_to(ctx.out(), fg(fmt::color::orchid), "{}", "Function");
+            case Tokenizer::Token::Type::While: return format_to(ctx.out(), fg(fmt::color::orchid), "{}", "While");
+            case Tokenizer::Token::Type::If: return format_to(ctx.out(), fg(fmt::color::orchid), "{}", "If");
+            case Tokenizer::Token::Type::Else: return format_to(ctx.out(), fg(fmt::color::orchid), "{}", "Else");
             case Tokenizer::Token::Type::Digits: return format_to(ctx.out(), "{}", "Digits");
             case Tokenizer::Token::Type::BuiltInType: return format_to(ctx.out(), "{}", "BuiltInType");
             case Tokenizer::Token::Type::Operator: return format_to(ctx.out(), "{}", "Operator");
-            case Tokenizer::Token::Type::Identifier: return format_to(ctx.out(), "{}", "Identifier");
+            case Tokenizer::Token::Type::Identifier: return format_to(ctx.out(), fg(fmt::color::light_blue), "{}", "Identifier");
             default:
             case Tokenizer::Token::Type::Unknown: return format_to(ctx.out(), "{}", "Unknown");
         }

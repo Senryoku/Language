@@ -28,7 +28,7 @@ class Parser : public Scoped {
             error("Error while parsing!\n");
             ast.reset();
         } else {
-            fmt::print("{}", *ast);
+            // fmt::print("{}", *ast);
             ast->optimize();
             fmt::print("Optimized {}", *ast);
         }
@@ -109,26 +109,16 @@ class Parser : public Scoped {
     }
 
     bool parse_while(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode) {
+        auto whileNode = currNode->add_child(new AST::Node(AST::Node::Type::WhileStatement, *it));
         ++it;
         if(it->value != "(") {
-            error("Expected '(' after while on line {}, got {}.", it->line, it->value);
+            error("Expected '(' after while on line {}, got {}.\n", it->line, it->value);
             return false;
         }
-        /*
-        do {
-            ++it;
-        } while(it != tokens.end() && it->value != ")");
-        if(it == tokens.end()) {
-            error("Unmatched '(' for while statement on line {}.", it->line);
-            return false;
-        }
-        */
-        auto whileNode = currNode->add_child(new AST::Node(AST::Node::Type::WhileStatement));
         // Parse condition and add it as first child
-        if(!parse_next_expression(tokens, it, currNode, 0))
+        if(!parse_next_expression(tokens, it, whileNode, 0))
             return false;
 
-        ++it;
         if(it == tokens.end()) {
             error("Expected while body on line {}, got end-of-file.", it->line);
             return false;
@@ -149,17 +139,19 @@ class Parser : public Scoped {
     }
 
     bool parse_function_declaration(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode) {
+        auto functionNode = currNode->add_child(new AST::Node(AST::Node::Type::FunctionDeclaration, *it));
+        ++it;
         if(it->type != Tokenizer::Token::Type::Identifier) {
             error("Expected identifier in function declaration on line {}, got {}.\n", it->line, it->value);
             return false;
         }
+        functionNode->value.type = GenericValue::Type::String;
+        functionNode->value.value.as_string = it->value;
         ++it;
         if(it->value != "(") {
             error("Expected '(' in function declaration on line {}, got {}.\n", it->line, it->value);
             return false;
         }
-
-        auto functionNode = currNode->add_child(new AST::Node(AST::Node::Type::FunctionDeclaration));
 
         push_scope(); // FIXME: Restrict function parameters to this scope, do better.
 
@@ -304,6 +296,13 @@ class Parser : public Scoped {
                         return false;
                     break;
                 }
+                case Tokenizer::Token::Type::Return: {
+                    ++it;
+                    auto returnNode = currNode->add_child(new AST::Node(AST::Node::Type::ReturnStatement));
+                    if(!parse_next_expression(tokens, it, currNode, 0))
+                        return false;
+                    break;
+                }
                 case Tokenizer::Token::Type::Digits: {
                     auto integer = currNode->add_child(new AST::Node(AST::Node::Type::ConstantValue, *it));
                     integer->value.type = GenericValue::Type::Integer;
@@ -348,19 +347,14 @@ class Parser : public Scoped {
                     ++it;
                     break;
                 }
-                case Tokenizer::Token::Type::Keyword: {
-                    if(it->value == "function") {
-                        ++it;
-                        if(!parse_function_declaration(tokens, it, currNode))
-                            return false;
-                    } else if(it->value == "while") {
-                        ++it;
-                        if(!parse_while(tokens, it, currNode))
-                            return false;
-                    } else {
-                        warn("Unimplemented keywords '{}'.", it->value);
-                        ++it;
-                    }
+                case Tokenizer::Token::Type::While: {
+                    if(!parse_while(tokens, it, currNode))
+                        return false;
+                    break;
+                }
+                case Tokenizer::Token::Type::Function: {
+                    if(!parse_function_declaration(tokens, it, currNode))
+                        return false;
                     break;
                 }
                 default:

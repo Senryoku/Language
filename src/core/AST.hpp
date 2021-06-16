@@ -20,6 +20,7 @@ class AST {
             IfStatement,
             ElseStatement,
             WhileStatement,
+            ReturnStatement,
             VariableDeclaration,
             FunctionDeclaration,
             Variable,
@@ -129,6 +130,8 @@ struct fmt::formatter<AST::Node> {
             r = format_to(ctx.out(), "Node({}) : {}\n", t.type, t.value);
         } else if(t.type == AST::Node::Type::Variable) {
             r = format_to(ctx.out(), "Node({}:{}) : {}\n", t.type, t.token.value, t.value);
+        } else if(t.type == AST::Node::Type::FunctionDeclaration) {
+            r = format_to(ctx.out(), "Node({}:{}) : {}\n", t.type, t.value.value.as_string, t.token);
         } else if(t.token.type == Tokenizer::Token::Type::Unknown) {
             r = format_to(ctx.out(), "Node({})\n", t.type);
         } else
@@ -155,13 +158,14 @@ struct fmt::formatter<AST::Node::Type> {
         switch(t) {
             case AST::Node::Type::Root: return format_to(ctx.out(), "{}", "Root");
             case AST::Node::Type::Expression: return format_to(ctx.out(), "{}", "Expression");
-            case AST::Node::Type::IfStatement: return format_to(ctx.out(), "{}", "IfStatement");
-            case AST::Node::Type::ElseStatement: return format_to(ctx.out(), "{}", "ElseStatement");
-            case AST::Node::Type::WhileStatement: return format_to(ctx.out(), "{}", "WhileStatement");
+            case AST::Node::Type::IfStatement: return format_to(ctx.out(), fg(fmt::color::orchid), "{}", "IfStatement");
+            case AST::Node::Type::ElseStatement: return format_to(ctx.out(), fg(fmt::color::orchid), "{}", "ElseStatement");
+            case AST::Node::Type::WhileStatement: return format_to(ctx.out(), fg(fmt::color::orchid), "{}", "WhileStatement");
+            case AST::Node::Type::ReturnStatement: return format_to(ctx.out(), fg(fmt::color::orchid), "{}", "ReturnStatement");
             case AST::Node::Type::Scope: return format_to(ctx.out(), "{}", "Scope {");
-            case AST::Node::Type::VariableDeclaration: return format_to(ctx.out(), "{}", "VariableDeclaration");
-            case AST::Node::Type::FunctionDeclaration: return format_to(ctx.out(), "{}", "FunctionDeclaration");
-            case AST::Node::Type::Variable: return format_to(ctx.out(), "{}", "Variable");
+            case AST::Node::Type::VariableDeclaration: return format_to(ctx.out(), fg(fmt::color::light_blue), "{}", "VariableDeclaration");
+            case AST::Node::Type::FunctionDeclaration: return format_to(ctx.out(), fg(fmt::color::light_yellow), "{}", "FunctionDeclaration");
+            case AST::Node::Type::Variable: return format_to(ctx.out(), fg(fmt::color::light_blue), "{}", "Variable");
             case AST::Node::Type::ConstantValue: return format_to(ctx.out(), "{}", "ConstantValue");
             case AST::Node::Type::BinaryOperator: return format_to(ctx.out(), "{}", "BinaryOperator");
             default: assert(false); return format_to(ctx.out(), "{}", "MissingFormat for AST::Node::Type!");
