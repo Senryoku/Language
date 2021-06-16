@@ -38,6 +38,10 @@ class Parser : public Scoped {
 
     bool parse_next_scope(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode) {
         if(it == tokens.end() || it->value != "{") {
+            if(it == tokens.end())
+                error("Syntax error: Expected scope opening, got end-of-document.\n");
+            else
+                error("Syntax error: Expected scope opening on line {}, got {}.\n", it->line, it->value);
             return false;
         }
         auto begin = it + 1;
@@ -45,7 +49,7 @@ class Parser : public Scoped {
         while(end != tokens.end() && end->value != "}")
             ++end;
         if(end == tokens.end()) {
-            fmt::print("Syntax error: no matching 'closing bracket'.\n");
+            error("Syntax error: no matching 'closing bracket', got end-of-document.\n");
             return false;
         }
 
@@ -104,6 +108,125 @@ class Parser : public Scoped {
         return result;
     }
 
+    bool parse_while(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode) {
+        ++it;
+        if(it->value != "(") {
+            error("Expected '(' after while on line {}, got {}.", it->line, it->value);
+            return false;
+        }
+        /*
+        do {
+            ++it;
+        } while(it != tokens.end() && it->value != ")");
+        if(it == tokens.end()) {
+            error("Unmatched '(' for while statement on line {}.", it->line);
+            return false;
+        }
+        */
+        auto whileNode = currNode->add_child(new AST::Node(AST::Node::Type::WhileStatement));
+        // Parse condition and add it as first child
+        if(!parse_next_expression(tokens, it, currNode, 0))
+            return false;
+
+        ++it;
+        if(it == tokens.end()) {
+            error("Expected while body on line {}, got end-of-file.", it->line);
+            return false;
+        }
+
+        if(it->value == "{") {
+            if(!parse_next_scope(tokens, it, whileNode))
+                return false;
+        } else {
+            // FIXME: Probably
+            auto end = it;
+            while(end != tokens.end() && end->value != ";")
+                ++end;
+            if(!parse({it, end}, whileNode))
+                return false;
+        }
+        return true;
+    }
+
+    bool parse_function_declaration(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode) {
+        if(it->type != Tokenizer::Token::Type::Identifier) {
+            error("Expected identifier in function declaration on line {}, got {}.\n", it->line, it->value);
+            return false;
+        }
+        ++it;
+        if(it->value != "(") {
+            error("Expected '(' in function declaration on line {}, got {}.\n", it->line, it->value);
+            return false;
+        }
+
+        auto functionNode = currNode->add_child(new AST::Node(AST::Node::Type::FunctionDeclaration));
+
+        push_scope(); // FIXME: Restrict function parameters to this scope, do better.
+
+        // Parse parameters
+        do {
+            ++it;
+            if(!parse_variable_declaration(tokens, it, functionNode))
+                return false;
+        } while(it != tokens.end() && it->value == ",");
+        if(it == tokens.end() || it->value != ")") {
+            error("Unmatched '(' in function declaration on line {}.\n", it->line);
+            return false;
+        }
+
+        ++it;
+        if(it == tokens.end()) {
+            error("Expected function body on line {}, got end-of-file.\n", it->line);
+            return false;
+        }
+
+        if(it->value == "{") {
+            if(!parse_next_scope(tokens, it, functionNode))
+                return false;
+        } else {
+            // FIXME: Probably
+            auto end = it;
+            while(end != tokens.end() && end->value != ";")
+                ++end;
+            if(!parse({it, end}, functionNode))
+                return false;
+        }
+
+        pop_scope();
+
+        return true;
+    }
+
+    /* it must point to an type identifier
+     * TODO: Handle non-built-it types.
+     */
+    bool parse_variable_declaration(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode) {
+        assert(it->type == Tokenizer::Token::Type::BuiltInType);
+        if(it + 1 == tokens.end()) {
+            error("Syntax error: expected Identifier for variable declaration, got Nothing.\n");
+            return false;
+        }
+        auto next = *(it + 1); // Hopefully a name
+        switch(next.type) {
+            case Tokenizer::Token::Type::Identifier: {
+                auto varDecNode = currNode->add_child(new AST::Node(AST::Node::Type::VariableDeclaration, *it));
+                varDecNode->value.type = parse_type(it->value);
+                // FIXME: Storing the variable name in the value... That probably shouldn't be there.
+                varDecNode->value.value.as_string = {.begin = &*next.value.begin(), .size = static_cast<uint32_t>(next.value.length())};
+                get_scope().declare_variable(varDecNode->value.type, next.value, it->line);
+                it += 2;
+                // Also push a variable identifier for initialisation
+                if(it != tokens.end() && it->value == "=") { // FIXME: Better check for initialisation ("= | {" I guess?)
+                    auto varNode = currNode->add_child(new AST::Node(AST::Node::Type::Variable, next));
+                    varNode->value.type = varDecNode->value.type;
+                }
+                break;
+            }
+            default: error("Syntax error: expected Identifier for variable declaration, got {}.\n", next); return false;
+        }
+        return true;
+    }
+
     bool parse(const std::span<Tokenizer::Token>& tokens, AST::Node* currNode) {
         auto it = tokens.begin();
         while(it != tokens.end()) {
@@ -121,7 +244,7 @@ class Parser : public Scoped {
                             while(currNode->type != AST::Node::Type::Scope && currNode->parent != nullptr)
                                 currNode = currNode->parent;
                             if(currNode->type != AST::Node::Type::Scope) {
-                                error("Syntax error: Unmatched '{'.\n"); // TODO: Do better.
+                                error("Syntax error: Unmatched '}' one line {}.\n", it->line);
                                 return false;
                             }
                             currNode = currNode->parent;
@@ -177,28 +300,8 @@ class Parser : public Scoped {
                     break;
                 }
                 case Tokenizer::Token::Type::BuiltInType: {
-                    if(it + 1 == tokens.end()) {
-                        error("Syntax error: expected Identifier for variable declaration, got Nothing.\n");
+                    if(!parse_variable_declaration(tokens, it, currNode))
                         return false;
-                    }
-                    auto next = *(it + 1); // Hopefully a name
-                    switch(next.type) {
-                        case Tokenizer::Token::Type::Identifier: {
-                            auto varDecNode = currNode->add_child(new AST::Node(AST::Node::Type::VariableDeclaration, *it));
-                            varDecNode->value.type = parse_type(it->value);
-                            // FIXME: Storing the variable name in the value... That probably shouldn't be there.
-                            varDecNode->value.value.as_string = {.begin = &*next.value.begin(), .size = static_cast<uint32_t>(next.value.length())};
-                            get_scope().declare_variable(varDecNode->value.type, next.value, it->line);
-                            it += 2;
-                            // Also push a variable identifier for initialisation
-                            if(it != tokens.end() && it->value != ";") { // FIXME: Better check for initialisation ("= | {" I guess?)
-                                auto varNode = currNode->add_child(new AST::Node(AST::Node::Type::Variable, next));
-                                varNode->value.type = varDecNode->value.type;
-                            }
-                            break;
-                        }
-                        default: error("Syntax error: expected Identifier for variable declaration, got {}.\n", next); return false;
-                    }
                     break;
                 }
                 case Tokenizer::Token::Type::Digits: {
@@ -233,15 +336,31 @@ class Parser : public Scoped {
                     break;
                 }
                 case Tokenizer::Token::Type::Identifier: {
-                    if(!get_scope().is_declared(it->value)) {
+                    auto maybe_variable = get(it->value);
+                    if(!maybe_variable) {
                         error("Syntax Error: Variable '{}' has not been declared.\n", it->value);
                         return false;
                     }
 
-                    const auto& variable = get_scope()[it->value];
-                    auto varNode = currNode->add_child(new AST::Node(AST::Node::Type::Variable, *it));
+                    const auto& variable = *maybe_variable;
+                    auto        varNode = currNode->add_child(new AST::Node(AST::Node::Type::Variable, *it));
                     varNode->value.type = variable.type;
                     ++it;
+                    break;
+                }
+                case Tokenizer::Token::Type::Keyword: {
+                    if(it->value == "function") {
+                        ++it;
+                        if(!parse_function_declaration(tokens, it, currNode))
+                            return false;
+                    } else if(it->value == "while") {
+                        ++it;
+                        if(!parse_while(tokens, it, currNode))
+                            return false;
+                    } else {
+                        warn("Unimplemented keywords '{}'.", it->value);
+                        ++it;
+                    }
                     break;
                 }
                 default:

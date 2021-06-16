@@ -5,7 +5,8 @@
 
 #include <GenericValue.hpp>
 
-class Variable : public GenericValue {};
+// class Variable : public GenericValue {};
+using Variable = GenericValue;
 
 // Hash & Comparison to let unordered_map::find work with string_views (Heterogeneous Lookup)
 struct TransparentEqual : public std::equal_to<> {

@@ -33,7 +33,12 @@ class Interpreter : public Scoped {
                 break;
             }
             case Variable: {
-                return get_scope()[node.token.value];
+                auto pVar = get(node.token.value);
+                if(!pVar) {
+                    error("Syntax error: Undeclared variable '{}' on line {}.\n", node.token.value, node.token.line);
+                    break;
+                }
+                return *pVar; // FIXME: Make sure GenericValue & Variable are transparent? Remove the 'Variable' type?
                 break;
             }
             case BinaryOperator: {

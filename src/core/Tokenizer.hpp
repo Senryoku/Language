@@ -93,7 +93,10 @@ class Tokenizer {
         auto begin = pointer;
         auto first_char = _source[pointer];
 
-        if(is(first_char, binary_operators)) {
+        if(first_char == ',') {
+            pointer += 1;
+            type = Token::Type::Control;
+        } else if(is(first_char, binary_operators)) {
             pointer += 1;
             type = Token::Type::Operator;
         } else if(is(first_char, control_characters)) {

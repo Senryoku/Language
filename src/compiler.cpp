@@ -8,7 +8,7 @@
 int main() {
     fmt::print("This is a compiler. I swear.\n");
 
-    const bool all_tests = true;
+    const bool all_tests = false;
 
     struct Test {
         bool        run = false;
@@ -16,6 +16,13 @@ int main() {
     };
 
     std::vector<Test> tests{
+        {true, R"(function multiply(int rhs, int lhs) {
+            return rhs * lhs;
+        })"},
+        {true, R"(int i = 5;
+        while(i) {
+            i = i - 1;
+        })"},
         {false, R"(int a = 1 + 2;)"},
         {false, R"(int b = 2 * 2 + 3 + 8 * 6;)"},
         {false, R"(
@@ -40,8 +47,8 @@ int main() {
                 tokens.push_back(tokenizer.consume());
 
             Parser parser;
-            auto ast = parser.parse(tokens);
-            if (ast.has_value()) {
+            auto   ast = parser.parse(tokens);
+            if(ast.has_value()) {
                 //  Do something :)
             }
         }
