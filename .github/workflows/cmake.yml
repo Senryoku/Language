@@ -22,7 +22,7 @@ jobs:
             os: [ubuntu-latest, windows-latest]
             include:
               - os: ubuntu-latest
-                compiler: [gcc]
+                compiler: gcc
                 gcc: 11
 
     steps:
