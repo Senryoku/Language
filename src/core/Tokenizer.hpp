@@ -85,6 +85,9 @@ class Tokenizer {
                                                                   {"==", Token::Type::Operator}, {"!=", Token::Type::Operator}, {">", Token::Type::Operator},
                                                                   {"<", Token::Type::Operator},  {">=", Token::Type::Operator}, {"<=", Token::Type::Operator}};
 
+    // FIXME: This is a workaround, not a proper way to recognize operators :)
+    static inline bool is_allowed_in_operators(char c) { return (c >= '*' && c <= '/') || (c >= '<' && c <= '>'); }
+
     std::unordered_map<std::string, Token::Type> keywords{
         {"function", Token::Type::Function}, {"return", Token::Type::Return},     {"if", Token::Type::If},
         {"else", Token::Type::Else},         {"while", Token::Type::While},       {"bool", Token::Type::BuiltInType},
@@ -112,7 +115,7 @@ class Tokenizer {
             } else {
                 // Binary Operators
                 // FIXME
-                while(!is_discardable(_source[pointer]) && pointer < _source.length())
+                while(!is_discardable(_source[pointer]) && is_allowed_in_operators(_source[pointer]) && pointer < _source.length())
                     ++pointer;
                 if(binary_operators.contains({_source.begin() + begin, _source.begin() + pointer})) {
                     type = Token::Type::Operator;

@@ -50,27 +50,71 @@ void tokenize(const char* filepath, std::vector<Tokenizer::Token>& tokens, std::
     Interpreter interpreter;              \
     interpreter.execute(*ast);
 
-TEST(Basic, Add) {
-    PARSE_INTERP("return 25 + 97;");
+TEST(Arithmetic, Add) {
+    PARSE_INTERP("25 + 97;");
     EXPECT_EQ(interpreter.get_return_value().value.as_int32_t, 122);
 }
 
-TEST(Basic, Sub) {
-    PARSE_INTERP("return 57 - 26;");
+TEST(Arithmetic, AddNoSpaces) {
+    PARSE_INTERP("25+97;");
+    EXPECT_EQ(interpreter.get_return_value().value.as_int32_t, 122);
+}
+
+TEST(Arithmetic, Sub) {
+    PARSE_INTERP("57 - 26");
     EXPECT_EQ(interpreter.get_return_value().value.as_int32_t, 31);
 }
 
-TEST(Basic, Expression) {
-    PARSE_INTERP("return 125 * 45 + 24 / (4 + 3) - 5;");
+TEST(Arithmetic, Mul) {
+    PARSE_INTERP("25 * 5");
+    EXPECT_EQ(interpreter.get_return_value().value.as_int32_t, 125);
+}
+
+TEST(Arithmetic, Div) {
+    PARSE_INTERP("125 / 5");
+    EXPECT_EQ(interpreter.get_return_value().value.as_int32_t, 25);
+}
+
+TEST(Arithmetic, Expression) {
+    PARSE_INTERP("125 * 45 + 24 / (4 + 3) - 5");
     EXPECT_EQ(interpreter.get_return_value().value.as_int32_t, 5623);
 }
 
-TEST(Basic, Arithmetic) {
-    LOAD_PARSE_INTERP("basic/arithmetic.lang");
-    EXPECT_EQ(interpreter.get_return_value().value.as_int32_t, 69); // Actually check :^)
+TEST(Arithmetic, Order) {
+    PARSE_INTERP("2 * (6 * 1 + 2) / 4 * (4 + 1)");
+    EXPECT_EQ(interpreter.get_return_value().value.as_int32_t, 20);
 }
 
-TEST(Basic, While) {
+TEST(Arithmetic, OrderWithoutSpaces) {
+    PARSE_INTERP("2*(6*1+2)/4*(4+1)");
+    EXPECT_EQ(interpreter.get_return_value().value.as_int32_t, 20);
+}
+
+TEST(Arithmetic, Assignment) {
+    LOAD_PARSE_INTERP("basic/arithmetic.lang");
+    EXPECT_EQ(interpreter.get_return_value().value.as_int32_t, 69);
+}
+
+TEST(Keywords, Return) {
+    PARSE_INTERP("return 458;");
+    EXPECT_EQ(interpreter.get_return_value().value.as_int32_t, 458);
+}
+
+TEST(Keywords, ReturnWithExpression) {
+    PARSE_INTERP("return  125 * 45 + 24 / (4 + 3) - 5;");
+    EXPECT_EQ(interpreter.get_return_value().value.as_int32_t, 5623);
+}
+
+TEST(Keywords, While) {
     LOAD_PARSE_INTERP("basic/while.lang");
     EXPECT_EQ(interpreter.get_return_value().value.as_int32_t, 10);
+}
+
+TEST(Function, Declaration) {
+    LOAD_PARSE_INTERP("function/declaration.lang");
+}
+
+TEST(Function, DeclarationAndCall) {
+    LOAD_PARSE_INTERP("function/call.lang");
+    EXPECT_EQ(interpreter.get_return_value().value.as_int32_t, 18 * 48);
 }

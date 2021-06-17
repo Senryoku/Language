@@ -27,6 +27,11 @@ class Interpreter : public Scoped {
                     execute(*child);
                 break;
             }
+            case Expression: {
+                auto value = execute(*node.children[0]);
+                return value; // FIXME
+                break;
+            }
             case WhileStatement: {
                 auto condition = execute(*node.children[0]);
                 while(condition.value.as_bool) {

@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.20)
 project(Lang)
 
+enable_testing()
 if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
     enable_testing()
 endif()

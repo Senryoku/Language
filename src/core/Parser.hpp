@@ -37,14 +37,14 @@ class Parser : public Scoped {
             warn("Couldn't resolve operator return type (Missing impl.).\n");
     }
 
-    std::optional<AST> parse(const std::span<Tokenizer::Token>& tokens) {
+    std::optional<AST> parse(const std::span<Tokenizer::Token>& tokens, bool optimize = true) {
         std::optional<AST> ast(AST{});
 
         bool r = parse(tokens, &(*ast).getRoot());
         if(!r) {
             error("Error while parsing!\n");
             ast.reset();
-        } else {
+        } else if(optimize) {
             ast->optimize();
         }
 
@@ -105,7 +105,7 @@ class Parser : public Scoped {
                 }
                 case Operator: {
                     auto p = operator_precedence.at(std::string(it->value));
-                    if(p >= precedence) {
+                    if(p > precedence) {
                         if(!parse_binary_operator(tokens, it, exprNode))
                             return false;
                     } else {
@@ -123,7 +123,7 @@ class Parser : public Scoped {
                     break;
                 }
                 default: {
-                    warn("[parse_next_expression] Unexpected Token Type '{}'.", it->type);
+                    warn("[parse_next_expression] Unexpected Token Type '{}' ({}).\n", it->type, *it);
                     return false;
                     break;
                 }

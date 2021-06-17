@@ -30,7 +30,7 @@ int main() {
                 tokens.push_back(tokenizer.consume());
 
             Parser parser;
-            auto   ast = parser.parse(tokens);
+            auto   ast = parser.parse(tokens, false);
             if(ast.has_value()) {
                 fmt::print("{}", *ast);
                 fmt::print("Executing using Interpreter...\n");
