@@ -32,11 +32,13 @@ add_executable(compiler ${SOURCES} ${HEADERS} src/compiler.cpp)
 add_executable(prompt ${SOURCES} ${HEADERS} src/prompt.cpp)
 add_executable(tester ${SOURCES} ${TEST_FILES} ${HEADERS} test/main.cpp)
 
-# FIXME
-#find_package(fmt)
-#target_link_libraries(compiler fmt::fmt)
-#target_link_libraries(compiler PRIVATE fmt::fmt-header-only)
+# Use included version of FMT
+add_subdirectory("ext/fmt-7.1.3")
+target_link_libraries(compiler fmt::fmt)
+target_link_libraries(prompt fmt::fmt)
+target_link_libraries(tester fmt::fmt)
 
+# Get GTest online
 include(FetchContent)
 FetchContent_Declare(
   googletest
@@ -54,6 +56,4 @@ set_property(TARGET compiler PROPERTY CXX_STANDARD 20)
 set_property(TARGET prompt PROPERTY CXX_STANDARD 20)
 set_property(TARGET tester PROPERTY CXX_STANDARD 20)
 
-#add_test(NAME arithmeric COMMAND tester "basic/arithmetic.lang" WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/test")
-#gtest_add_tests(TARGET tester WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/test")
 gtest_discover_tests(tester WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/test")
