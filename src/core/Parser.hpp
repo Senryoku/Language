@@ -20,6 +20,23 @@ class Parser : public Scoped {
         push_scope();
     }
 
+    // FIXME: For many reasons (string creations...) Just correctly type the node from the start (i.e. token stage) I guess?
+    inline static const std::unordered_map<std::string, uint8_t> operator_precedence{
+        {"=", 0}, {"==", 1}, {"!=", 1}, {">", 1}, {"<", 1}, {">=", 1}, {"<=", 1}, {"+", 2}, {"-", 2}, {"*", 3}, {"/", 3}, {"^", 4},
+    };
+
+    void resolve_operator_type(AST::Node* binaryOp) {
+        assert(binaryOp->type == AST::Node::Type::BinaryOperator);
+        // TODO
+        if(binaryOp->token.value == "==" || binaryOp->token.value == "!=" || binaryOp->token.value == "<" || binaryOp->token.value == ">" || binaryOp->token.value == "=>" ||
+           binaryOp->token.value == "<=")
+            binaryOp->value.type = GenericValue::Type::Bool;
+        else if(binaryOp->children[0]->value.type == GenericValue::Type::Integer && binaryOp->children[1]->value.type == GenericValue::Type::Integer)
+            binaryOp->value.type = GenericValue::Type::Integer;
+        else
+            warn("Couldn't resolve operator return type (Missing impl.).\n");
+    }
+
     std::optional<AST> parse(const std::span<Tokenizer::Token>& tokens) {
         std::optional<AST> ast(AST{});
 
@@ -28,9 +45,7 @@ class Parser : public Scoped {
             error("Error while parsing!\n");
             ast.reset();
         } else {
-            // fmt::print("{}", *ast);
             ast->optimize();
-            fmt::print("Optimized {}", *ast);
         }
 
         return ast;
@@ -61,11 +76,6 @@ class Parser : public Scoped {
         return r;
     }
 
-    // FIXME
-    inline static const std::unordered_map<char, uint8_t> operator_precedence{
-        {'=', 0}, {'+', 1}, {'-', 1}, {'*', 2}, {'/', 2},
-    };
-
     // TODO: Formely define wtf is an expression :)
     bool parse_next_expression(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode, uint8_t precedence) {
         const auto& begin = it;
@@ -80,7 +90,7 @@ class Parser : public Scoped {
         uint32_t opened_brackets = 0;
         while(end != tokens.end() && end->value != ";") {
             // TODO: Check other types!
-            if(end->type == Tokenizer::Token::Type::Operator && operator_precedence.at(end->value[0]) <= precedence)
+            if(end->type == Tokenizer::Token::Type::Operator && operator_precedence.at(std::string(end->value)) <= precedence)
                 break;
             if(end->type == Tokenizer::Token::Type::Control && end->value == "(")
                 ++opened_brackets;
@@ -99,6 +109,11 @@ class Parser : public Scoped {
 
         auto exprNode = currNode->add_child(new AST::Node(AST::Node::Type::Expression));
         auto result = parse({search_for_matching_bracket ? begin + 1 : begin, end}, exprNode);
+
+        // Evaluate Expression final return type
+        // FIXME
+        if(exprNode->children.size() == 1)
+            exprNode->value.type = exprNode->children[0]->value.type;
 
         if(search_for_matching_bracket) // Skip ending bracket
             ++end;
@@ -299,7 +314,7 @@ class Parser : public Scoped {
                 case Tokenizer::Token::Type::Return: {
                     ++it;
                     auto returnNode = currNode->add_child(new AST::Node(AST::Node::Type::ReturnStatement));
-                    if(!parse_next_expression(tokens, it, currNode, 0))
+                    if(!parse_next_expression(tokens, it, returnNode, 0))
                         return false;
                     break;
                 }
@@ -321,7 +336,7 @@ class Parser : public Scoped {
 
                     binaryOperatorNode->add_child(prevExpr);
 
-                    auto precedence = operator_precedence.at(it->value[0]);
+                    auto precedence = operator_precedence.at(std::string(it->value));
                     if((it + 1) == tokens.end()) {
                         error("Syntax error: Reached end of document without a right-hand side operand for {} on line {}.\n", it->value, it->line);
                         return false;
@@ -331,6 +346,8 @@ class Parser : public Scoped {
                     if(!parse_next_expression(tokens, it, binaryOperatorNode, precedence))
                         return false;
                     // TODO: Test if types are compatible (with the operator and between each other)
+
+                    resolve_operator_type(binaryOperatorNode);
 
                     break;
                 }

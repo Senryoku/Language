@@ -68,8 +68,6 @@ class Tokenizer {
         }
     }
 
-    constexpr static std::array<char, 6> binary_operators{'=', '*', '+', '-', '/', '^'};
-
     constexpr static std::array<char, 7> control_characters{
         ';', '(', ')', '{', '}', '[', ']',
     };
@@ -82,6 +80,11 @@ class Tokenizer {
         return false;
     }
 
+    std::unordered_map<std::string, Token::Type> binary_operators{{"=", Token::Type::Operator},  {"*", Token::Type::Operator},  {"+", Token::Type::Operator},
+                                                                  {"-", Token::Type::Operator},  {"/", Token::Type::Operator},  {"^", Token::Type::Operator},
+                                                                  {"==", Token::Type::Operator}, {"!=", Token::Type::Operator}, {">", Token::Type::Operator},
+                                                                  {"<", Token::Type::Operator},  {">=", Token::Type::Operator}, {"<=", Token::Type::Operator}};
+
     std::unordered_map<std::string, Token::Type> keywords{
         {"function", Token::Type::Function}, {"return", Token::Type::Return},     {"if", Token::Type::If},
         {"else", Token::Type::Else},         {"while", Token::Type::While},       {"bool", Token::Type::BuiltInType},
@@ -93,23 +96,32 @@ class Tokenizer {
         auto begin = pointer;
         auto first_char = _source[pointer];
 
-        if(first_char == ',') {
-            pointer += 1;
-            type = Token::Type::Control;
-        } else if(is(first_char, binary_operators)) {
-            pointer += 1;
-            type = Token::Type::Operator;
-        } else if(is(first_char, control_characters)) {
-            pointer += 1;
-            type = Token::Type::Control;
-        } else if(is_digit(first_char)) {
-            while(is_digit(_source[pointer]) && pointer < _source.length())
-                ++pointer;
-            type = Token::Type::Digits;
-        } else {
-            while(is_allowed_in_identifiers(_source[pointer]) && pointer < _source.length()) {
-                ++pointer;
+        // FIXME: Should be more specific
+        if(!is_allowed_in_identifiers(first_char)) {
+            if(first_char == ',') {
+                pointer += 1;
+                type = Token::Type::Control;
+            } else if(is(first_char, control_characters)) {
+                pointer += 1;
+                type = Token::Type::Control;
+
+            } else if(is_digit(first_char)) {
+                while(is_digit(_source[pointer]) && pointer < _source.length())
+                    ++pointer;
+                type = Token::Type::Digits;
+            } else {
+                // Binary Operators
+                // FIXME
+                while(!is_discardable(_source[pointer]) && pointer < _source.length())
+                    ++pointer;
+                if(binary_operators.contains({_source.begin() + begin, _source.begin() + pointer})) {
+                    type = Token::Type::Operator;
+                }
             }
+        } else {
+            while(is_allowed_in_identifiers(_source[pointer]) && pointer < _source.length())
+                ++pointer;
+
             const std::string str{_source.begin() + begin, _source.begin() + pointer}; // Having to construct a string here isn't great.
             if(keywords.contains(str))
                 type = keywords.at(str);

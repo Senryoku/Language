@@ -8,12 +8,13 @@ class Scope {
   public:
     bool declare_variable(GenericValue::Type type, const std::string_view& name, size_t line = 0) {
         if(is_declared(name)) {
-            error("Error on line {}: Variable '{}' already declared.\n", line, name);
+            error("[Scope] Error on line {}: Variable '{}' already declared.\n", line, name);
             return false;
         }
         switch(type) {
             case GenericValue::Type::Integer: _variables[std::string{name}] = Variable{Variable::Type::Integer}; break;
-            default: error("Error on line {}: Unimplemented type '{}'.\n", line, type);
+            case GenericValue::Type::Bool: _variables[std::string{name}] = Variable{Variable::Type::Bool}; break;
+            default: error("[Scope] Error on line {}: Unimplemented type '{}'.\n", line, type);
         }
         return true;
     }

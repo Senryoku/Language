@@ -20,7 +20,7 @@ int main() {
             return rhs * lhs;
         })"},
         {true, R"(int i = 5;
-        while(i) {
+        while(i > 0) {
             i = i - 1;
         })"},
         {false, R"(int a = 1 + 2;)"},
@@ -49,7 +49,7 @@ int main() {
             Parser parser;
             auto   ast = parser.parse(tokens);
             if(ast.has_value()) {
-                //  Do something :)
+                fmt::print("{}", ast);
             }
         }
     }

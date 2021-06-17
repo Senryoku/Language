@@ -132,6 +132,8 @@ struct fmt::formatter<AST::Node> {
             r = format_to(ctx.out(), "Node({}:{}) : {}\n", t.type, t.token.value, t.value);
         } else if(t.type == AST::Node::Type::FunctionDeclaration) {
             r = format_to(ctx.out(), "Node({}:{}) : {}\n", t.type, t.value.value.as_string, t.token);
+        } else if(t.type == AST::Node::Type::BinaryOperator) {
+            r = format_to(ctx.out(), "Node({}:{}) : {}\n", t.type, t.value.type, t.token);
         } else if(t.token.type == Tokenizer::Token::Type::Unknown) {
             r = format_to(ctx.out(), "Node({})\n", t.type);
         } else

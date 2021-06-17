@@ -21,9 +21,19 @@ class Interpreter : public Scoped {
     GenericValue execute(const AST::Node& node) {
         switch(node.type) {
             using enum AST::Node::Type;
-            case Root: {
+            case Root:
+            case Scope: {
                 for(const auto& child : node.children)
                     execute(*child);
+                break;
+            }
+            case WhileStatement: {
+                auto condition = execute(*node.children[0]);
+                while(condition.value.as_bool) {
+                    execute(*node.children[1]);
+                    condition = execute(*node.children[0]);
+                }
+                return node.value; // FIXME
                 break;
             }
             case VariableDeclaration: {
@@ -53,24 +63,35 @@ class Interpreter : public Scoped {
                         break;
                     }
                     if(is_assignable(node.children[0]->value.type, node.children[1]->value.type)) {
-                        auto& v = get_scope()[node.children[0]->token.value];
+                        GenericValue* v = get(node.children[0]->token.value);
+                        assert(v);
                         // TODO: Handle others types and implicit conversions.
-                        v.value.as_int32_t = rhs.value.as_int32_t;
-                        _return_value.type = v.type;
-                        _return_value.value = v.value;
+                        v->value.as_int32_t = rhs.value.as_int32_t;
+                        _return_value.type = v->type;
+                        _return_value.value = v->value;
                     }
                     break;
                 }
 
                 // TODO: Abstract this. (GenericValue operators? Free function(s) ?)
                 if(lhs.type == GenericValue::Type::Integer && rhs.type == GenericValue::Type::Integer) {
-                    _return_value.type = GenericValue::Type::Integer;
-                    switch(node.token.value[0]) {
-                        case '+': _return_value.value.as_int32_t = lhs.value.as_int32_t + rhs.value.as_int32_t; break;
-                        case '-': _return_value.value.as_int32_t = lhs.value.as_int32_t - rhs.value.as_int32_t; break;
-                        case '*': _return_value.value.as_int32_t = lhs.value.as_int32_t * rhs.value.as_int32_t; break;
-                        case '/': _return_value.value.as_int32_t = lhs.value.as_int32_t / rhs.value.as_int32_t; break;
-                        default: error("BinaryOperator: Unsupported operation ('{}') on Integer.\n", node.token.value);
+                    if(node.token.value.length() == 1) {
+                        _return_value.type = GenericValue::Type::Integer;
+                        switch(node.token.value[0]) {
+                            case '+': _return_value.value.as_int32_t = lhs.value.as_int32_t + rhs.value.as_int32_t; break;
+                            case '-': _return_value.value.as_int32_t = lhs.value.as_int32_t - rhs.value.as_int32_t; break;
+                            case '*': _return_value.value.as_int32_t = lhs.value.as_int32_t * rhs.value.as_int32_t; break;
+                            case '/': _return_value.value.as_int32_t = lhs.value.as_int32_t / rhs.value.as_int32_t; break;
+                            case '<':
+                                _return_value.type = GenericValue::Type::Bool;
+                                _return_value.value.as_bool = lhs.value.as_int32_t < rhs.value.as_int32_t;
+                                break;
+                            case '>':
+                                _return_value.type = GenericValue::Type::Bool;
+                                _return_value.value.as_bool = lhs.value.as_int32_t > rhs.value.as_int32_t;
+                                break;
+                            default: error("BinaryOperator: Unsupported operation ('{}') on Integer.\n", node.token.value);
+                        }
                     }
                     return _return_value;
                 }
@@ -80,6 +101,16 @@ class Interpreter : public Scoped {
             }
             case ConstantValue: {
                 _return_value = node.value;
+                break;
+            }
+            case ReturnStatement: {
+                assert(node.children.size() == 1);
+                const auto result = execute(*node.children[0]);
+                _return_value = result;
+                break;
+            }
+            default: {
+                warn("[Interpreter] Unimplemented Node type : {}.\n", node.type);
                 break;
             }
         }
