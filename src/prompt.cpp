@@ -32,6 +32,7 @@ int main() {
             Parser parser;
             auto   ast = parser.parse(tokens);
             if(ast.has_value()) {
+                fmt::print("{}", *ast);
                 fmt::print("Executing using Interpreter...\n");
                 auto        clock = std::chrono::steady_clock();
                 auto        start = clock.now();

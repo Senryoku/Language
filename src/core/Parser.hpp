@@ -78,37 +78,62 @@ class Parser : public Scoped {
 
     // TODO: Formely define wtf is an expression :)
     bool parse_next_expression(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode, uint8_t precedence) {
-        const auto& begin = it;
-        auto        end = begin + 1;
-
         bool search_for_matching_bracket = false;
         if(it->type == Tokenizer::Token::Type::Control && it->value == "(") {
             precedence = 0;
+            ++it;
             search_for_matching_bracket = true;
         }
 
-        uint32_t opened_brackets = 0;
-        while(end != tokens.end() && end->value != ";") {
+        auto exprNode = currNode->add_child(new AST::Node(AST::Node::Type::Expression));
+
+        bool stop = false;
+
+        while(it != tokens.end() && it->value != ";" && !stop) {
             // TODO: Check other types!
-            if(end->type == Tokenizer::Token::Type::Operator && operator_precedence.at(std::string(end->value)) <= precedence)
-                break;
-            if(end->type == Tokenizer::Token::Type::Control && end->value == "(")
-                ++opened_brackets;
-            if(end->type == Tokenizer::Token::Type::Control && end->value == ")") {
-                if(search_for_matching_bracket && opened_brackets == 0)
+            switch(it->type) {
+                using enum Tokenizer::Token::Type;
+                case Digits: {
+                    if(!parse_digits(tokens, it, exprNode))
+                        return false;
                     break;
-                --opened_brackets;
+                }
+                case Identifier: {
+                    if(!parse_identifier(tokens, it, exprNode))
+                        return false;
+                    break;
+                }
+                case Operator: {
+                    auto p = operator_precedence.at(std::string(it->value));
+                    if(p >= precedence) {
+                        if(!parse_binary_operator(tokens, it, exprNode))
+                            return false;
+                    } else {
+                        stop = true;
+                    }
+                    break;
+                }
+                case Control: {
+                    if(it->value == "(") {
+                        if(!parse_next_expression(tokens, it, exprNode, 0))
+                            return false;
+                    } else if(it->value == ")") {
+                        stop = true;
+                    }
+                    break;
+                }
+                default: {
+                    warn("[parse_next_expression] Unexpected Token Type '{}'.", it->type);
+                    return false;
+                    break;
+                }
             }
-            ++end;
         }
 
-        if(search_for_matching_bracket && (end == tokens.end() || end->value != ")")) {
+        if(search_for_matching_bracket && (it == tokens.end() || it->value != ")")) {
             error("Unmatched '(' on line {}.\n", it->line);
             return false;
         }
-
-        auto exprNode = currNode->add_child(new AST::Node(AST::Node::Type::Expression));
-        auto result = parse({search_for_matching_bracket ? begin + 1 : begin, end}, exprNode);
 
         // Evaluate Expression final return type
         // FIXME
@@ -116,11 +141,23 @@ class Parser : public Scoped {
             exprNode->value.type = exprNode->children[0]->value.type;
 
         if(search_for_matching_bracket) // Skip ending bracket
-            ++end;
+            ++it;
 
-        it = end;
+        return true;
+    }
 
-        return result;
+    bool parse_identifier(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode) {
+        auto maybe_variable = get(it->value);
+        if(!maybe_variable) {
+            error("Syntax Error: Variable '{}' has not been declared.\n", it->value);
+            return false;
+        }
+
+        const auto& variable = *maybe_variable;
+        auto        varNode = currNode->add_child(new AST::Node(AST::Node::Type::Variable, *it));
+        varNode->value.type = variable.type;
+        ++it;
+        return true;
     }
 
     bool parse_while(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode) {
@@ -201,6 +238,40 @@ class Parser : public Scoped {
 
         pop_scope();
 
+        return true;
+    }
+
+    bool parse_digits(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode) {
+        auto integer = currNode->add_child(new AST::Node(AST::Node::Type::ConstantValue, *it));
+        integer->value.type = GenericValue::Type::Integer;
+        auto result = std::from_chars(&*(it->value.begin()), &*(it->value.begin()) + it->value.length(), integer->value.value.as_int32_t);
+        ++it;
+        return true;
+    }
+
+    bool parse_binary_operator(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode) {
+        if(currNode->children.empty()) {
+            error("Syntax error: unexpected binary operator: {}.\n", *it);
+            return false;
+        }
+        AST::Node* prevExpr = currNode->pop_child();
+        // TODO: Test type of previous node! (Must be an expression resolving to something operable)
+        AST::Node* binaryOperatorNode = currNode->add_child(new AST::Node(AST::Node::Type::BinaryOperator, *it));
+
+        binaryOperatorNode->add_child(prevExpr);
+
+        auto precedence = operator_precedence.at(std::string(it->value));
+        if((it + 1) == tokens.end()) {
+            error("Syntax error: Reached end of document without a right-hand side operand for {} on line {}.\n", it->value, it->line);
+            return false;
+        }
+        ++it;
+        // Lookahead for rhs
+        if(!parse_next_expression(tokens, it, binaryOperatorNode, precedence))
+            return false;
+        // TODO: Test if types are compatible (with the operator and between each other)
+
+        resolve_operator_type(binaryOperatorNode);
         return true;
     }
 
@@ -312,56 +383,25 @@ class Parser : public Scoped {
                     break;
                 }
                 case Tokenizer::Token::Type::Return: {
+                    auto returnNode = currNode->add_child(new AST::Node(AST::Node::Type::ReturnStatement, *it));
                     ++it;
-                    auto returnNode = currNode->add_child(new AST::Node(AST::Node::Type::ReturnStatement));
                     if(!parse_next_expression(tokens, it, returnNode, 0))
                         return false;
                     break;
                 }
                 case Tokenizer::Token::Type::Digits: {
-                    auto integer = currNode->add_child(new AST::Node(AST::Node::Type::ConstantValue, *it));
-                    integer->value.type = GenericValue::Type::Integer;
-                    auto result = std::from_chars(&*(it->value.begin()), &*(it->value.begin()) + it->value.length(), integer->value.value.as_int32_t);
-                    ++it;
+                    if(!parse_digits(tokens, it, currNode))
+                        return false;
                     break;
                 }
                 case Tokenizer::Token::Type::Operator: {
-                    if(currNode->children.empty()) {
-                        error("Syntax error: unexpected binary operator: {}.\n", *it);
+                    if(!parse_binary_operator(tokens, it, currNode))
                         return false;
-                    }
-                    AST::Node* prevExpr = currNode->pop_child();
-                    // TODO: Test type of previous node! (Must be an expression resolving to something operable)
-                    AST::Node* binaryOperatorNode = currNode->add_child(new AST::Node(AST::Node::Type::BinaryOperator, *it));
-
-                    binaryOperatorNode->add_child(prevExpr);
-
-                    auto precedence = operator_precedence.at(std::string(it->value));
-                    if((it + 1) == tokens.end()) {
-                        error("Syntax error: Reached end of document without a right-hand side operand for {} on line {}.\n", it->value, it->line);
-                        return false;
-                    }
-                    ++it;
-                    // Lookahead for rhs
-                    if(!parse_next_expression(tokens, it, binaryOperatorNode, precedence))
-                        return false;
-                    // TODO: Test if types are compatible (with the operator and between each other)
-
-                    resolve_operator_type(binaryOperatorNode);
-
                     break;
                 }
                 case Tokenizer::Token::Type::Identifier: {
-                    auto maybe_variable = get(it->value);
-                    if(!maybe_variable) {
-                        error("Syntax Error: Variable '{}' has not been declared.\n", it->value);
+                    if(!parse_identifier(tokens, it, currNode))
                         return false;
-                    }
-
-                    const auto& variable = *maybe_variable;
-                    auto        varNode = currNode->add_child(new AST::Node(AST::Node::Type::Variable, *it));
-                    varNode->value.type = variable.type;
-                    ++it;
                     break;
                 }
                 case Tokenizer::Token::Type::While: {

@@ -27,29 +27,50 @@ void tokenize(const char* filepath, std::vector<Tokenizer::Token>& tokens, std::
     EXPECT_GT(tokens.size(), 0);
 }
 
-TEST(Arithmetic, Basic) {
-    std::string                   source;
-    std::vector<Tokenizer::Token> tokens;
-    tokenize("basic/arithmetic.lang", tokens, source);
-
-    Parser parser;
-    auto   ast = parser.parse(tokens);
-    ASSERT_TRUE(ast.has_value());
-
-    Interpreter interpreter;
+#define PARSE_INTERP(code)                           \
+    std::string                   source{code};      \
+    std::vector<Tokenizer::Token> tokens;            \
+    Tokenizer                     tokenizer(source); \
+    while(tokenizer.has_more())                      \
+        tokens.push_back(tokenizer.consume());       \
+    EXPECT_GT(tokens.size(), 0);                     \
+    Parser parser;                                   \
+    auto   ast = parser.parse(tokens);               \
+    ASSERT_TRUE(ast.has_value());                    \
+    Interpreter interpreter;                         \
     interpreter.execute(*ast);
+
+#define LOAD_PARSE_INTERP(path)           \
+    std::string                   source; \
+    std::vector<Tokenizer::Token> tokens; \
+    tokenize(path, tokens, source);       \
+    Parser parser;                        \
+    auto   ast = parser.parse(tokens);    \
+    ASSERT_TRUE(ast.has_value());         \
+    Interpreter interpreter;              \
+    interpreter.execute(*ast);
+
+TEST(Basic, Add) {
+    PARSE_INTERP("return 25 + 97;");
+    EXPECT_EQ(interpreter.get_return_value().value.as_int32_t, 122);
+}
+
+TEST(Basic, Sub) {
+    PARSE_INTERP("return 57 - 26;");
+    EXPECT_EQ(interpreter.get_return_value().value.as_int32_t, 31);
+}
+
+TEST(Basic, Expression) {
+    PARSE_INTERP("return 125 * 45 + 24 / (4 + 3) - 5;");
+    EXPECT_EQ(interpreter.get_return_value().value.as_int32_t, 5623);
+}
+
+TEST(Basic, Arithmetic) {
+    LOAD_PARSE_INTERP("basic/arithmetic.lang");
     EXPECT_EQ(interpreter.get_return_value().value.as_int32_t, 69); // Actually check :^)
 }
 
 TEST(Basic, While) {
-    std::string                   source;
-    std::vector<Tokenizer::Token> tokens;
-    tokenize("basic/while.lang", tokens, source);
-
-    Parser parser;
-    auto   ast = parser.parse(tokens);
-    ASSERT_TRUE(ast.has_value());
-    Interpreter interpreter;
-    interpreter.execute(*ast);
+    LOAD_PARSE_INTERP("basic/while.lang");
     EXPECT_EQ(interpreter.get_return_value().value.as_int32_t, 10);
 }

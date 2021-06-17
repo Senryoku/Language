@@ -16,26 +16,13 @@ int main() {
     };
 
     std::vector<Test> tests{
-        {true, R"(function multiply(int rhs, int lhs) {
-            return rhs * lhs;
-        })"},
         {true, R"(int i = 5;
         while(i > 0) {
             i = i - 1;
         })"},
-        {false, R"(int a = 1 + 2;)"},
-        {false, R"(int b = 2 * 2 + 3 + 8 * 6;)"},
-        {false, R"(
-	    int a = 0;
-        if(a) {
-            int b = 0;
+        {true, R"(function multiply(int rhs, int lhs) {
+            return rhs * lhs;
         })"},
-        {false, R"(
-        int a = 2;
-        int     b = 5;
-        int     c = a * b;
-        int     d = c + 8;
-        int     e = 2 * a * b + 4 + 4 * c + 5;)"},
     };
 
     for(const auto& t : tests) {
@@ -49,7 +36,7 @@ int main() {
             Parser parser;
             auto   ast = parser.parse(tokens);
             if(ast.has_value()) {
-                fmt::print("{}", ast);
+                fmt::print("{}", *ast);
             }
         }
     }
