@@ -29,7 +29,7 @@ AST::Node* AST::optimize(AST::Node* currNode) {
             assert(rhs->children.size() == 0);
 
             if(lhs->value.type == GenericValue::Type::Integer && rhs->value.type == GenericValue::Type::Integer) {
-                constexpr auto apply = [&](int32_t res) {
+                auto apply = [&](int32_t res) {
                     currNode->children.clear();
                     delete currNode;
                     currNode = new AST::Node(AST::Node::Type::ConstantValue);
