@@ -122,7 +122,7 @@ class Interpreter : public Scoped {
         return _return_value;
     }
 
-    const const GenericValue& get_return_value() const { return _return_value; }
+    const GenericValue& get_return_value() const { return _return_value; }
 
   private:
     GenericValue _return_value; // FIXME: Probably not the right move!

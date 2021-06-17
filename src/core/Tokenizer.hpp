@@ -72,7 +72,7 @@ class Tokenizer {
         ';', '(', ')', '{', '}', '[', ']',
     };
 
-    template <int N>
+    template <size_t N>
     static bool is(char c, std::array<char, N> arr) {
         for(const auto& s : arr)
             if(s == c)
