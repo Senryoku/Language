@@ -15,7 +15,7 @@ struct StringView {
         size = sv.length();
         return *this;
     }
-    std::string_view to_std_string_view() const { return std::string_view(begin, begin + size); }
+    std::string_view to_std_string_view() const { return std::string_view(begin, size); }
 };
 
 union ValueUnion {
