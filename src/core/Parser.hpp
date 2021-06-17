@@ -22,7 +22,8 @@ class Parser : public Scoped {
 
     // FIXME: For many reasons (string creations...) Just correctly type the node from the start (i.e. token stage) I guess?
     inline static const std::unordered_map<std::string, uint8_t> operator_precedence{
-        {"=", 0}, {"==", 1}, {"!=", 1}, {">", 1}, {"<", 1}, {">=", 1}, {"<=", 1}, {"+", 2}, {"-", 2}, {"*", 3}, {"/", 3}, {"^", 4},
+        {"=", (uint8_t)0},  {"==", (uint8_t)1}, {"!=", (uint8_t)1}, {">", (uint8_t)1}, {"<", (uint8_t)1}, {">=", (uint8_t)1},
+        {"<=", (uint8_t)1}, {"+", (uint8_t)2},  {"-", (uint8_t)2},  {"*", (uint8_t)3}, {"/", (uint8_t)3}, {"^", (uint8_t)4},
     };
 
     void resolve_operator_type(AST::Node* binaryOp) {
@@ -89,7 +90,7 @@ class Parser : public Scoped {
 
         bool stop = false;
 
-        while(it != tokens.end() && it->value != ";" && !stop) {
+        while(it != tokens.end() && it->value != ";" && it->value != "," && !stop) {
             // TODO: Check other types!
             switch(it->type) {
                 using enum Tokenizer::Token::Type;
@@ -147,16 +148,51 @@ class Parser : public Scoped {
     }
 
     bool parse_identifier(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode) {
-        auto maybe_variable = get(it->value);
-        if(!maybe_variable) {
-            error("Syntax Error: Variable '{}' has not been declared.\n", it->value);
-            return false;
-        }
+        // Function Call
+        if(it + 1 != tokens.end() && (it + 1)->value == "(") {
+            // TODO: Check if the function has been declared (or is a built-in?) & Fetch corresponding FunctionDeclaration Node.
+            auto callNode = currNode->add_child(new AST::Node(AST::Node::Type::FunctionCall, *it));
+            it += 2;
+            // Parse arguments
+            while(it != tokens.end() && it->value != ")") {
+                if(!parse_next_expression(tokens, it, callNode, 0))
+                    return false;
+                if(it != tokens.end() && it->value == ",")
+                    ++it;
+            }
+            if(it == tokens.end()) {
+                error("Syntax error: Unmatched '(' on line {}, got to end-of-file.\n", it->line);
+                return false;
+            } else
+                ++it;
+            return true;
+        } else { // Variable
+            auto maybe_variable = get(it->value);
+            if(!maybe_variable) {
+                error("Syntax Error: Variable '{}' has not been declared.\n", it->value);
+                return false;
+            }
 
-        const auto& variable = *maybe_variable;
-        auto        varNode = currNode->add_child(new AST::Node(AST::Node::Type::Variable, *it));
-        varNode->value.type = variable.type;
-        ++it;
+            const auto& variable = *maybe_variable;
+            auto        varNode = currNode->add_child(new AST::Node(AST::Node::Type::Variable, *it));
+            varNode->value.type = variable.type;
+            ++it;
+            return true;
+        }
+    }
+
+    bool parse_scope_or_single_statement(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode) {
+        if(it->value == "{") {
+            if(!parse_next_scope(tokens, it, currNode))
+                return false;
+        } else {
+            // FIXME: Probably
+            auto end = it;
+            while(end != tokens.end() && end->value != ";")
+                ++end;
+            if(!parse({it, end}, currNode))
+                return false;
+        }
         return true;
     }
 
@@ -172,21 +208,12 @@ class Parser : public Scoped {
             return false;
 
         if(it == tokens.end()) {
-            error("Expected while body on line {}, got end-of-file.", it->line);
+            error("Expected while body on line {}, got end-of-file.\n", it->line);
             return false;
         }
 
-        if(it->value == "{") {
-            if(!parse_next_scope(tokens, it, whileNode))
-                return false;
-        } else {
-            // FIXME: Probably
-            auto end = it;
-            while(end != tokens.end() && end->value != ";")
-                ++end;
-            if(!parse({it, end}, whileNode))
-                return false;
-        }
+        if(!parse_scope_or_single_statement(tokens, it, whileNode))
+            return false;
         return true;
     }
 
@@ -420,5 +447,6 @@ class Parser : public Scoped {
                     break;
             }
         }
+        return true;
     }
 };

@@ -60,9 +60,10 @@ class Scoped {
         auto val = it->find(name);
         while(it != _scopes.rend() && !it->is_valid(val)) {
             it++;
-            val = it->find(name);
+            if(it != _scopes.rend())
+                val = it->find(name);
         }
-        return it->is_valid(val) ? &val->second : nullptr;
+        return it != _scopes.rend() && it->is_valid(val) ? &val->second : nullptr;
     }
     inline const Variable* get(const std::string_view& name) const {
         auto it = _scopes.rbegin();
@@ -72,7 +73,7 @@ class Scoped {
             if(it != _scopes.rend())
                 val = it->find(name);
         }
-        return it->is_valid(val) ? &val->second : nullptr;
+        return it != _scopes.rend() && it->is_valid(val) ? &val->second : nullptr;
     }
 
     bool is_declared(const std::string_view& name) const { return get(name) != nullptr; }

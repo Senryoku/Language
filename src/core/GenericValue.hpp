@@ -12,7 +12,7 @@ struct StringView {
 
     StringView& operator=(const std::string_view& sv) {
         begin = sv.data();
-        size = sv.length();
+        size = static_cast<uint32_t>(sv.length());
         return *this;
     }
     std::string_view to_std_string_view() const { return std::string_view(begin, size); }

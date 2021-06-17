@@ -23,6 +23,7 @@ class AST {
             ReturnStatement,
             VariableDeclaration,
             FunctionDeclaration,
+            FunctionCall,
             Variable,
             ConstantValue,
             BinaryOperator,
@@ -167,6 +168,7 @@ struct fmt::formatter<AST::Node::Type> {
             case AST::Node::Type::Scope: return format_to(ctx.out(), "{}", "Scope {");
             case AST::Node::Type::VariableDeclaration: return format_to(ctx.out(), fg(fmt::color::light_blue), "{}", "VariableDeclaration");
             case AST::Node::Type::FunctionDeclaration: return format_to(ctx.out(), fg(fmt::color::light_yellow), "{}", "FunctionDeclaration");
+            case AST::Node::Type::FunctionCall: return format_to(ctx.out(), fg(fmt::color::light_yellow), "{}", "FunctionCall");
             case AST::Node::Type::Variable: return format_to(ctx.out(), fg(fmt::color::light_blue), "{}", "Variable");
             case AST::Node::Type::ConstantValue: return format_to(ctx.out(), "{}", "ConstantValue");
             case AST::Node::Type::BinaryOperator: return format_to(ctx.out(), "{}", "BinaryOperator");
