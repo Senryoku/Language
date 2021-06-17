@@ -13,10 +13,8 @@
 #include <Parser.hpp>
 #include <Tokenizer.hpp>
 
-const std::string PathPrefix = "H:/Source/Lang/test/"; // FIXME: This is a workaround for VS not honoring the WORKING_DIRECTORY setup in CMakeLists.txt
-
 void tokenize(const char* filepath, std::vector<Tokenizer::Token>& tokens, std::string& source) {
-    std::ifstream file(PathPrefix + filepath);
+    std::ifstream file(filepath);
     ASSERT_TRUE(file) << "Couldn't open test file '" << filepath << "' (Run from " << std::filesystem::current_path() << ")";
     source = std::string((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
 
