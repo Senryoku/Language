@@ -41,6 +41,33 @@ class Interpreter : public Scoped {
                 return node.value; // FIXME
                 break;
             }
+            case FunctionDeclaration: {
+                get_scope().declare_function(node);
+                return node.value; // FIXME
+                break;
+            }
+            case FunctionCall: {
+                auto functionNode = get_function(node.token.value);
+                if(!functionNode) {
+                    error("Runtime error: function {} as not been declared in this scope (line {}).\n", node.token.value, node.token.line);
+                    break;
+                }
+                // TODO: Check arguments count and type
+                push_scope();
+                // Execute and bind arguments (Last child in functionNode is the function body)
+                for(size_t i = 0; i < functionNode->children.size() - 1; ++i) {
+                    // Declare arguments
+                    // TODO: Default values (?)
+                    execute(*functionNode->children[i]);
+                    // Bind value
+                    auto arg_value = execute(*node.children[i]);
+                    get_scope().get(functionNode->children[i]->value.value.as_string.to_std_string_view()) = arg_value;
+                }
+                execute(*functionNode->children.back());
+                pop_scope();
+                return _return_value;
+                break;
+            }
             case VariableDeclaration: {
                 assert(!get_scope().is_declared(node.token.value));
                 get_scope().declare_variable(node.value.type, node.value.value.as_string.to_std_string_view());

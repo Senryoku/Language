@@ -3,9 +3,29 @@
 #include <vector>
 
 #include <VariableStore.hpp>
+#include <het_unordered_map.hpp>
 
 class Scope {
   public:
+    struct FunctionDeclaration {
+        const AST::Node* node;
+    };
+
+    bool declare_function(const AST::Node& node) {
+        auto sv = node.value.value.as_string.to_std_string_view();
+        if(is_valid(find_function(sv))) {
+            error("Parsing error: function {} already declared in this scope.\n", sv);
+            return false;
+        }
+        // TODO: Check & warn shadowing from other scopes?
+        _functions[std::string{sv}] = {.node = &node};
+        return true;
+    }
+
+    bool                                             is_valid(const het_unordered_map<FunctionDeclaration>::iterator& it) const { return it != _functions.end(); }
+    het_unordered_map<FunctionDeclaration>::iterator find_function(const std::string_view& name) { return _functions.find(name); }
+    const AST::Node*                                 get_function(const std::string_view& name) { return _functions.find(name)->second.node; }
+
     bool declare_variable(GenericValue::Type type, const std::string_view& name, size_t line = 0) {
         if(is_declared(name)) {
             error("[Scope] Error on line {}: Variable '{}' already declared.\n", line, name);
@@ -35,7 +55,8 @@ class Scope {
 
   private:
     // FIXME: At some point we'll have ton consolidate these string_view to their final home... Maybe the lexer should have done it already.
-    VariableStore _variables;
+    VariableStore                          _variables;
+    het_unordered_map<FunctionDeclaration> _functions;
 };
 
 // TODO: Fetch variables from others scopes
@@ -51,11 +72,22 @@ class Scoped {
 
     void pop_scope() { _scopes.pop_back(); }
 
+    const AST::Node* get_function(const std::string_view& name) {
+        auto it = _scopes.rbegin();
+        auto val = it->find_function(name);
+        while(it != _scopes.rend() && !it->is_valid(val)) {
+            it++;
+            if(it != _scopes.rend())
+                val = it->find_function(name);
+        }
+        return it != _scopes.rend() && it->is_valid(val) ? val->second.node : nullptr;
+    }
+
     /*
     inline std::optional<Variable&>       operator[](const std::string_view& name) { return get(name); }
     inline std::optional<const Variable&> operator[](const std::string_view& name) const { return get(name); }
     */
-    inline Variable* get(const std::string_view& name) {
+    Variable* get(const std::string_view& name) {
         auto it = _scopes.rbegin();
         auto val = it->find(name);
         while(it != _scopes.rend() && !it->is_valid(val)) {
@@ -65,7 +97,7 @@ class Scoped {
         }
         return it != _scopes.rend() && it->is_valid(val) ? &val->second : nullptr;
     }
-    inline const Variable* get(const std::string_view& name) const {
+    const Variable* get(const std::string_view& name) const {
         auto it = _scopes.rbegin();
         auto val = it->find(name);
         while(it != _scopes.rend() && !it->is_valid(val)) {

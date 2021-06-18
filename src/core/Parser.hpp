@@ -234,12 +234,18 @@ class Parser : public Scoped {
 
         push_scope(); // FIXME: Restrict function parameters to this scope, do better.
 
+        ++it;
         // Parse parameters
-        do {
-            ++it;
+        while(it != tokens.end() && it->value != ")") {
             if(!parse_variable_declaration(tokens, it, functionNode))
                 return false;
-        } while(it != tokens.end() && it->value == ",");
+            if(it->value == ",")
+                ++it;
+            else if(it->value != ")") {
+                error("Expected ',' in function declaration argument list on line {}, got {}.\n", it->line, it->value);
+                return false;
+            }
+        }
         if(it == tokens.end() || it->value != ")") {
             error("Unmatched '(' in function declaration on line {}.\n", it->line);
             return false;
