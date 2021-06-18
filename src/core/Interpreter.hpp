@@ -23,22 +23,25 @@ class Interpreter : public Scoped {
             using enum AST::Node::Type;
             case Root:
             case Scope: {
-                for(const auto& child : node.children)
+                for(const auto& child : node.children) {
                     execute(*child);
+                    if(_returning_value)
+                        break;
+                }
                 break;
             }
             case Expression: {
-                auto value = execute(*node.children[0]);
-                return value;
+                return execute(*node.children[0]);
                 break;
             }
             case WhileStatement: {
                 auto condition = execute(*node.children[0]);
                 while(condition.value.as_bool) {
                     execute(*node.children[1]);
+                    if(_returning_value)
+                        break;
                     condition = execute(*node.children[0]);
                 }
-                return _return_value;
                 break;
             }
             case IfStatement: {
@@ -46,12 +49,10 @@ class Interpreter : public Scoped {
                 if(condition.value.as_bool) {
                     execute(*node.children[1]);
                 }
-                return _return_value;
                 break;
             }
             case FunctionDeclaration: {
                 get_scope().declare_function(node);
-                return _return_value;
                 break;
             }
             case FunctionCall: {
@@ -73,7 +74,10 @@ class Interpreter : public Scoped {
                 }
                 execute(*functionNode->children.back());
                 pop_scope();
-                return _return_value;
+                if(_returning_value) {
+                    _returning_value = false;
+                    return _return_value;
+                }
                 break;
             }
             case VariableDeclaration: {
@@ -151,6 +155,7 @@ class Interpreter : public Scoped {
                 assert(node.children.size() == 1);
                 const auto result = execute(*node.children[0]);
                 _return_value = result;
+                _returning_value = true;
                 break;
             }
             default: {
@@ -164,5 +169,6 @@ class Interpreter : public Scoped {
     const GenericValue& get_return_value() const { return _return_value; }
 
   private:
+    bool         _returning_value = false;
     GenericValue _return_value; // FIXME: Probably not the right move!
 };

@@ -116,3 +116,36 @@ TEST(Function, DeclarationAndCall) {
     LOAD_PARSE_INTERP("function/call.lang");
     EXPECT_EQ(interpreter.get_return_value().value.as_int32_t, 18 * 48);
 }
+
+bool is_prime(int number) {
+    if(number < 2)
+        return false;
+    if(number == 2)
+        return true;
+    if(number % 2 == 0)
+        return false;
+    for(int i = 3; (i * i) <= number; i += 2)
+        if(number % i == 0)
+            return false;
+    return true;
+}
+
+TEST(Function, isPrime) {
+    LOAD_PARSE_INTERP("function/prime.lang");
+    ast->optimize();
+    for(uint32_t i = 2; i < 200; ++i) {
+        auto      s = fmt::format("isPrime({});", i);
+        Tokenizer next_tokens(s);
+        auto      first = tokens.size();
+        while(next_tokens.has_more())
+            tokens.push_back(next_tokens.consume());
+        EXPECT_GT(tokens.size(), first);
+        auto newNodes = parser.parse(std::span<Tokenizer::Token>{tokens.begin() + first, tokens.end()}, *ast);
+        ASSERT_TRUE(newNodes.size() > 0);
+        for(auto node : newNodes) {
+            interpreter.execute(*node);
+        }
+        interpreter.execute(*ast);
+        EXPECT_EQ(interpreter.get_return_value().value.as_bool, is_prime(i));
+    }
+}
