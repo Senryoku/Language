@@ -52,6 +52,137 @@ class Parser : public Scoped {
         return ast;
     }
 
+    // Append to an existing AST and return the added children
+    std::span<AST::Node*> parse(const std::span<Tokenizer::Token>& tokens, AST& ast) {
+        auto first = ast.getRoot().children.size();
+        bool r = parse(tokens, &(ast.getRoot()));
+        if(!r)
+            error("Error while parsing!\n");
+        return std::span<AST::Node*>{ast.getRoot().children.begin() + first, ast.getRoot().children.end()};
+    }
+
+    bool parse(const std::span<Tokenizer::Token>& tokens, AST::Node* currNode) {
+        auto it = tokens.begin();
+        while(it != tokens.end()) {
+            const auto& token = *it;
+            switch(token.type) {
+                case Tokenizer::Token::Type::Control: {
+                    switch(token.value[0]) {
+                        case '{': { // Open a new scope
+                            currNode = currNode->add_child(new AST::Node(AST::Node::Type::Scope, *it));
+                            push_scope();
+                            ++it;
+                            break;
+                        }
+                        case '}': { // Close nearest scope
+                            while(currNode->type != AST::Node::Type::Scope && currNode->parent != nullptr)
+                                currNode = currNode->parent;
+                            if(currNode->type != AST::Node::Type::Scope) {
+                                error("Syntax error: Unmatched '}' one line {}.\n", it->line);
+                                return false;
+                            }
+                            currNode = currNode->parent;
+                            pop_scope();
+                            ++it;
+                            break;
+                        }
+                        case '(': {
+                            if(!parse_next_expression(tokens, it, currNode, 0))
+                                return false;
+                            break;
+                        }
+                        case ')': error("Unmatched ')' on line {}.\n", it->line); return false;
+                        case ';': // Just do nothing
+                            ++it;
+                            break;
+                        default:
+                            warn("Unused token: {}.\n", *it);
+                            ++it;
+                            break;
+                    }
+                    break;
+                }
+                case Tokenizer::Token::Type::If: {
+                    if(it + 1 == tokens.end() || (it + 1)->value != "(") {
+                        error("Syntax error: expected '(' after 'if'.\n");
+                        return false;
+                    }
+
+                    // TODO: Abstract this ("parse_next_expression"?)
+                    auto begin = it + 1;
+                    auto end = begin + 1;
+                    while(end != tokens.end() && end->value != ")")
+                        ++end;
+                    if(end == tokens.end()) {
+                        error("Syntax error: no matching ')'.\n");
+                        return false;
+                    }
+
+                    auto ifNode = currNode->add_child(new AST::Node(AST::Node::Type::IfStatement));
+                    auto expr = ifNode->add_child(new AST::Node(AST::Node::Type::Expression)); // TODO: Should be re-using something else
+                    if(!parse({begin + 1, end}, expr))
+                        return false;
+
+                    it = end + 1;
+
+                    if(!parse_next_scope(tokens, it, ifNode)) {
+                        error("Syntax error: expected 'new scope' after 'if'.\n");
+                        return false;
+                    }
+                    // TODO: Handle Else here?
+
+                    break;
+                }
+                case Tokenizer::Token::Type::BuiltInType: {
+                    if(!parse_variable_declaration(tokens, it, currNode))
+                        return false;
+                    break;
+                }
+                case Tokenizer::Token::Type::Return: {
+                    auto returnNode = currNode->add_child(new AST::Node(AST::Node::Type::ReturnStatement, *it));
+                    ++it;
+                    if(!parse_next_expression(tokens, it, returnNode, 0)) {
+                        delete returnNode;
+                        currNode->children.pop_back();
+                        return false;
+                    }
+                    break;
+                }
+                case Tokenizer::Token::Type::Digits: {
+                    if(!parse_digits(tokens, it, currNode))
+                        return false;
+                    break;
+                }
+                case Tokenizer::Token::Type::Operator: {
+                    if(!parse_binary_operator(tokens, it, currNode))
+                        return false;
+                    break;
+                }
+                case Tokenizer::Token::Type::Identifier: {
+                    if(!parse_identifier(tokens, it, currNode))
+                        return false;
+                    break;
+                }
+                case Tokenizer::Token::Type::While: {
+                    if(!parse_while(tokens, it, currNode))
+                        return false;
+                    break;
+                }
+                case Tokenizer::Token::Type::Function: {
+                    if(!parse_function_declaration(tokens, it, currNode))
+                        return false;
+                    break;
+                }
+                default:
+                    warn("Unused token: {}.\n", *it);
+                    ++it;
+                    break;
+            }
+        }
+        return true;
+    }
+
+  private:
     bool parse_next_scope(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode) {
         if(it == tokens.end() || it->value != "{") {
             if(it == tokens.end())
@@ -79,6 +210,10 @@ class Parser : public Scoped {
 
     // TODO: Formely define wtf is an expression :)
     bool parse_next_expression(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode, uint8_t precedence) {
+        if(it == tokens.end()) {
+            error("Expected expression, got end-of-file.\n");
+            return false;
+        }
         bool search_for_matching_bracket = false;
         if(it->type == Tokenizer::Token::Type::Control && it->value == "(") {
             precedence = 0;
@@ -334,124 +469,6 @@ class Parser : public Scoped {
                 break;
             }
             default: error("Syntax error: expected Identifier for variable declaration, got {}.\n", next); return false;
-        }
-        return true;
-    }
-
-    bool parse(const std::span<Tokenizer::Token>& tokens, AST::Node* currNode) {
-        auto it = tokens.begin();
-        while(it != tokens.end()) {
-            const auto& token = *it;
-            switch(token.type) {
-                case Tokenizer::Token::Type::Control: {
-                    switch(token.value[0]) {
-                        case '{': { // Open a new scope
-                            currNode = currNode->add_child(new AST::Node(AST::Node::Type::Scope, *it));
-                            push_scope();
-                            ++it;
-                            break;
-                        }
-                        case '}': { // Close nearest scope
-                            while(currNode->type != AST::Node::Type::Scope && currNode->parent != nullptr)
-                                currNode = currNode->parent;
-                            if(currNode->type != AST::Node::Type::Scope) {
-                                error("Syntax error: Unmatched '}' one line {}.\n", it->line);
-                                return false;
-                            }
-                            currNode = currNode->parent;
-                            pop_scope();
-                            ++it;
-                            break;
-                        }
-                        case '(': {
-                            if(!parse_next_expression(tokens, it, currNode, 0))
-                                return false;
-                            break;
-                        }
-                        case ')': error("Unmatched ')' on line {}.\n", it->line); return false;
-                        case ';': // Just do nothing
-                            ++it;
-                            break;
-                        default:
-                            warn("Unused token: {}.\n", *it);
-                            ++it;
-                            break;
-                    }
-                    break;
-                }
-                case Tokenizer::Token::Type::If: {
-                    if(it + 1 == tokens.end() || (it + 1)->value != "(") {
-                        error("Syntax error: expected '(' after 'if'.\n");
-                        return false;
-                    }
-
-                    // TODO: Abstract this ("parse_next_expression"?)
-                    auto begin = it + 1;
-                    auto end = begin + 1;
-                    while(end != tokens.end() && end->value != ")")
-                        ++end;
-                    if(end == tokens.end()) {
-                        error("Syntax error: no matching ')'.\n");
-                        return false;
-                    }
-
-                    auto ifNode = currNode->add_child(new AST::Node(AST::Node::Type::IfStatement));
-                    auto expr = ifNode->add_child(new AST::Node(AST::Node::Type::Expression)); // TODO: Should be re-using something else
-                    if(!parse({begin + 1, end}, expr))
-                        return false;
-
-                    it = end + 1;
-
-                    if(!parse_next_scope(tokens, it, ifNode)) {
-                        error("Syntax error: expected 'new scope' after 'if'.\n");
-                        return false;
-                    }
-                    // TODO: Handle Else here?
-
-                    break;
-                }
-                case Tokenizer::Token::Type::BuiltInType: {
-                    if(!parse_variable_declaration(tokens, it, currNode))
-                        return false;
-                    break;
-                }
-                case Tokenizer::Token::Type::Return: {
-                    auto returnNode = currNode->add_child(new AST::Node(AST::Node::Type::ReturnStatement, *it));
-                    ++it;
-                    if(!parse_next_expression(tokens, it, returnNode, 0))
-                        return false;
-                    break;
-                }
-                case Tokenizer::Token::Type::Digits: {
-                    if(!parse_digits(tokens, it, currNode))
-                        return false;
-                    break;
-                }
-                case Tokenizer::Token::Type::Operator: {
-                    if(!parse_binary_operator(tokens, it, currNode))
-                        return false;
-                    break;
-                }
-                case Tokenizer::Token::Type::Identifier: {
-                    if(!parse_identifier(tokens, it, currNode))
-                        return false;
-                    break;
-                }
-                case Tokenizer::Token::Type::While: {
-                    if(!parse_while(tokens, it, currNode))
-                        return false;
-                    break;
-                }
-                case Tokenizer::Token::Type::Function: {
-                    if(!parse_function_declaration(tokens, it, currNode))
-                        return false;
-                    break;
-                }
-                default:
-                    warn("Unused token: {}.\n", *it);
-                    ++it;
-                    break;
-            }
         }
         return true;
     }
