@@ -1,0 +1,9 @@
+function isPrime(int i) { 
+	int n = 2;
+	while(n < i) { 
+		if(n * (i / n) == i) 
+			return false; 
+		n = n + 1; 
+	} 
+	return true; 
+}

@@ -29,10 +29,24 @@ struct GenericValue {
     {
         Integer,
         String,
-        Bool,
+        Boolean,
         Composite,
         Undefined
     };
+
+    GenericValue operator==(const GenericValue& rhs) {
+        GenericValue r{.type = Type::Boolean};
+        r.value.as_bool = false;
+        if(type != rhs.type)
+            return r;
+        switch(type) {
+            case Type::Integer: r.value.as_bool = value.as_int32_t == rhs.value.as_int32_t; break;
+            case Type::String: assert(false); break; // TODO
+            case Type::Boolean: r.value.as_bool = value.as_bool == rhs.value.as_bool; break;
+            default: assert(false); break;
+        }
+        return r;
+    }
 
     Type       type;
     ValueUnion value;
@@ -43,7 +57,7 @@ inline static GenericValue::Type parse_type(const std::string_view& str) {
     if(str == "int")
         return Integer;
     else if(str == "bool")
-        return Bool;
+        return Boolean;
     return Undefined;
 }
 
@@ -76,7 +90,7 @@ struct fmt::formatter<GenericValue> {
             using enum GenericValue::Type;
             case Integer: return format_to(ctx.out(), "{}:{}", v.type, v.value.as_int32_t);
             case String: return format_to(ctx.out(), "{}:{}", v.type, v.value.as_string);
-            case Bool: return format_to(ctx.out(), "{}:{}", v.type, v.value.as_bool ? "True" : "False");
+            case Boolean: return format_to(ctx.out(), "{}:{}", v.type, v.value.as_bool ? "True" : "False");
             default: return format_to(ctx.out(), fg(fmt::color::gray), "{}", "Undefined");
         }
     }
@@ -96,7 +110,7 @@ struct fmt::formatter<GenericValue::Type> {
             using enum GenericValue::Type;
             case Integer: return format_to(ctx.out(), "{}", "Integer");
             case String: return format_to(ctx.out(), "{}", "String");
-            case Bool: return format_to(ctx.out(), "{}", "Boolean");
+            case Boolean: return format_to(ctx.out(), "{}", "Boolean");
             default: return format_to(ctx.out(), fg(fmt::color::gray), "{}", "Undefined");
         }
     }

@@ -29,7 +29,7 @@ class Interpreter : public Scoped {
             }
             case Expression: {
                 auto value = execute(*node.children[0]);
-                return value; // FIXME
+                return value;
                 break;
             }
             case WhileStatement: {
@@ -38,12 +38,20 @@ class Interpreter : public Scoped {
                     execute(*node.children[1]);
                     condition = execute(*node.children[0]);
                 }
-                return node.value; // FIXME
+                return _return_value;
+                break;
+            }
+            case IfStatement: {
+                auto condition = execute(*node.children[0]);
+                if(condition.value.as_bool) {
+                    execute(*node.children[1]);
+                }
+                return _return_value;
                 break;
             }
             case FunctionDeclaration: {
                 get_scope().declare_function(node);
-                return node.value; // FIXME
+                return _return_value;
                 break;
             }
             case FunctionCall: {
@@ -89,9 +97,9 @@ class Interpreter : public Scoped {
                 auto rhs = execute(*node.children[1]);
 
                 // Assignment (Should probably be its own Node::Type...)
-                if(node.token.value[0] == '=') {
+                if(node.token.value.length() == 1 && node.token.value[0] == '=') {
                     if(node.children[0]->type != Variable) {
-                        error("Trying to assign to something ({}) that's not a variable?", node.children[0]->token);
+                        error("[Interpreter] Trying to assign to something ({}) that's not a variable?\n", node.children[0]->token);
                         break;
                     }
                     if(is_assignable(node.children[0]->value.type, node.children[1]->value.type)) {
@@ -115,14 +123,18 @@ class Interpreter : public Scoped {
                             case '*': _return_value.value.as_int32_t = lhs.value.as_int32_t * rhs.value.as_int32_t; break;
                             case '/': _return_value.value.as_int32_t = lhs.value.as_int32_t / rhs.value.as_int32_t; break;
                             case '<':
-                                _return_value.type = GenericValue::Type::Bool;
+                                _return_value.type = GenericValue::Type::Boolean;
                                 _return_value.value.as_bool = lhs.value.as_int32_t < rhs.value.as_int32_t;
                                 break;
                             case '>':
-                                _return_value.type = GenericValue::Type::Bool;
+                                _return_value.type = GenericValue::Type::Boolean;
                                 _return_value.value.as_bool = lhs.value.as_int32_t > rhs.value.as_int32_t;
                                 break;
                             default: error("BinaryOperator: Unsupported operation ('{}') on Integer.\n", node.token.value);
+                        }
+                    } else {
+                        if(node.token.value == "==") {
+                            _return_value = lhs == rhs;
                         }
                     }
                     return _return_value;

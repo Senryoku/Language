@@ -33,7 +33,7 @@ class Scope {
         }
         switch(type) {
             case GenericValue::Type::Integer: _variables[std::string{name}] = Variable{Variable::Type::Integer}; break;
-            case GenericValue::Type::Bool: _variables[std::string{name}] = Variable{Variable::Type::Bool}; break;
+            case GenericValue::Type::Boolean: _variables[std::string{name}] = Variable{Variable::Type::Boolean}; break;
             default: error("[Scope] Error on line {}: Unimplemented type '{}'.\n", line, type);
         }
         return true;

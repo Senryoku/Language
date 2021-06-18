@@ -16,6 +16,7 @@ class Tokenizer {
             Function,
             Return,
             Digits,
+            Boolean,
             BuiltInType,
             Operator,
             Identifier,
@@ -90,8 +91,8 @@ class Tokenizer {
 
     std::unordered_map<std::string, Token::Type> keywords{
         {"function", Token::Type::Function}, {"return", Token::Type::Return},     {"if", Token::Type::If},
-        {"else", Token::Type::Else},         {"while", Token::Type::While},       {"bool", Token::Type::BuiltInType},
-        {"int", Token::Type::BuiltInType},   {"float", Token::Type::BuiltInType}, {"string", Token::Type::BuiltInType},
+        {"else", Token::Type::Else},         {"while", Token::Type::While},       {"bool", Token::Type::BuiltInType},   {"int", Token::Type::BuiltInType}, {"float", Token::Type::BuiltInType},  {"string", Token::Type::BuiltInType},
+        {"true", Token::Type::Boolean}, {"false", Token::Type::Boolean},
     };
 
     Token search_next(size_t& pointer) const {
@@ -192,6 +193,7 @@ struct fmt::formatter<Tokenizer::Token::Type> {
             case Tokenizer::Token::Type::If: return format_to(ctx.out(), fg(fmt::color::orchid), "{}", "If");
             case Tokenizer::Token::Type::Else: return format_to(ctx.out(), fg(fmt::color::orchid), "{}", "Else");
             case Tokenizer::Token::Type::Digits: return format_to(ctx.out(), "{}", "Digits");
+            case Tokenizer::Token::Type::Boolean: return format_to(ctx.out(), "{}", "Boolean");
             case Tokenizer::Token::Type::BuiltInType: return format_to(ctx.out(), "{}", "BuiltInType");
             case Tokenizer::Token::Type::Operator: return format_to(ctx.out(), "{}", "Operator");
             case Tokenizer::Token::Type::Identifier: return format_to(ctx.out(), fg(fmt::color::light_blue), "{}", "Identifier");

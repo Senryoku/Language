@@ -31,7 +31,7 @@ class Parser : public Scoped {
         // TODO
         if(binaryOp->token.value == "==" || binaryOp->token.value == "!=" || binaryOp->token.value == "<" || binaryOp->token.value == ">" || binaryOp->token.value == "=>" ||
            binaryOp->token.value == "<=")
-            binaryOp->value.type = GenericValue::Type::Bool;
+            binaryOp->value.type = GenericValue::Type::Boolean;
         else if(binaryOp->children[0]->value.type == GenericValue::Type::Integer && binaryOp->children[1]->value.type == GenericValue::Type::Integer)
             binaryOp->value.type = GenericValue::Type::Integer;
         else
@@ -108,24 +108,12 @@ class Parser : public Scoped {
                         return false;
                     }
 
-                    // TODO: Abstract this ("parse_next_expression"?)
-                    auto begin = it + 1;
-                    auto end = begin + 1;
-                    while(end != tokens.end() && end->value != ")")
-                        ++end;
-                    if(end == tokens.end()) {
-                        error("Syntax error: no matching ')'.\n");
-                        return false;
-                    }
-
                     auto ifNode = currNode->add_child(new AST::Node(AST::Node::Type::IfStatement));
-                    auto expr = ifNode->add_child(new AST::Node(AST::Node::Type::Expression)); // TODO: Should be re-using something else
-                    if(!parse({begin + 1, end}, expr))
+                    ++it;
+                    if(!parse_next_expression(tokens, it, ifNode, 0))
                         return false;
 
-                    it = end + 1;
-
-                    if(!parse_next_scope(tokens, it, ifNode)) {
+                    if(!parse_scope_or_single_statement(tokens, it, ifNode)) {
                         error("Syntax error: expected 'new scope' after 'if'.\n");
                         return false;
                     }
@@ -150,6 +138,11 @@ class Parser : public Scoped {
                 }
                 case Tokenizer::Token::Type::Digits: {
                     if(!parse_digits(tokens, it, currNode))
+                        return false;
+                    break;
+                }
+                case Tokenizer::Token::Type::Boolean: {
+                    if(!parse_boolean(tokens, it, currNode))
                         return false;
                     break;
                 }
@@ -191,10 +184,20 @@ class Parser : public Scoped {
                 error("Syntax error: Expected scope opening on line {}, got {}.\n", it->line, it->value);
             return false;
         }
-        auto begin = it + 1;
-        auto end = begin + 1;
-        while(end != tokens.end() && end->value != "}")
+        auto   begin = it + 1;
+        auto   end = begin;
+        size_t inner_scopes = 0;
+        while(end != tokens.end()) {
+            if(end->value == "{")
+                ++inner_scopes;
+            if(end->value == "}") {
+                if(inner_scopes == 0)
+                    break;
+                else
+                    --inner_scopes;
+            }
             ++end;
+        }
         if(end == tokens.end()) {
             error("Syntax error: no matching 'closing bracket', got end-of-document.\n");
             return false;
@@ -234,6 +237,11 @@ class Parser : public Scoped {
                         return false;
                     break;
                 }
+                case Boolean: {
+                    if(!parse_boolean(tokens, it, exprNode))
+                        return false;
+                    break;
+                }
                 case Identifier: {
                     if(!parse_identifier(tokens, it, exprNode))
                         return false;
@@ -267,7 +275,10 @@ class Parser : public Scoped {
         }
 
         if(search_for_matching_bracket && (it == tokens.end() || it->value != ")")) {
-            error("Unmatched '(' on line {}.\n", it->line);
+            if(it == tokens.end())
+                error("Unmatched '(' after reaching end-of-document.\n");
+            else
+                error("Unmatched '(' on line {}.\n", it->line);
             return false;
         }
 
@@ -327,6 +338,7 @@ class Parser : public Scoped {
                 ++end;
             if(!parse({it, end}, currNode))
                 return false;
+            it = end;
         }
         return true;
     }
@@ -413,6 +425,14 @@ class Parser : public Scoped {
         auto integer = currNode->add_child(new AST::Node(AST::Node::Type::ConstantValue, *it));
         integer->value.type = GenericValue::Type::Integer;
         auto result = std::from_chars(&*(it->value.begin()), &*(it->value.begin()) + it->value.length(), integer->value.value.as_int32_t);
+        ++it;
+        return true;
+    }
+
+    bool parse_boolean(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode) {
+        auto boolNode = currNode->add_child(new AST::Node(AST::Node::Type::ConstantValue, *it));
+        boolNode->value.type = GenericValue::Type::Boolean;
+        boolNode->value.value.as_bool = it->value == "true";
         ++it;
         return true;
     }
