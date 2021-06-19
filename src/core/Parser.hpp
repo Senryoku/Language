@@ -103,16 +103,15 @@ class Parser : public Scoped {
                     break;
                 }
                 case Tokenizer::Token::Type::If: {
-                    if(it + 1 == tokens.end() || (it + 1)->value != "(") {
+                    ++it;
+                    if(it == tokens.end() || it->value != "(") {
                         error("Syntax error: expected '(' after 'if'.\n");
                         return false;
                     }
-
                     auto ifNode = currNode->add_child(new AST::Node(AST::Node::Type::IfStatement));
                     ++it;
-                    if(!parse_next_expression(tokens, it, ifNode, 0))
+                    if(!parse_next_expression(tokens, it, ifNode, 0, true))
                         return false;
-
                     if(!parse_scope_or_single_statement(tokens, it, ifNode)) {
                         error("Syntax error: expected 'new scope' after 'if'.\n");
                         return false;
@@ -212,19 +211,19 @@ class Parser : public Scoped {
     }
 
     // TODO: Formely define wtf is an expression :)
-    bool parse_next_expression(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode, uint8_t precedence) {
+    bool parse_next_expression(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode, uint8_t precedence,
+                               bool search_for_matching_bracket = false) {
         if(it == tokens.end()) {
             error("Expected expression, got end-of-file.\n");
             return false;
         }
-        bool search_for_matching_bracket = false;
-        if(it->type == Tokenizer::Token::Type::Control && it->value == "(") {
-            precedence = 0;
-            ++it;
-            search_for_matching_bracket = true;
-        }
 
         auto exprNode = currNode->add_child(new AST::Node(AST::Node::Type::Expression));
+
+        if(it->type == Tokenizer::Token::Type::Control && it->value == "(") {
+            ++it;
+            parse_next_expression(tokens, it, exprNode, 0, true);
+        }
 
         bool stop = false;
 
@@ -351,7 +350,8 @@ class Parser : public Scoped {
             return false;
         }
         // Parse condition and add it as first child
-        if(!parse_next_expression(tokens, it, whileNode, 0))
+        ++it; // Point to the beginning of the expression until ')' ('search_for_matching_bracket': true)
+        if(!parse_next_expression(tokens, it, whileNode, 0, true))
             return false;
 
         if(it == tokens.end()) {

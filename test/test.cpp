@@ -80,7 +80,7 @@ TEST(Arithmetic, Expression) {
 
 TEST(Arithmetic, RightMul) {
     PARSE_INTERP("2 + (2) * 4");
-    EXPECT_EQ(interpreter.get_return_value().value.as_int32_t, 83);
+    EXPECT_EQ(interpreter.get_return_value().value.as_int32_t, 10);
 }
 
 TEST(Arithmetic, RightMul2) {
