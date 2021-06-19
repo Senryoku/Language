@@ -37,12 +37,90 @@ struct GenericValue {
     GenericValue operator==(const GenericValue& rhs) {
         GenericValue r{.type = Type::Boolean};
         r.value.as_bool = false;
-        if(type != rhs.type)
+        if(type != rhs.type) // TODO: Hanlde implicit conversion?
             return r;
         switch(type) {
             case Type::Integer: r.value.as_bool = value.as_int32_t == rhs.value.as_int32_t; break;
             case Type::String: assert(false); break; // TODO
             case Type::Boolean: r.value.as_bool = value.as_bool == rhs.value.as_bool; break;
+            default: assert(false); break;
+        }
+        return r;
+    }
+
+    GenericValue operator!=(const GenericValue& rhs) {
+        // TODO: Handle types
+        auto r = (*this == rhs);
+        r.value.as_bool = !r.value.as_bool;
+        return r;
+    }
+
+    GenericValue operator+(const GenericValue& rhs) {
+        GenericValue r{.type = Type::Integer};
+        if(type != rhs.type)
+            return r;
+        switch(type) {
+            case Type::Integer: r.value.as_int32_t = value.as_int32_t + rhs.value.as_int32_t; break;
+            case Type::String: assert(false); break;  // TODO
+            case Type::Boolean: assert(false); break; // Invalid
+            default: assert(false); break;
+        }
+        return r;
+    }
+
+    GenericValue operator-(const GenericValue& rhs) {
+        GenericValue r{.type = Type::Integer};
+        if(type != rhs.type)
+            return r;
+        switch(type) {
+            case Type::Integer: r.value.as_int32_t = value.as_int32_t - rhs.value.as_int32_t; break;
+            case Type::String: assert(false); break;  // TODO
+            case Type::Boolean: assert(false); break; // Invalid
+            default: assert(false); break;
+        }
+        return r;
+    }
+
+    GenericValue operator*(const GenericValue& rhs) {
+        GenericValue r{.type = Type::Integer};
+        if(type != rhs.type)
+            return r;
+        switch(type) {
+            case Type::Integer: r.value.as_int32_t = value.as_int32_t * rhs.value.as_int32_t; break;
+            case Type::String: assert(false); break;  // TODO
+            case Type::Boolean: assert(false); break; // Invalid
+            default: assert(false); break;
+        }
+        return r;
+    }
+
+    GenericValue operator/(const GenericValue& rhs) {
+        GenericValue r{.type = Type::Integer};
+        if(type != rhs.type)
+            return r;
+        switch(type) {
+            case Type::Integer: r.value.as_int32_t = value.as_int32_t / rhs.value.as_int32_t; break;
+            case Type::String: assert(false); break;  // TODO
+            case Type::Boolean: assert(false); break; // Invalid
+            default: assert(false); break;
+        }
+        return r;
+    }
+
+    GenericValue operator^(const GenericValue& rhs) {
+        GenericValue r{.type = Type::Integer};
+        if(type != rhs.type)
+            return r;
+        switch(type) {
+            case Type::Integer: {
+                auto exp = rhs.value.as_int32_t;
+                r.value.as_int32_t = 1;
+                while(--exp > 0)
+                    r.value.as_int32_t *= value.as_int32_t;
+                break;
+            }
+            case Type::String: assert(false); break;  // TODO
+            case Type::Boolean: assert(false); break; // Invalid
             default: assert(false); break;
         }
         return r;

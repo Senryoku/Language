@@ -78,6 +78,16 @@ TEST(Arithmetic, Expression) {
     EXPECT_EQ(interpreter.get_return_value().value.as_int32_t, 5623);
 }
 
+TEST(Arithmetic, RightMul) {
+    PARSE_INTERP("2 + (2) * 4");
+    EXPECT_EQ(interpreter.get_return_value().value.as_int32_t, 83);
+}
+
+TEST(Arithmetic, RightMul2) {
+    PARSE_INTERP("4 * 5 + (4 + 5) * 7");
+    EXPECT_EQ(interpreter.get_return_value().value.as_int32_t, 83);
+}
+
 TEST(Arithmetic, Order) {
     PARSE_INTERP("2 * (6 * 1 + 2) / 4 * (4 + 1)");
     EXPECT_EQ(interpreter.get_return_value().value.as_int32_t, 20);
@@ -133,19 +143,19 @@ bool is_prime(int number) {
 TEST(Function, isPrime) {
     LOAD_PARSE_INTERP("function/prime.lang");
     ast->optimize();
-    for(uint32_t i = 2; i < 200; ++i) {
-        auto      s = fmt::format("isPrime({});", i);
-        Tokenizer next_tokens(s);
+    std::vector<std::string> lines;
+    for(uint32_t i = 2; i < 1000; ++i) {
+        lines.push_back(fmt::format("isPrime({});", i));
+        auto&     line = lines.back();
+        Tokenizer next_tokens(line);
         auto      first = tokens.size();
         while(next_tokens.has_more())
             tokens.push_back(next_tokens.consume());
         EXPECT_GT(tokens.size(), first);
         auto newNodes = parser.parse(std::span<Tokenizer::Token>{tokens.begin() + first, tokens.end()}, *ast);
         ASSERT_TRUE(newNodes.size() > 0);
-        for(auto node : newNodes) {
+        for(auto node : newNodes)
             interpreter.execute(*node);
-        }
-        interpreter.execute(*ast);
         EXPECT_EQ(interpreter.get_return_value().value.as_bool, is_prime(i));
     }
 }

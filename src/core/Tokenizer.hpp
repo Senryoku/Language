@@ -90,9 +90,9 @@ class Tokenizer {
     static inline bool is_allowed_in_operators(char c) { return (c >= '*' && c <= '/') || (c >= '<' && c <= '>'); }
 
     std::unordered_map<std::string, Token::Type> keywords{
-        {"function", Token::Type::Function}, {"return", Token::Type::Return},     {"if", Token::Type::If},
-        {"else", Token::Type::Else},         {"while", Token::Type::While},       {"bool", Token::Type::BuiltInType},   {"int", Token::Type::BuiltInType}, {"float", Token::Type::BuiltInType},  {"string", Token::Type::BuiltInType},
-        {"true", Token::Type::Boolean}, {"false", Token::Type::Boolean},
+        {"function", Token::Type::Function},  {"return", Token::Type::Return},    {"if", Token::Type::If},           {"else", Token::Type::Else},
+        {"while", Token::Type::While},        {"bool", Token::Type::BuiltInType}, {"int", Token::Type::BuiltInType}, {"float", Token::Type::BuiltInType},
+        {"string", Token::Type::BuiltInType}, {"true", Token::Type::Boolean},     {"false", Token::Type::Boolean},
     };
 
     Token search_next(size_t& pointer) const {
