@@ -1,43 +1,42 @@
 #include <array>
+#include <filesystem>
+#include <fstream>
+#include <sstream>
 #include <string>
 #include <string_view>
 
 #include <Parser.hpp>
 #include <Tokenizer.hpp>
+#include <utils/CLIArg.hpp>
 
-int main() {
-    fmt::print("This is a compiler. I swear.\n");
+int main(int argc, char* argv[]) {
+    fmt::print("<insert language name> compiler.\n");
+    CLIArg args;
+    args.add('a', "ast", false, "Dump the parsed AST to the command line.");
+    args.parse(argc, argv);
 
-    const bool all_tests = false;
+    if(args.get_default_arg() == "") {
+        error("No source file provided.\n");
+        print("Usage: 'compiler path/to/source.lang'.\n");
+        return -1;
+    }
 
-    struct Test {
-        bool        run = false;
-        std::string source;
-    };
+    std::ifstream file(args.get_default_arg());
+    if(!file) {
+        error("Couldn't open file '{}' (Running from {}).\n", args.get_default_arg(), std::filesystem::current_path().string());
+        return -1;
+    }
+    std::string source{(std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>()};
 
-    std::vector<Test> tests{
-        {true, R"(int i = 5;
-        while(i > 0) {
-            i = i - 1;
-        })"},
-        {true, R"(function multiply(int rhs, int lhs) {
-            return rhs * lhs;
-        })"},
-    };
+    std::vector<Tokenizer::Token> tokens;
+    Tokenizer                     tokenizer(source);
+    while(tokenizer.has_more())
+        tokens.push_back(tokenizer.consume());
 
-    for(const auto& t : tests) {
-        if(t.run || all_tests) {
-            std::vector<Tokenizer::Token> tokens;
-
-            Tokenizer tokenizer(t.source);
-            while(tokenizer.has_more())
-                tokens.push_back(tokenizer.consume());
-
-            Parser parser;
-            auto   ast = parser.parse(tokens);
-            if(ast.has_value()) {
-                fmt::print("{}", *ast);
-            }
-        }
+    Parser parser;
+    auto   ast = parser.parse(tokens);
+    if(ast.has_value()) {
+        if(args['a'].set)
+            fmt::print("{}", *ast);
     }
 }
