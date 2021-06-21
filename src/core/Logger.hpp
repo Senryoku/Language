@@ -4,23 +4,23 @@
 #include <fmt/core.h>
 
 template <typename... Args>
-void error(Args... args) {
-    fmt::print(fg(fmt::color::red), args...);
+void error(Args&&... args) {
+    fmt::print(fg(fmt::color::red), std::forward<Args>(args)...);
 }
 
 template <typename... Args>
-void warn(Args... args) {
-    fmt::print(fg(fmt::color::yellow), args...);
+void warn(Args&&... args) {
+    fmt::print(fg(fmt::color::yellow), std::forward<Args>(args)...);
 }
 
 template <typename... Args>
-void success(Args... args) {
-    fmt::print(fg(fmt::color::green), args...);
+void success(Args&&... args) {
+    fmt::print(fg(fmt::color::green), std::forward<Args>(args)...);
 }
 
 template <typename... Args>
-void print(Args... args) {
-    fmt::print(args...);
+void print(Args&&... args) {
+    fmt::print(std::forward<Args>(args)...);
 }
 
 struct Indenter {
@@ -37,6 +37,6 @@ struct Indenter {
     template <typename... Args>
     void print(fmt::string_view format_str, const Args&... args) {
         fmt::print("{:{}}", "", indent);
-        fmt::print(format_str, args...);
+        fmt::print(format_str, std::forward<Args>(args)...);
     }
 };
