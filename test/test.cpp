@@ -159,3 +159,31 @@ TEST(Function, isPrime) {
         EXPECT_EQ(interpreter.get_return_value().value.as_bool, is_prime(i));
     }
 }
+
+int fib(int n) {
+    if(n == 0)
+        return 0;
+    if(n == 1)
+        return 1;
+    return fib(n - 1) + fib(n - 2);
+}
+
+TEST(Function, Fibonacci) {
+    LOAD_PARSE_INTERP("function/fib.lang");
+    ast->optimize();
+    std::vector<std::string> lines;
+    for(uint32_t i = 0; i < 20; ++i) {
+        lines.push_back(fmt::format("fib({});", i));
+        auto&     line = lines.back();
+        Tokenizer next_tokens(line);
+        auto      first = tokens.size();
+        while(next_tokens.has_more())
+            tokens.push_back(next_tokens.consume());
+        EXPECT_GT(tokens.size(), first);
+        auto newNodes = parser.parse(std::span<Tokenizer::Token>{tokens.begin() + first, tokens.end()}, *ast);
+        ASSERT_TRUE(newNodes.size() > 0);
+        for(auto node : newNodes)
+            interpreter.execute(*node);
+        EXPECT_EQ(interpreter.get_return_value().value.as_int32_t, fib(i));
+    }
+}
