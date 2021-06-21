@@ -62,15 +62,18 @@ class Interpreter : public Scoped {
                     break;
                 }
                 // TODO: Check arguments count and type
+                // Execute argement in the caller scope.
+                std::vector<GenericValue> arguments_values;
+                for(size_t i = 0; i < functionNode->children.size() - 1; ++i)
+                    arguments_values.push_back(execute(*node.children[i]));
                 push_scope();
-                // Execute and bind arguments (Last child in functionNode is the function body)
+                // Declare and bind arguments (Last child in functionNode is the function body)
                 for(size_t i = 0; i < functionNode->children.size() - 1; ++i) {
                     // Declare arguments
                     // TODO: Default values (?)
                     execute(*functionNode->children[i]);
                     // Bind value
-                    auto arg_value = execute(*node.children[i]);
-                    get_scope().get(functionNode->children[i]->value.value.as_string.to_std_string_view()) = arg_value;
+                    get_scope().get(functionNode->children[i]->value.value.as_string.to_std_string_view()) = arguments_values[i];
                 }
                 execute(*functionNode->children.back());
                 pop_scope();
