@@ -102,19 +102,17 @@ template <>
 struct fmt::formatter<AST::Node> {
     constexpr static bool is_digit(char c) { return c >= '0' && c <= '9'; }
 
-    size_t indent = 0;
+    std::string indent = "";
 
     constexpr auto parse(format_parse_context& ctx) {
         auto begin = ctx.begin(), end = ctx.end();
         auto it = begin;
-        // Check if reached the end of the range:
-        // Allow only empty format.
-        while(it != end && is_digit(*it))
+        while(it != end && *it != '}')
             ++it;
         if(it != end && *it != '}')
             throw format_error("Invalid format for AST::Node");
         if(it != begin)
-            std::from_chars(&*begin, &*it, indent);
+            indent = std::string{begin, it};
         // Return an iterator past the end of the parsed range:
         return it;
     }
@@ -122,10 +120,20 @@ struct fmt::formatter<AST::Node> {
     template <typename FormatContext>
     auto format(const AST::Node& t, FormatContext& ctx) {
         auto r = ctx.out();
-        for(size_t i = 1; i < indent; ++i)
-            r = format_to(ctx.out(), "   ");
-        if(indent > 0)
-            r = format_to(ctx.out(), "|- ");
+        for(size_t i = 0; i < indent.length(); ++i) {
+            const char c = indent[i];
+            if(i == indent.length() - 1) {
+                if(c == 'i')
+                    r = format_to(ctx.out(), fg(fmt::color::dim_gray), "├─");
+                else if(c == 'e')
+                    r = format_to(ctx.out(), fg(fmt::color::dim_gray), "╰─");
+            } else {
+                if(c == 'i')
+                    r = format_to(ctx.out(), fg(fmt::color::dim_gray), "│ ");
+                else if(c == 'e')
+                    r = format_to(ctx.out(), fg(fmt::color::dim_gray), "  ");
+            }
+        }
 
         if(t.type == AST::Node::Type::ConstantValue) {
             r = format_to(ctx.out(), "Node({}) : {}\n", t.type, t.value);
@@ -140,8 +148,8 @@ struct fmt::formatter<AST::Node> {
         } else
             r = format_to(ctx.out(), "Node({}) : {}\n", t.type, t.token);
 
-        for(const auto c : t.children)
-            r = format_to(r, "{:" + std::to_string(indent + 1) + "}", *c);
+        for(size_t i = 0; i < t.children.size(); ++i)
+            r = format_to(r, "{:" + indent + (i == t.children.size() - 1 ? "e" : "i") + "}", *t.children[i]);
 
         return r;
     }

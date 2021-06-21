@@ -18,7 +18,7 @@ include_directories("${CMAKE_SOURCE_DIR}/src/utils")
 include_directories("${CMAKE_SOURCE_DIR}/ext")
 
 if (MSVC)
-    add_compile_options(/W4)
+    add_compile_options(/W4 /utf-8)
 else()
     add_compile_options(-Wall -Wextra -pedantic)
 endif()
