@@ -1,11 +1,9 @@
 #pragma once
 
 #include <array>
+#include <het_unordered_map.hpp>
 #include <string>
 #include <string_view>
-
-#include <fmt/core.h>
-#include <fmt/format.h>
 
 class Tokenizer {
   public:
@@ -54,11 +52,9 @@ class Tokenizer {
     bool has_more() const { return _current_pos < _source.length(); }
 
   private:
-    bool is_discardable(char c) const { return c == ' ' || c == '\n' || c == '\r' || c == '\t'; }
-
-    bool is_allowed_in_identifiers(char c) const { return c >= 'A' && c <= 'z' || c == '_'; }
-
-    bool is_digit(char c) const { return c >= '0' && c <= '9'; }
+    inline bool is_discardable(char c) const { return c == ' ' || c == '\n' || c == '\r' || c == '\t'; }
+    inline bool is_allowed_in_identifiers(char c) const { return c >= 'A' && c <= 'z' || c == '_'; }
+    inline bool is_digit(char c) const { return c >= '0' && c <= '9'; }
 
     void advance_ptr(size_t& pointer) {
         // Skip discardable characters
@@ -81,15 +77,14 @@ class Tokenizer {
         return false;
     }
 
-    std::unordered_map<std::string, Token::Type> binary_operators{{"=", Token::Type::Operator},  {"*", Token::Type::Operator},  {"+", Token::Type::Operator},
-                                                                  {"-", Token::Type::Operator},  {"/", Token::Type::Operator},  {"^", Token::Type::Operator},
-                                                                  {"==", Token::Type::Operator}, {"!=", Token::Type::Operator}, {">", Token::Type::Operator},
-                                                                  {"<", Token::Type::Operator},  {">=", Token::Type::Operator}, {"<=", Token::Type::Operator}};
+    const het_unordered_map<Token::Type> binary_operators{{"=", Token::Type::Operator}, {"*", Token::Type::Operator}, {"+", Token::Type::Operator},  {"-", Token::Type::Operator},
+                                                          {"/", Token::Type::Operator}, {"^", Token::Type::Operator}, {"==", Token::Type::Operator}, {"!=", Token::Type::Operator},
+                                                          {">", Token::Type::Operator}, {"<", Token::Type::Operator}, {">=", Token::Type::Operator}, {"<=", Token::Type::Operator}};
 
     // FIXME: This is a workaround, not a proper way to recognize operators :)
     static inline bool is_allowed_in_operators(char c) { return (c >= '*' && c <= '/') || (c >= '<' && c <= '>'); }
 
-    std::unordered_map<std::string, Token::Type> keywords{
+    const het_unordered_map<Token::Type> keywords{
         {"function", Token::Type::Function},  {"return", Token::Type::Return},    {"if", Token::Type::If},           {"else", Token::Type::Else},
         {"while", Token::Type::While},        {"bool", Token::Type::BuiltInType}, {"int", Token::Type::BuiltInType}, {"float", Token::Type::BuiltInType},
         {"string", Token::Type::BuiltInType}, {"true", Token::Type::Boolean},     {"false", Token::Type::Boolean},
@@ -108,7 +103,6 @@ class Tokenizer {
             } else if(is(first_char, control_characters)) {
                 pointer += 1;
                 type = Token::Type::Control;
-
             } else if(is_digit(first_char)) {
                 while(is_digit(_source[pointer]) && pointer < _source.length())
                     ++pointer;
@@ -118,7 +112,7 @@ class Tokenizer {
                 // FIXME
                 while(!is_discardable(_source[pointer]) && is_allowed_in_operators(_source[pointer]) && pointer < _source.length())
                     ++pointer;
-                if(binary_operators.contains({_source.begin() + begin, _source.begin() + pointer})) {
+                if(binary_operators.contains(std::string_view{_source.begin() + begin, _source.begin() + pointer})) {
                     type = Token::Type::Operator;
                 }
             }
@@ -126,9 +120,9 @@ class Tokenizer {
             while(is_allowed_in_identifiers(_source[pointer]) && pointer < _source.length())
                 ++pointer;
 
-            const std::string str{_source.begin() + begin, _source.begin() + pointer}; // Having to construct a string here isn't great.
+            const std::string_view str{_source.begin() + begin, _source.begin() + pointer};
             if(keywords.contains(str))
-                type = keywords.at(str);
+                type = keywords.find(str)->second;
             else
                 type = Token::Type::Identifier;
         }
@@ -140,38 +134,22 @@ class Tokenizer {
     size_t             _current_line = 0;
 };
 
+// fmt Formaters for Token and Token::Type
+
+#include <fmt/core.h>
+#include <fmt/format.h>
+
 template <>
 struct fmt::formatter<Tokenizer::Token> {
     constexpr auto parse(format_parse_context& ctx) {
-        // auto parse(format_parse_context &ctx) -> decltype(ctx.begin()) // c++11
-        // [ctx.begin(), ctx.end()) is a character range that contains a part of
-        // the format string starting from the format specifications to be parsed,
-        // e.g. in
-        //
-        //   fmt::format("{:f} - point of interest", point{1, 2});
-        //
-        // the range will contain "f} - point of interest". The formatter should
-        // parse specifiers until '}' or the end of the range. In this example
-        // the formatter should parse the 'f' specifier and return an iterator
-        // pointing to '}'.
-
-        // Parse the presentation format and store it in the formatter:
         auto it = ctx.begin(), end = ctx.end();
-        // Check if reached the end of the range:
-        // Allow only empty format.
         if(it != end && *it != '}')
             throw format_error("Invalid format for Tokenizer::Token");
-
-        // Return an iterator past the end of the parsed range:
         return it;
     }
 
-    // Formats the point p using the parsed format specification (presentation)
-    // stored in this formatter.
     template <typename FormatContext>
     auto format(const Tokenizer::Token& t, FormatContext& ctx) {
-        // auto format(const point &p, FormatContext &ctx) -> decltype(ctx.out()) // c++11
-        // ctx.out() is an output iterator to write to.
         return format_to(ctx.out(), fg(fmt::color::gray), "Token({}, '{}', Ln: {})", t.type, t.value, t.line);
     }
 };
