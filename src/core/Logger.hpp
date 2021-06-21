@@ -35,7 +35,7 @@ struct Indenter {
     }
 
     template <typename... Args>
-    void print(fmt::string_view format_str, const Args&... args) {
+    void print(fmt::string_view format_str, Args&&... args) {
         fmt::print("{:{}}", "", indent);
         fmt::print(format_str, std::forward<Args>(args)...);
     }
