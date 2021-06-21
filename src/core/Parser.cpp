@@ -246,7 +246,7 @@ bool Parser::parse_function_declaration(const std::span<Tokenizer::Token>& token
     return true;
 }
 
-bool Parser::parse_digits(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode) {
+bool Parser::parse_digits(const std::span<Tokenizer::Token>&, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode) {
     auto integer = currNode->add_child(new AST::Node(AST::Node::Type::ConstantValue, *it));
     integer->value.type = GenericValue::Type::Integer;
     auto result = std::from_chars(&*(it->value.begin()), &*(it->value.begin()) + it->value.length(), integer->value.value.as_int32_t);
@@ -254,7 +254,7 @@ bool Parser::parse_digits(const std::span<Tokenizer::Token>& tokens, std::span<T
     return true;
 }
 
-bool Parser::parse_boolean(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode) {
+bool Parser::parse_boolean(const std::span<Tokenizer::Token>&, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode) {
     auto boolNode = currNode->add_child(new AST::Node(AST::Node::Type::ConstantValue, *it));
     boolNode->value.type = GenericValue::Type::Boolean;
     boolNode->value.value.as_bool = it->value == "true";

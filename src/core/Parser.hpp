@@ -34,8 +34,10 @@ class Parser : public Scoped {
             binaryOp->value.type = GenericValue::Type::Boolean;
         else if(binaryOp->children[0]->value.type == GenericValue::Type::Integer && binaryOp->children[1]->value.type == GenericValue::Type::Integer)
             binaryOp->value.type = GenericValue::Type::Integer;
-        else
-            warn("Couldn't resolve operator return type (Missing impl.).\n");
+        else {
+            warn("[Parser] Couldn't resolve operator return type (Missing impl.) on line {}. Children:\n", binaryOp->token.line);
+            fmt::print("LHS: {}RHS: {}\n", *binaryOp->children[0], *binaryOp->children[1]);
+        }
     }
 
     std::optional<AST> parse(const std::span<Tokenizer::Token>& tokens, bool optimize = true) {

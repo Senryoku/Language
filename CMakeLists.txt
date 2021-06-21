@@ -14,12 +14,12 @@ set(Lang_VERSION_MINOR 1)
 set(Lang_VERSION_MAJOR 0)
 include_directories("${CMAKE_SOURCE_DIR}/src")
 include_directories("${CMAKE_SOURCE_DIR}/src/core")
+include_directories("${CMAKE_SOURCE_DIR}/src/utils")
+include_directories("${CMAKE_SOURCE_DIR}/ext")
 
 if (MSVC)
-    # warning level 4 and all warnings as errors
     add_compile_options(/W4)
 else()
-    # lots of warnings and all warnings as errors
     add_compile_options(-Wall -Wextra -pedantic)
 endif()
 
@@ -31,6 +31,12 @@ file(GLOB HEADERS src/**/*.hpp)
 add_executable(compiler ${SOURCES} ${HEADERS} src/compiler.cpp)
 add_executable(prompt ${SOURCES} ${HEADERS} src/prompt.cpp)
 add_executable(tester ${SOURCES} ${TEST_FILES} ${HEADERS} test/main.cpp)
+
+target_include_directories(compiler PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/ext")
+
+set_property(TARGET compiler PROPERTY CXX_STANDARD 20)
+set_property(TARGET prompt PROPERTY CXX_STANDARD 20)
+set_property(TARGET tester PROPERTY CXX_STANDARD 20)
 
 # Use included version of FMT
 add_subdirectory("ext/fmt-7.1.3")
@@ -51,9 +57,5 @@ FetchContent_MakeAvailable(googletest)
 # Now simply link against gtest or gtest_main as needed.
 target_link_libraries(tester gtest_main)
 include(GoogleTest)
-
-set_property(TARGET compiler PROPERTY CXX_STANDARD 20)
-set_property(TARGET prompt PROPERTY CXX_STANDARD 20)
-set_property(TARGET tester PROPERTY CXX_STANDARD 20)
 
 gtest_discover_tests(tester WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/test")
