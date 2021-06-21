@@ -170,5 +170,5 @@ class Interpreter : public Scoped {
 
   private:
     bool         _returning_value = false;
-    GenericValue _return_value; // FIXME: Probably not the right move!
+    GenericValue _return_value{.type = GenericValue::Type::Integer, .value = 0}; // FIXME: Probably not the right move!
 };

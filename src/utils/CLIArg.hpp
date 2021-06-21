@@ -67,26 +67,29 @@ void CLIArg::parse(int argc, char* argv[]) {
                     warn("[CLIArg] Unknown argument '{}'.\n", argv[idx] + 2);
                 } else {
                     a->set = true;
-                    if(a->takes_value && idx + 1 < argc) {
+                    if(a->takes_value && idx + 1 < argc && argv[idx + 1][0] != '-') {
                         ++idx;
                         a->value = argv[idx];
                     }
                 }
             } else {
                 size_t p = 1;
+                bool   skip_next = false; // Skip next argument if it was consumed
                 while(argv[idx][p] != '\0') {
                     auto a = get_short(argv[idx][p]);
                     if(!a) {
                         warn("[CLIArg] Unknown argument '{}'.\n", argv[idx] + p);
                     } else {
                         a->set = true;
-                        if(a->takes_value && idx + 1 < argc) {
-                            ++idx;
-                            a->value = argv[idx];
+                        if(a->takes_value && idx + 1 < argc && argv[idx + 1][0] != '-') {
+                            a->value = argv[idx + 1];
+                            skip_next = true;
                         }
                     }
                     ++p;
                 }
+                if(skip_next)
+                    ++idx;
             }
         } else {
             _default_arg = argv[idx];
