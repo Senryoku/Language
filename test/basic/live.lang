@@ -1,1 +1,5 @@
-int a = (4 * (4 + 2 * (2 + 2 * (2+1)))) 
+int a = 2;
+function c(int f) {
+	return f;
+}
+int b = a * 2 * c(4);

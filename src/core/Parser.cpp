@@ -122,6 +122,8 @@ bool Parser::parse_identifier(const std::span<Tokenizer::Token>& tokens, std::sp
     if(it + 1 != tokens.end() && (it + 1)->value == "(") {
         // TODO: Check if the function has been declared (or is a built-in?) & Fetch corresponding FunctionDeclaration Node.
         auto callNode = currNode->add_child(new AST::Node(AST::Node::Type::FunctionCall, *it));
+        callNode->value.type = GenericValue::Type::Integer; // TODO: Actually compute the return type (Could it be depend on the actual parameter type at the call site? Like
+                                                            // automatic (albeit maybe only on explicit request at function declaration) templating?).
         it += 2;
         // Parse arguments
         while(it != tokens.end() && it->value != ")") {
