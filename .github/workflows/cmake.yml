@@ -19,7 +19,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
         matrix:
-            os: [windows-latest, ubuntu-latest]
+            os: [windows-latest]
+            #os: [windows-latest, ubuntu-latest]
             include:
               - os: ubuntu-latest
                 compiler: gcc
