@@ -6,32 +6,44 @@
 #include <fmt/core.h>
 #include <fmt/format.h>
 
-struct StringView {
-    const char* begin;
-    uint32_t    size;
-
-    StringView& operator=(const std::string_view& sv) {
-        begin = sv.data();
-        size = static_cast<uint32_t>(sv.length());
-        return *this;
-    }
-    std::string_view to_std_string_view() const { return std::string_view(begin, size); }
-};
-
-union ValueUnion {
-    int32_t    as_int32_t;
-    StringView as_string; // Not sure if this is the right choice?
-    bool       as_bool;
-};
-
 struct GenericValue {
     enum class Type
     {
         Integer,
         String,
         Boolean,
+        Array,
         Composite,
         Undefined
+    };
+
+    struct StringView {
+        const char* begin;
+        uint32_t    size;
+
+        StringView& operator=(const std::string_view& sv) {
+            begin = sv.data();
+            size = static_cast<uint32_t>(sv.length());
+            return *this;
+        }
+        std::string_view to_std_string_view() const { return std::string_view(begin, size); }
+    };
+
+    union ValueUnion;
+
+    // Fixed-Size array.
+    struct Array {
+        GenericValue::Type type; // FIXME: Enforce this.
+        uint32_t           capacity;
+        GenericValue*      items; // FIXME. Also not space eficient, but way easier this way (the type information is useless here, but convenient). The runtime will have the
+                                  // responsability to manage this memory.
+    };
+
+    union ValueUnion {
+        int32_t    as_int32_t;
+        StringView as_string; // Not sure if this is the right choice?
+        bool       as_bool;
+        Array      as_array;
     };
 
     GenericValue operator==(const GenericValue& rhs) {
@@ -140,7 +152,7 @@ inline static GenericValue::Type parse_type(const std::string_view& str) {
 }
 
 template <>
-struct fmt::formatter<StringView> {
+struct fmt::formatter<GenericValue::StringView> {
     constexpr auto parse(format_parse_context& ctx) {
         auto it = ctx.begin(), end = ctx.end();
         if(it != end && *it != '}')
@@ -148,7 +160,7 @@ struct fmt::formatter<StringView> {
         return it;
     }
     template <typename FormatContext>
-    auto format(const StringView& v, FormatContext& ctx) {
+    auto format(const GenericValue::StringView& v, FormatContext& ctx) {
         std::string_view str{v.begin, v.begin + v.size};
         return format_to(ctx.out(), "{}", str);
     }
@@ -169,6 +181,16 @@ struct fmt::formatter<GenericValue> {
             case Integer: return format_to(ctx.out(), "{}:{}", v.type, v.value.as_int32_t);
             case String: return format_to(ctx.out(), "{}:{}", v.type, v.value.as_string);
             case Boolean: return format_to(ctx.out(), "{}:{}", v.type, v.value.as_bool ? "True" : "False");
+            case Array: {
+                auto r = format_to(ctx.out(), "{}:{}[{}]", v.type, v.value.as_array.type, v.value.as_array.capacity);
+                if(v.value.as_array.items) {
+                    r = format_to(ctx.out(), " [");
+                    for(size_t i = 0; i < v.value.as_array.capacity; ++i)
+                        r = format_to(ctx.out(), "{}, ", v.value.as_array.items[i]);
+                    r = format_to(ctx.out(), "]");
+                }
+                return r;
+            }
             default: return format_to(ctx.out(), fg(fmt::color::gray), "{}", "Undefined");
         }
     }
@@ -189,6 +211,7 @@ struct fmt::formatter<GenericValue::Type> {
             case Integer: return format_to(ctx.out(), "{}", "Integer");
             case String: return format_to(ctx.out(), "{}", "String");
             case Boolean: return format_to(ctx.out(), "{}", "Boolean");
+            case Array: return format_to(ctx.out(), "{}", "Array");
             default: return format_to(ctx.out(), fg(fmt::color::gray), "{}", "Undefined");
         }
     }

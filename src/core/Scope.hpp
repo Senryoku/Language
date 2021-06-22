@@ -12,9 +12,9 @@ class Scope {
     };
 
     bool declare_function(const AST::Node& node) {
-        auto sv = node.value.value.as_string.to_std_string_view();
+        auto sv = node.token.value;
         if(is_valid(find_function(sv))) {
-            error("Parsing error: function {} already declared in this scope.\n", sv);
+            error("[Scope] Function {} already declared in this scope.\n", sv);
             return false;
         }
         // TODO: Check & warn shadowing from other scopes?
@@ -26,15 +26,25 @@ class Scope {
     het_unordered_map<FunctionDeclaration>::iterator find_function(const std::string_view& name) { return _functions.find(name); }
     const AST::Node*                                 get_function(const std::string_view& name) { return _functions.find(name)->second.node; }
 
-    bool declare_variable(GenericValue::Type type, const std::string_view& name, size_t line = 0) {
+    bool declare_variable(const AST::Node& decNode, size_t line = 0) {
+        const auto& name = decNode.token.value;
         if(is_declared(name)) {
             error("[Scope] Error on line {}: Variable '{}' already declared.\n", line, name);
             return false;
         }
-        switch(type) {
+        switch(decNode.value.type) {
             case GenericValue::Type::Integer: _variables[std::string{name}] = Variable{Variable::Type::Integer}; break;
             case GenericValue::Type::Boolean: _variables[std::string{name}] = Variable{Variable::Type::Boolean}; break;
-            default: error("[Scope] Error on line {}: Unimplemented type '{}'.\n", line, type);
+            case GenericValue::Type::Array: {
+
+                Variable v{Variable::Type::Array};
+                v.value.as_array.type = decNode.value.value.as_array.type;
+                v.value.as_array.capacity = decNode.value.value.as_array.capacity;
+                v.value.as_array.items = nullptr;
+                _variables[std::string{name}] = v;
+                break;
+            }
+            default: error("[Scope] Error on line {}: Unimplemented type '{}'.\n", line, decNode.value.type);
         }
         return true;
     }

@@ -53,7 +53,7 @@ class Tokenizer {
 
   private:
     inline bool is_discardable(char c) const { return c == ' ' || c == '\n' || c == '\r' || c == '\t'; }
-    inline bool is_allowed_in_identifiers(char c) const { return c >= 'A' && c <= 'z' || c == '_'; }
+    inline bool is_allowed_in_identifiers(char c) const { return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || c == '_'; }
     inline bool is_digit(char c) const { return c >= '0' && c <= '9'; }
 
     void advance_ptr(size_t& pointer) {

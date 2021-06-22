@@ -87,6 +87,8 @@ bool Parser::parse_next_expression(const std::span<Tokenizer::Token>& tokens, st
                         return false;
                 } else if(it->value == ")") {
                     stop = true;
+                } else if(it->value == "]") {
+                    stop = true;
                 }
                 break;
             }
@@ -118,6 +120,7 @@ bool Parser::parse_next_expression(const std::span<Tokenizer::Token>& tokens, st
 }
 
 bool Parser::parse_identifier(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode) {
+    assert(it->type == Tokenizer::Token::Type::Identifier);
     // Function Call
     if(it + 1 != tokens.end() && (it + 1)->value == "(") {
         // TODO: Check if the function has been declared (or is a built-in?) & Fetch corresponding FunctionDeclaration Node.
@@ -133,7 +136,7 @@ bool Parser::parse_identifier(const std::span<Tokenizer::Token>& tokens, std::sp
                 ++it;
         }
         if(it == tokens.end()) {
-            error("Syntax error: Unmatched '(' on line {}, got to end-of-file.\n", it->line);
+            error("[Parser] Syntax error: Unmatched '(' on line {}, got to end-of-file.\n", it->line);
             return false;
         } else
             ++it;
@@ -141,14 +144,29 @@ bool Parser::parse_identifier(const std::span<Tokenizer::Token>& tokens, std::sp
     } else { // Variable
         auto maybe_variable = get(it->value);
         if(!maybe_variable) {
-            error("Syntax Error: Variable '{}' has not been declared.\n", it->value);
+            error("[Parser] Syntax Error: Variable '{}' has not been declared on line.\n", it->value, it->line);
             return false;
         }
-
         const auto& variable = *maybe_variable;
-        auto        varNode = currNode->add_child(new AST::Node(AST::Node::Type::Variable, *it));
+
+        auto varNode = currNode->add_child(new AST::Node(AST::Node::Type::Variable, *it));
         varNode->value.type = variable.type;
-        ++it;
+        if(it + 1 != tokens.end() && (it + 1)->value == "[") { // Array accessor
+            if(variable.type != GenericValue::Type::Array) {
+                error("[Parser] Syntax Error: Variable '{}' on line {} is not an array.\n", it->value, it->line);
+                return false;
+            }
+            varNode->value.value.as_array.type = variable.value.as_array.type;
+            varNode->value.value.as_array.capacity = variable.value.as_array.capacity;
+            it += 2;
+            // Get the index and add it as a child.
+            if(!parse_next_expression(tokens, it, varNode, 0, false))
+                return false;
+            assert(it->value == "]");
+            ++it; // Skip ']'
+        } else {
+            ++it;
+        }
         return true;
     }
 }
@@ -198,6 +216,7 @@ bool Parser::parse_function_declaration(const std::span<Tokenizer::Token>& token
         error("Expected identifier in function declaration on line {}, got {}.\n", it->line, it->value);
         return false;
     }
+    functionNode->token = *it; // Store the function name using its token.
     functionNode->value.type = GenericValue::Type::String;
     functionNode->value.value.as_string = it->value;
     ++it;
@@ -295,27 +314,42 @@ bool Parser::parse_binary_operator(const std::span<Tokenizer::Token>& tokens, st
  */
 bool Parser::parse_variable_declaration(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode) {
     assert(it->type == Tokenizer::Token::Type::BuiltInType);
-    if(it + 1 == tokens.end()) {
-        error("Syntax error: expected Identifier for variable declaration, got Nothing.\n");
+    auto varDecNode = currNode->add_child(new AST::Node(AST::Node::Type::VariableDeclaration, *it));
+    varDecNode->value.type = parse_type(it->value);
+    ++it;
+    // Array declaration
+    if(it != tokens.end() && it->value == "[") {
+        varDecNode->value.value.as_array.type = varDecNode->value.type;
+        varDecNode->value.type = GenericValue::Type::Array;
+        ++it;
+        std::from_chars(&*(it->value.begin()), &*(it->value.begin()) + it->value.length(), varDecNode->value.value.as_array.capacity);
+        ++it;
+        if(it == tokens.end()) {
+            error("[Parser] Syntax error: Expected ']', got end-of-document.");
+            return false;
+        } else if(it->value != "]") {
+            error("[Parser] Syntax error: Expected ']', got {}.", *it);
+            return false;
+        }
+        ++it;
+    }
+    if(it == tokens.end()) {
+        error("[Parser] Syntax error: Expected variable identifier, got end-of-document.");
         return false;
     }
-    auto next = *(it + 1); // Hopefully a name
-    switch(next.type) {
-        case Tokenizer::Token::Type::Identifier: {
-            auto varDecNode = currNode->add_child(new AST::Node(AST::Node::Type::VariableDeclaration, *it));
-            varDecNode->value.type = parse_type(it->value);
-            // FIXME: Storing the variable name in the value... That probably shouldn't be there.
-            varDecNode->value.value.as_string = {.begin = &*next.value.begin(), .size = static_cast<uint32_t>(next.value.length())};
-            get_scope().declare_variable(varDecNode->value.type, next.value, it->line);
-            it += 2;
-            // Also push a variable identifier for initialisation
-            if(it != tokens.end() && it->value == "=") { // FIXME: Better check for initialisation ("= | {" I guess?)
-                auto varNode = currNode->add_child(new AST::Node(AST::Node::Type::Variable, next));
-                varNode->value.type = varDecNode->value.type;
-            }
-            break;
+    auto next = *it; // Hopefully a name
+    if(next.type == Tokenizer::Token::Type::Identifier) {
+        varDecNode->token = next; // We'll be getting the function name from the token. This may still be a FIXME?...
+        get_scope().declare_variable(*varDecNode, next.line);
+        ++it;
+        // Also push a variable identifier for initialisation
+        if(it != tokens.end() && it->value == "=") {
+            auto varNode = currNode->add_child(new AST::Node(AST::Node::Type::Variable, next));
+            varNode->value.type = varDecNode->value.type;
         }
-        default: error("Syntax error: expected Identifier for variable declaration, got {}.\n", next); return false;
+    } else {
+        error("[Parser] Syntax error: Expected Identifier for variable declaration, got {}.\n", next);
+        return false;
     }
     return true;
 }

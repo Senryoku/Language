@@ -5,9 +5,9 @@
 #include <Scope.hpp>
 #include <VariableStore.hpp>
 
-constexpr bool is_assignable(GenericValue::Type var, GenericValue::Type val) {
+constexpr bool is_assignable(GenericValue& var, GenericValue& val) {
     // TODO
-    return var == val;
+    return var.type == val.type || (var.type == GenericValue::Type::Array && (var.value.as_array.type == val.type));
 }
 
 class Interpreter : public Scoped {
@@ -16,7 +16,20 @@ class Interpreter : public Scoped {
         push_scope(); // TODO: Push an empty for now.
     }
 
+    ~Interpreter() {
+        for(auto p : _allocated_arrays)
+            delete[] p;
+        _allocated_arrays.clear();
+    }
+
     void execute(const AST& ast) { execute(ast.getRoot()); }
+
+    void allocate_array(Variable& var) {
+        assert(var.type == GenericValue::Type::Array);
+        auto arr = new GenericValue[var.value.as_array.capacity];
+        _allocated_arrays.push_back(arr);
+        var.value.as_array.items = arr;
+    }
 
     GenericValue execute(const AST::Node& node) {
         switch(node.type) {
@@ -73,7 +86,7 @@ class Interpreter : public Scoped {
                     // TODO: Default values (?)
                     execute(*functionNode->children[i]);
                     // Bind value
-                    get_scope().get(functionNode->children[i]->value.value.as_string.to_std_string_view()) = arguments_values[i];
+                    get_scope().get(functionNode->children[i]->token.value) = arguments_values[i];
                 }
                 execute(*functionNode->children.back());
                 pop_scope();
@@ -85,7 +98,9 @@ class Interpreter : public Scoped {
             }
             case VariableDeclaration: {
                 assert(!get_scope().is_declared(node.token.value));
-                get_scope().declare_variable(node.value.type, node.value.value.as_string.to_std_string_view());
+                get_scope().declare_variable(node);
+                if(node.value.type == GenericValue::Type::Array)
+                    allocate_array(get_scope().get(node.token.value));
                 return node.value; // FIXME
                 break;
             }
@@ -94,6 +109,14 @@ class Interpreter : public Scoped {
                 if(!pVar) {
                     error("Syntax error: Undeclared variable '{}' on line {}.\n", node.token.value, node.token.line);
                     break;
+                }
+                if(node.value.type == GenericValue::Type::Array) {
+                    if(node.children.size() == 1) { // Accessed using an index
+                        auto index = execute(*node.children[0]);
+                        assert(index.type == GenericValue::Type::Integer);
+                        assert((size_t)index.value.as_int32_t < node.value.value.as_array.capacity); // FIXME: Should be a runtime error?
+                        return pVar->value.as_array.items[index.value.as_int32_t];
+                    }
                 }
                 return *pVar; // FIXME: Make sure GenericValue & Variable are transparent? Remove the 'Variable' type?
                 break;
@@ -109,9 +132,17 @@ class Interpreter : public Scoped {
                         error("[Interpreter] Trying to assign to something ({}) that's not a variable?\n", node.children[0]->token);
                         break;
                     }
-                    if(is_assignable(node.children[0]->value.type, node.children[1]->value.type)) {
+                    if(is_assignable(node.children[0]->value, node.children[1]->value)) {
                         GenericValue* v = get(node.children[0]->token.value);
                         assert(v);
+                        if(v->type == GenericValue::Type::Array) {
+                            assert(node.children[0]->children.size() == 1);
+                            const auto index = execute(*node.children[0]->children[0]);
+                            assert(index.type == GenericValue::Type::Integer);
+                            assert((size_t)index.value.as_int32_t < v->value.as_array.capacity); // FIXME: Runtime error?
+                            v = v->value.as_array.items + index.value.as_int32_t;
+                            v->type = rhs.type;
+                        }
                         // TODO: Handle others types and implicit conversions.
                         v->value.as_int32_t = rhs.value.as_int32_t;
                         _return_value.type = v->type;
@@ -174,4 +205,6 @@ class Interpreter : public Scoped {
   private:
     bool         _returning_value = false;
     GenericValue _return_value{.type = GenericValue::Type::Integer, .value = 0}; // FIXME: Probably not the right move!
+
+    std::vector<GenericValue*> _allocated_arrays;
 };

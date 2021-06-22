@@ -187,3 +187,23 @@ TEST(Function, Fibonacci) {
         EXPECT_EQ(interpreter.get_return_value().value.as_int32_t, fib(i));
     }
 }
+
+TEST(Function, FibonacciArray) {
+    LOAD_PARSE_INTERP("function/fib_array.lang");
+    ast->optimize();
+    std::vector<std::string> lines;
+    for(uint32_t i = 0; i < 32; ++i) {
+        lines.push_back(fmt::format("fib({});", i));
+        auto&     line = lines.back();
+        Tokenizer next_tokens(line);
+        auto      first = tokens.size();
+        while(next_tokens.has_more())
+            tokens.push_back(next_tokens.consume());
+        EXPECT_GT(tokens.size(), first);
+        auto newNodes = parser.parse(std::span<Tokenizer::Token>{tokens.begin() + first, tokens.end()}, *ast);
+        ASSERT_TRUE(newNodes.size() > 0);
+        for(auto node : newNodes)
+            interpreter.execute(*node);
+        EXPECT_EQ(interpreter.get_return_value().value.as_int32_t, fib(i));
+    }
+}
