@@ -135,18 +135,27 @@ struct fmt::formatter<AST::Node> {
             }
         }
 
-        if(t.type == AST::Node::Type::ConstantValue) {
-            r = format_to(ctx.out(), "Node({}) : {}\n", t.type, t.value);
-        } else if(t.type == AST::Node::Type::Variable) {
-            r = format_to(ctx.out(), "Node({}:{}) : {}\n", t.type, t.token.value, t.value);
-        } else if(t.type == AST::Node::Type::FunctionDeclaration) {
-            r = format_to(ctx.out(), "Node({}:{}) : {}\n", t.type, t.value.value.as_string, t.token);
-        } else if(t.type == AST::Node::Type::BinaryOperator) {
-            r = format_to(ctx.out(), "Node({}:{}) : {}\n", t.type, t.value.type, t.token);
-        } else if(t.token.type == Tokenizer::Token::Type::Unknown) {
-            r = format_to(ctx.out(), "Node({})\n", t.type);
-        } else
-            r = format_to(ctx.out(), "Node({}) : {}\n", t.type, t.token);
+        switch(t.type) {
+            case AST::Node::Type::ConstantValue: r = format_to(ctx.out(), "{}:{}", t.type, t.value); break;
+            case AST::Node::Type::ReturnStatement: r = format_to(ctx.out(), "{}:{}", t.type, t.value.type); break;
+            case AST::Node::Type::WhileStatement: r = format_to(ctx.out(), "{}", t.type); break;
+            case AST::Node::Type::Variable: r = format_to(ctx.out(), "{}:{}:{}", t.type, t.token.value, t.value.type); break;
+            case AST::Node::Type::FunctionDeclaration: r = format_to(ctx.out(), "{}:{}", t.type, t.token.value); break;
+            case AST::Node::Type::FunctionCall: r = format_to(ctx.out(), "{}:{}()", t.type, t.token.value); break;
+            case AST::Node::Type::VariableDeclaration: r = format_to(ctx.out(), "{}:{} {}", t.type, t.value.type, t.token.value); break;
+            case AST::Node::Type::BinaryOperator:
+                r = format_to(ctx.out(), "{} {}:{}", fmt::format(fmt::emphasis::bold | fg(fmt::color::black) | bg(fmt::color::dim_gray), t.token.value), t.type, t.value.type);
+                break;
+            default: r = format_to(ctx.out(), "{}", t.type);
+        }
+
+        auto token_str = t.token.type == Tokenizer::Token::Type::Unknown ? "None" : fmt::format("{}", t.token);
+        // FIXME: This would be cool to use the actual token_str length here, but computing the printed length (stripping style/control characters) isn't trivial.
+        const auto length = 60;
+        // Forward then backward
+        // r = format_to(ctx.out(), "\033[999C\033[{}D{}\n", length, token_str);
+        // Backward then forward
+        r = format_to(ctx.out(), "\033[999D\033[{}C{}\n", 50, token_str);
 
         for(size_t i = 0; i < t.children.size(); ++i)
             r = format_to(r, "{:" + indent + (i == t.children.size() - 1 ? "e" : "i") + "}", *t.children[i]);

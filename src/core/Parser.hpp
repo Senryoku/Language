@@ -34,8 +34,8 @@ class Parser : public Scoped {
             binaryOp->value.type = GenericValue::Type::Boolean;
         else if(binaryOp->children[0]->value.type == GenericValue::Type::Integer && binaryOp->children[1]->value.type == GenericValue::Type::Integer)
             binaryOp->value.type = GenericValue::Type::Integer;
-        else if(binaryOp->children[0]->value.type == GenericValue::Type::Array && binaryOp->children[0]->children.size() > 0 && binaryOp->children[0]->children[0]->value.type == GenericValue::Type::Integer &&
-                binaryOp->children[1]->value.type == GenericValue::Type::Integer)
+        else if(binaryOp->children[0]->value.type == GenericValue::Type::Array && binaryOp->children[0]->children.size() > 0 &&
+                binaryOp->children[0]->children[0]->value.type == GenericValue::Type::Integer && binaryOp->children[1]->value.type == GenericValue::Type::Integer)
             binaryOp->value.type = GenericValue::Type::Integer;
         else {
             warn("[Parser] Couldn't resolve operator return type (Missing impl.) on line {}. Children:\n", binaryOp->token.line);
@@ -138,6 +138,7 @@ class Parser : public Scoped {
                         currNode->children.pop_back();
                         return false;
                     }
+                    returnNode->value.type = returnNode->children[0]->value.type;
                     break;
                 }
                 case Tokenizer::Token::Type::Digits: {

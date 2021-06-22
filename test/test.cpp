@@ -168,7 +168,7 @@ int fib(int n) {
     return fib(n - 1) + fib(n - 2);
 }
 
-TEST(Function, Fibonacci) {
+TEST(Function, RecursionFibonacci) {
     LOAD_PARSE_INTERP("function/fib.lang");
     ast->optimize();
     std::vector<std::string> lines;
@@ -188,7 +188,7 @@ TEST(Function, Fibonacci) {
     }
 }
 
-TEST(Function, FibonacciArray) {
+TEST(Function, ArrayFibonacci) {
     LOAD_PARSE_INTERP("function/fib_array.lang");
     ast->optimize();
     std::vector<std::string> lines;

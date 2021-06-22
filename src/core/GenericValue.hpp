@@ -208,9 +208,9 @@ struct fmt::formatter<GenericValue::Type> {
     auto format(const GenericValue::Type& t, FormatContext& ctx) {
         switch(t) {
             using enum GenericValue::Type;
-            case Integer: return format_to(ctx.out(), "{}", "Integer");
-            case String: return format_to(ctx.out(), "{}", "String");
-            case Boolean: return format_to(ctx.out(), "{}", "Boolean");
+            case Integer: return format_to(ctx.out(), fg(fmt::color::golden_rod), "{}", "Integer");
+            case String: return format_to(ctx.out(), fg(fmt::color::burly_wood), "{}", "String");
+            case Boolean: return format_to(ctx.out(), fg(fmt::color::royal_blue), "{}", "Boolean");
             case Array: return format_to(ctx.out(), "{}", "Array");
             default: return format_to(ctx.out(), fg(fmt::color::gray), "{}", "Undefined");
         }
