@@ -13,14 +13,19 @@ class Tokenizer {
             Control,
             Function,
             Return,
+            // Constants
             Digits,
+            StringLiteral,
             Boolean,
+
             BuiltInType,
             Operator,
             Identifier,
+
             If,
             Else,
             While,
+
             Unknown
         };
 
@@ -100,6 +105,14 @@ class Tokenizer {
             if(first_char == ',') {
                 pointer += 1;
                 type = Token::Type::Control;
+            } else if(first_char == '"') {
+                ++pointer; // Skip '"'
+                while(pointer < _source.length() && _source[pointer] != '"')
+                    ++pointer;
+                assert(pointer < _source.length());
+                ++pointer; // Skip '"'
+                type = Token::Type::StringLiteral;
+                return Token{type, std::string_view{_source.begin() + begin + 1, _source.begin() + (pointer - 1)}, _current_line};
             } else if(is(first_char, control_characters)) {
                 pointer += 1;
                 type = Token::Type::Control;
@@ -110,7 +123,7 @@ class Tokenizer {
             } else {
                 // Binary Operators
                 // FIXME
-                while(!is_discardable(_source[pointer]) && is_allowed_in_operators(_source[pointer]) && pointer < _source.length())
+                while(pointer < _source.length() && !is_discardable(_source[pointer]) && is_allowed_in_operators(_source[pointer]))
                     ++pointer;
                 if(binary_operators.contains(std::string_view{_source.begin() + begin, _source.begin() + pointer})) {
                     type = Token::Type::Operator;

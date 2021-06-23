@@ -33,8 +33,9 @@ class Scope {
             return false;
         }
         switch(decNode.value.type) {
-            case GenericValue::Type::Integer: _variables[std::string{name}] = Variable{Variable::Type::Integer}; break;
-            case GenericValue::Type::Boolean: _variables[std::string{name}] = Variable{Variable::Type::Boolean}; break;
+            case GenericValue::Type::Integer: [[fallthrough]];
+            case GenericValue::Type::Boolean: [[fallthrough]];
+            case GenericValue::Type::String: _variables[std::string{name}] = Variable{decNode.value.type}; break;
             case GenericValue::Type::Array: {
 
                 Variable v{Variable::Type::Array};
@@ -44,7 +45,7 @@ class Scope {
                 _variables[std::string{name}] = v;
                 break;
             }
-            default: error("[Scope] Error on line {}: Unimplemented type '{}'.\n", line, decNode.value.type);
+            default: error("[Scope] Error on line {}: Unimplemented type '{}'.\n", line, decNode.value.type); return false;
         }
         return true;
     }

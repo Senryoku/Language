@@ -52,7 +52,7 @@ bool Parser::parse_next_expression(const std::span<Tokenizer::Token>& tokens, st
 
     bool stop = false;
 
-    while(it != tokens.end() && it->value != ";" && it->value != "," && !stop) {
+    while(it != tokens.end() && !(it->type == Tokenizer::Token::Type::Control && (it->value == ";" || it->value == ",")) && !stop) {
         // TODO: Check other types!
         switch(it->type) {
             using enum Tokenizer::Token::Type;
@@ -63,6 +63,11 @@ bool Parser::parse_next_expression(const std::span<Tokenizer::Token>& tokens, st
             }
             case Boolean: {
                 if(!parse_boolean(tokens, it, exprNode))
+                    return false;
+                break;
+            }
+            case StringLiteral: {
+                if(!parse_string(tokens, it, exprNode))
                     return false;
                 break;
             }
@@ -123,6 +128,7 @@ bool Parser::parse_identifier(const std::span<Tokenizer::Token>& tokens, std::sp
     assert(it->type == Tokenizer::Token::Type::Identifier);
     // Function Call
     if(it + 1 != tokens.end() && (it + 1)->value == "(") {
+        const auto start = (it + 1);
         // TODO: Check if the function has been declared (or is a built-in?) & Fetch corresponding FunctionDeclaration Node.
         auto callNode = currNode->add_child(new AST::Node(AST::Node::Type::FunctionCall, *it));
         callNode->value.type = GenericValue::Type::Integer; // TODO: Actually compute the return type (Could it be depend on the actual parameter type at the call site? Like
@@ -136,10 +142,10 @@ bool Parser::parse_identifier(const std::span<Tokenizer::Token>& tokens, std::sp
                 ++it;
         }
         if(it == tokens.end()) {
-            error("[Parser] Syntax error: Unmatched '(' on line {}, got to end-of-file.\n", it->line);
+            error("[Parser] Syntax error: Unmatched '(' on line {}, got to end-of-file.\n", start->line);
             return false;
-        } else
-            ++it;
+        }
+        ++it;
         return true;
     } else { // Variable
         auto maybe_variable = get(it->value);
@@ -279,6 +285,14 @@ bool Parser::parse_boolean(const std::span<Tokenizer::Token>&, std::span<Tokeniz
     auto boolNode = currNode->add_child(new AST::Node(AST::Node::Type::ConstantValue, *it));
     boolNode->value.type = GenericValue::Type::Boolean;
     boolNode->value.value.as_bool = it->value == "true";
+    ++it;
+    return true;
+}
+
+bool Parser::parse_string(const std::span<Tokenizer::Token>&, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode) {
+    auto strNode = currNode->add_child(new AST::Node(AST::Node::Type::ConstantValue, *it));
+    strNode->value.type = GenericValue::Type::String;
+    strNode->value.value.as_string = it->value;
     ++it;
     return true;
 }

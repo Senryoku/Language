@@ -10,8 +10,8 @@ struct GenericValue {
     enum class Type
     {
         Integer,
-        String,
         Boolean,
+        String,
         Array,
         Composite,
         Undefined
@@ -148,6 +148,8 @@ inline static GenericValue::Type parse_type(const std::string_view& str) {
         return Integer;
     else if(str == "bool")
         return Boolean;
+    else if(str == "string")
+        return String;
     return Undefined;
 }
 
@@ -179,7 +181,7 @@ struct fmt::formatter<GenericValue> {
         switch(v.type) {
             using enum GenericValue::Type;
             case Integer: return format_to(ctx.out(), "{}:{}", v.type, v.value.as_int32_t);
-            case String: return format_to(ctx.out(), "{}:{}", v.type, v.value.as_string);
+            case String: return format_to(ctx.out(), "{}:{}", v.type, v.value.as_string.to_std_string_view());
             case Boolean: return format_to(ctx.out(), "{}:{}", v.type, v.value.as_bool ? "True" : "False");
             case Array: {
                 auto r = format_to(ctx.out(), "{}:{}[{}]", v.type, v.value.as_array.type, v.value.as_array.capacity);

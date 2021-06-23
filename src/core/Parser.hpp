@@ -34,6 +34,8 @@ class Parser : public Scoped {
             binaryOp->value.type = GenericValue::Type::Boolean;
         else if(binaryOp->children[0]->value.type == GenericValue::Type::Integer && binaryOp->children[1]->value.type == GenericValue::Type::Integer)
             binaryOp->value.type = GenericValue::Type::Integer;
+        else if(binaryOp->children[0]->value.type == GenericValue::Type::String && binaryOp->children[1]->value.type == GenericValue::Type::String)
+            binaryOp->value.type = GenericValue::Type::String;
         else if(binaryOp->children[0]->value.type == GenericValue::Type::Array && binaryOp->children[0]->children.size() > 0 &&
                 binaryOp->children[0]->children[0]->value.type == GenericValue::Type::Integer && binaryOp->children[1]->value.type == GenericValue::Type::Integer)
             binaryOp->value.type = GenericValue::Type::Integer;
@@ -96,7 +98,9 @@ class Parser : public Scoped {
                                 return false;
                             break;
                         }
-                        case ')': error("Unmatched ')' on line {}.\n", it->line); return false;
+                        case ')': // Should have been handled by others parsing functions.
+                            error("Unmatched ')' on line {}.\n", it->line);
+                            return false;
                         case ';': // Just do nothing
                             ++it;
                             break;
@@ -151,6 +155,11 @@ class Parser : public Scoped {
                         return false;
                     break;
                 }
+                case Tokenizer::Token::Type::StringLiteral: {
+                    if(!parse_string(tokens, it, currNode))
+                        return false;
+                    break;
+                }
                 case Tokenizer::Token::Type::Operator: {
                     if(!parse_binary_operator(tokens, it, currNode))
                         return false;
@@ -190,6 +199,7 @@ class Parser : public Scoped {
     bool parse_function_declaration(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode);
     bool parse_digits(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode);
     bool parse_boolean(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode);
+    bool parse_string(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode);
     bool parse_binary_operator(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode);
     bool parse_variable_declaration(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode);
 };

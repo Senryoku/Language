@@ -22,9 +22,11 @@ class AST {
             WhileStatement,
             ReturnStatement,
             VariableDeclaration,
+            Variable,
             FunctionDeclaration,
             FunctionCall,
-            Variable,
+            BuiltInFunctionDeclaration,
+            // BuiltInFunctionCall,
             ConstantValue,
             BinaryOperator,
 

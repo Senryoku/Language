@@ -5,7 +5,7 @@
 #include <Scope.hpp>
 #include <VariableStore.hpp>
 
-constexpr bool is_assignable(GenericValue& var, GenericValue& val) {
+constexpr bool is_assignable(const GenericValue& var, const GenericValue& val) {
     // TODO
     return var.type == val.type || (var.type == GenericValue::Type::Array && (var.value.as_array.type == val.type));
 }
@@ -13,7 +13,10 @@ constexpr bool is_assignable(GenericValue& var, GenericValue& val) {
 class Interpreter : public Scoped {
   public:
     Interpreter() {
-        push_scope(); // TODO: Push an empty for now.
+        push_scope(); // TODO: Push an empty scope for now.
+        _builtin_print.reset(new AST::Node(AST::Node::Type::BuiltInFunctionDeclaration));
+        _builtin_print->token.value = "print"; // We have to provide a name via the token.
+        get_scope().declare_function(*_builtin_print);
     }
 
     ~Interpreter() {
@@ -74,7 +77,15 @@ class Interpreter : public Scoped {
                     error("Runtime error: function {} as not been declared in this scope (line {}).\n", node.token.value, node.token.line);
                     break;
                 }
+                if(functionNode->type == BuiltInFunctionDeclaration) {
+                    fmt::print("Call to builtin function.\n");
+                    for(size_t i = 0; i < node.children.size(); ++i) {
+                        fmt::print("  {}\n", execute(*node.children[i]));
+                    }
+                    break;
+                }
                 // TODO: Check arguments count and type
+                assert(node.children.size() == functionNode->children.size() - 1); // FIXME: Turn this into a runtime error and handle optional arguments
                 // Execute argement in the caller scope.
                 std::vector<GenericValue> arguments_values;
                 for(size_t i = 0; i < functionNode->children.size() - 1; ++i)
@@ -207,4 +218,7 @@ class Interpreter : public Scoped {
     GenericValue _return_value{.type = GenericValue::Type::Integer, .value = 0}; // FIXME: Probably not the right move!
 
     std::vector<GenericValue*> _allocated_arrays;
+
+    // FIXME
+    std::shared_ptr<AST::Node> _builtin_print{nullptr};
 };
