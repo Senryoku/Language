@@ -222,9 +222,8 @@ bool Parser::parse_function_declaration(const std::span<Tokenizer::Token>& token
         error("Expected identifier in function declaration on line {}, got {}.\n", it->line, it->value);
         return false;
     }
-    functionNode->token = *it; // Store the function name using its token.
-    functionNode->value.type = GenericValue::Type::String;
-    functionNode->value.value.as_string = it->value;
+    functionNode->token = *it;                              // Store the function name using its token.
+    functionNode->value.type = GenericValue::Type::Integer; // TODO: Actually compute the return type (will probably just be part of the declation.)
     ++it;
     if(it->value != "(") {
         error("Expected '(' in function declaration on line {}, got {}.\n", it->line, it->value);
