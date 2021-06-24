@@ -9,8 +9,9 @@
 struct GenericValue {
     enum class Type
     {
-        Integer,
         Boolean,
+        Integer,
+        Float,
         String,
         Array,
         Composite,
@@ -40,11 +41,30 @@ struct GenericValue {
     };
 
     union ValueUnion {
-        int32_t    as_int32_t;
-        StringView as_string; // Not sure if this is the right choice?
         bool       as_bool;
+        int32_t    as_int32_t;
+        float      as_float;
+        StringView as_string; // Not sure if this is the right choice?
         Array      as_array;
     };
+
+    static GenericValue::Type resolve_operator_type(const std::string_view& op, GenericValue::Type lhs, GenericValue::Type rhs) {
+        // TODO: Cleanup?
+        if(op == "==" || op == "!=" || op == "<" || op == ">" || op == "=>" || op == "<=")
+            return GenericValue::Type::Boolean;
+        else if(lhs == GenericValue::Type::Integer && rhs == GenericValue::Type::Integer)
+            return GenericValue::Type::Integer;
+        else if(lhs == GenericValue::Type::Float && rhs == GenericValue::Type::Float)
+            return GenericValue::Type::Float;
+        else if((lhs == GenericValue::Type::Integer && rhs == GenericValue::Type::Float) ||
+                (lhs == GenericValue::Type::Float && rhs == GenericValue::Type::Integer)) // Promote integer to Float
+            return GenericValue::Type::Float;
+        else if(lhs == GenericValue::Type::String && rhs == GenericValue::Type::String)
+            return GenericValue::Type::String;
+        return GenericValue::Type::Undefined;
+    }
+
+    // Boolean operators
 
     GenericValue operator==(const GenericValue& rhs) {
         GenericValue r{.type = Type::Boolean};
@@ -53,6 +73,7 @@ struct GenericValue {
             return r;
         switch(type) {
             case Type::Integer: r.value.as_bool = value.as_int32_t == rhs.value.as_int32_t; break;
+            case Type::Float: r.value.as_bool = value.as_float == rhs.value.as_float; break;
             case Type::String: assert(false); break; // TODO
             case Type::Boolean: r.value.as_bool = value.as_bool == rhs.value.as_bool; break;
             default: assert(false); break;
@@ -67,12 +88,45 @@ struct GenericValue {
         return r;
     }
 
+    GenericValue operator<(const GenericValue& rhs) {
+        GenericValue r{.type = Type::Boolean};
+        r.value.as_bool = false;
+        if(type != rhs.type) // TODO: Hanlde implicit conversion?
+            return r;
+        switch(type) {
+            case Type::Integer: r.value.as_bool = value.as_int32_t < rhs.value.as_int32_t; break;
+            case Type::Float: r.value.as_bool = value.as_float < rhs.value.as_float; break;
+            case Type::String: assert(false); break; // TODO
+            case Type::Boolean: r.value.as_bool = value.as_bool == rhs.value.as_bool; break;
+            default: assert(false); break;
+        }
+        return r;
+    }
+
+    GenericValue operator>(const GenericValue& rhs) {
+        GenericValue r{.type = Type::Boolean};
+        r.value.as_bool = false;
+        if(type != rhs.type) // TODO: Hanlde implicit conversion?
+            return r;
+        switch(type) {
+            case Type::Integer: r.value.as_bool = value.as_int32_t > rhs.value.as_int32_t; break;
+            case Type::Float: r.value.as_bool = value.as_float > rhs.value.as_float; break;
+            case Type::String: assert(false); break; // TODO
+            case Type::Boolean: r.value.as_bool = value.as_bool == rhs.value.as_bool; break;
+            default: assert(false); break;
+        }
+        return r;
+    }
+
+    // Arithmetic operators
+
     GenericValue operator+(const GenericValue& rhs) {
-        GenericValue r{.type = Type::Integer};
+        GenericValue r{.type = resolve_operator_type("+", type, rhs.type)};
         if(type != rhs.type)
             return r;
         switch(type) {
             case Type::Integer: r.value.as_int32_t = value.as_int32_t + rhs.value.as_int32_t; break;
+            case Type::Float: r.value.as_float = value.as_float + rhs.value.as_float; break;
             case Type::String: assert(false); break;  // TODO
             case Type::Boolean: assert(false); break; // Invalid
             default: assert(false); break;
@@ -81,11 +135,12 @@ struct GenericValue {
     }
 
     GenericValue operator-(const GenericValue& rhs) {
-        GenericValue r{.type = Type::Integer};
+        GenericValue r{.type = resolve_operator_type("-", type, rhs.type)};
         if(type != rhs.type)
             return r;
         switch(type) {
             case Type::Integer: r.value.as_int32_t = value.as_int32_t - rhs.value.as_int32_t; break;
+            case Type::Float: r.value.as_float = value.as_float - rhs.value.as_float; break;
             case Type::String: assert(false); break;  // TODO
             case Type::Boolean: assert(false); break; // Invalid
             default: assert(false); break;
@@ -94,11 +149,12 @@ struct GenericValue {
     }
 
     GenericValue operator*(const GenericValue& rhs) {
-        GenericValue r{.type = Type::Integer};
+        GenericValue r{.type = resolve_operator_type("*", type, rhs.type)};
         if(type != rhs.type)
             return r;
         switch(type) {
             case Type::Integer: r.value.as_int32_t = value.as_int32_t * rhs.value.as_int32_t; break;
+            case Type::Float: r.value.as_float = value.as_float * rhs.value.as_float; break;
             case Type::String: assert(false); break;  // TODO
             case Type::Boolean: assert(false); break; // Invalid
             default: assert(false); break;
@@ -107,11 +163,12 @@ struct GenericValue {
     }
 
     GenericValue operator/(const GenericValue& rhs) {
-        GenericValue r{.type = Type::Integer};
+        GenericValue r{.type = resolve_operator_type("/", type, rhs.type)};
         if(type != rhs.type)
             return r;
         switch(type) {
             case Type::Integer: r.value.as_int32_t = value.as_int32_t / rhs.value.as_int32_t; break;
+            case Type::Float: r.value.as_float = value.as_float / rhs.value.as_float; break;
             case Type::String: assert(false); break;  // TODO
             case Type::Boolean: assert(false); break; // Invalid
             default: assert(false); break;
@@ -120,7 +177,7 @@ struct GenericValue {
     }
 
     GenericValue operator^(const GenericValue& rhs) {
-        GenericValue r{.type = Type::Integer};
+        GenericValue r{.type = resolve_operator_type("^", type, rhs.type)};
         if(type != rhs.type)
             return r;
         switch(type) {
@@ -129,6 +186,13 @@ struct GenericValue {
                 r.value.as_int32_t = 1;
                 while(--exp > 0)
                     r.value.as_int32_t *= value.as_int32_t;
+                break;
+            }
+            case Type::Float: {
+                auto exp = rhs.value.as_float;
+                r.value.as_float = 1;
+                while(--exp > 0)
+                    r.value.as_float *= value.as_float;
                 break;
             }
             case Type::String: assert(false); break;  // TODO
@@ -146,6 +210,8 @@ inline static GenericValue::Type parse_type(const std::string_view& str) {
     using enum GenericValue::Type;
     if(str == "int")
         return Integer;
+    else if(str == "float")
+        return Float;
     else if(str == "bool")
         return Boolean;
     else if(str == "string")
@@ -181,6 +247,7 @@ struct fmt::formatter<GenericValue> {
         switch(v.type) {
             using enum GenericValue::Type;
             case Integer: return format_to(ctx.out(), "{}:{}", v.type, v.value.as_int32_t);
+            case Float: return format_to(ctx.out(), "{}:{}", v.type, v.value.as_float);
             case String: return format_to(ctx.out(), "{}:{}", v.type, v.value.as_string.to_std_string_view());
             case Boolean: return format_to(ctx.out(), "{}:{}", v.type, v.value.as_bool ? "True" : "False");
             case Array: {
@@ -211,6 +278,7 @@ struct fmt::formatter<GenericValue::Type> {
         switch(t) {
             using enum GenericValue::Type;
             case Integer: return format_to(ctx.out(), fg(fmt::color::golden_rod), "{}", "Integer");
+            case Float: return format_to(ctx.out(), fg(fmt::color::golden_rod), "{}", "Float");
             case String: return format_to(ctx.out(), fg(fmt::color::burly_wood), "{}", "String");
             case Boolean: return format_to(ctx.out(), fg(fmt::color::royal_blue), "{}", "Boolean");
             case Array: return format_to(ctx.out(), "{}", "Array");

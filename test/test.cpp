@@ -103,6 +103,11 @@ TEST(Arithmetic, Assignment) {
     EXPECT_EQ(interpreter.get_return_value().value.as_int32_t, 69);
 }
 
+TEST(Arithmetic, Float) {
+    LOAD_PARSE_INTERP("basic/float.lang");
+    EXPECT_EQ(static_cast<int>(interpreter.get_return_value().value.as_float), 11313); // We shouldn't compare floats directly.
+}
+
 TEST(Keywords, Return) {
     PARSE_INTERP("return 458;");
     EXPECT_EQ(interpreter.get_return_value().value.as_int32_t, 458);

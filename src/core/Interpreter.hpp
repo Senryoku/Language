@@ -162,34 +162,18 @@ class Interpreter : public Scoped {
                     break;
                 }
 
-                // TODO: Abstract this. (GenericValue operators? Free function(s) ?)
-                if(lhs.type == GenericValue::Type::Integer && rhs.type == GenericValue::Type::Integer) {
-                    if(node.token.value.length() == 1) {
-                        _return_value.type = GenericValue::Type::Integer;
-                        switch(node.token.value[0]) {
-                            case '+': _return_value.value.as_int32_t = lhs.value.as_int32_t + rhs.value.as_int32_t; break;
-                            case '-': _return_value.value.as_int32_t = lhs.value.as_int32_t - rhs.value.as_int32_t; break;
-                            case '*': _return_value.value.as_int32_t = lhs.value.as_int32_t * rhs.value.as_int32_t; break;
-                            case '/': _return_value.value.as_int32_t = lhs.value.as_int32_t / rhs.value.as_int32_t; break;
-                            case '<':
-                                _return_value.type = GenericValue::Type::Boolean;
-                                _return_value.value.as_bool = lhs.value.as_int32_t < rhs.value.as_int32_t;
-                                break;
-                            case '>':
-                                _return_value.type = GenericValue::Type::Boolean;
-                                _return_value.value.as_bool = lhs.value.as_int32_t > rhs.value.as_int32_t;
-                                break;
-                            default: error("BinaryOperator: Unsupported operation ('{}') on Integer.\n", node.token.value);
-                        }
-                    } else {
-                        if(node.token.value == "==") {
-                            _return_value = lhs == rhs;
-                        }
-                    }
-                    return _return_value;
-                }
+                // Call the appropriate operator, see GenericValue operator overloads
+#define OP(O)                  \
+    if(node.token.value == #O) \
+        _return_value = lhs O rhs;
 
-                error("BinaryOperator: Unsupported operation ('{}') on {} and {}.\n", node.token.value, lhs, rhs);
+                OP(+)
+                else OP(-) else OP(*) else OP(/) else OP(<) else OP(>) else OP(==) else OP(!=) else error("BinaryOperator: Unsupported operation ('{}') on {} and {}.\n",
+                                                                                                          node.token.value, lhs, rhs);
+#undef OP
+
+                return _return_value;
+
                 break;
             }
             case ConstantValue: {

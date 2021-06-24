@@ -5,6 +5,8 @@
 #include <string>
 #include <string_view>
 
+#include <Logger.hpp>
+
 class Tokenizer {
   public:
     struct Token {
@@ -15,6 +17,7 @@ class Tokenizer {
             Return,
             // Constants
             Digits,
+            Float,
             StringLiteral,
             Boolean,
 
@@ -117,9 +120,19 @@ class Tokenizer {
                 pointer += 1;
                 type = Token::Type::Control;
             } else if(is_digit(first_char)) {
-                while(is_digit(_source[pointer]) && pointer < _source.length())
+                bool found_decimal_separator = false;
+                while(pointer < _source.length() && (is_digit(_source[pointer]) || _source[pointer] == '.')) {
+                    if(_source[pointer] == '.') {
+                        if(found_decimal_separator)
+                            error("[Tokenizer] Unexcepted supernumerary '.' in float constant on line {}.\n", _current_line);
+                        found_decimal_separator = true;
+                    }
                     ++pointer;
-                type = Token::Type::Digits;
+                }
+                if(found_decimal_separator)
+                    type = Token::Type::Float;
+                else
+                    type = Token::Type::Digits;
             } else {
                 // Binary Operators
                 // FIXME

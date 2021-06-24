@@ -26,20 +26,12 @@ class Parser : public Scoped {
         {"<=", (uint8_t)1}, {"+", (uint8_t)2},  {"-", (uint8_t)2},  {"*", (uint8_t)3}, {"/", (uint8_t)3}, {"^", (uint8_t)4},
     };
 
-    void resolve_operator_type(AST::Node* binaryOp) {
+    static void resolve_operator_type(AST::Node* binaryOp) {
         assert(binaryOp->type == AST::Node::Type::BinaryOperator);
-        // TODO
-        if(binaryOp->token.value == "==" || binaryOp->token.value == "!=" || binaryOp->token.value == "<" || binaryOp->token.value == ">" || binaryOp->token.value == "=>" ||
-           binaryOp->token.value == "<=")
-            binaryOp->value.type = GenericValue::Type::Boolean;
-        else if(binaryOp->children[0]->value.type == GenericValue::Type::Integer && binaryOp->children[1]->value.type == GenericValue::Type::Integer)
-            binaryOp->value.type = GenericValue::Type::Integer;
-        else if(binaryOp->children[0]->value.type == GenericValue::Type::String && binaryOp->children[1]->value.type == GenericValue::Type::String)
-            binaryOp->value.type = GenericValue::Type::String;
-        else if(binaryOp->children[0]->value.type == GenericValue::Type::Array && binaryOp->children[0]->children.size() > 0 &&
-                binaryOp->children[0]->children[0]->value.type == GenericValue::Type::Integer && binaryOp->children[1]->value.type == GenericValue::Type::Integer)
-            binaryOp->value.type = GenericValue::Type::Integer;
-        else {
+        const auto lhs = binaryOp->children[0]->value.type;
+        const auto rhs = binaryOp->children[1]->value.type;
+        binaryOp->value.type = GenericValue::resolve_operator_type(binaryOp->token.value, lhs, rhs);
+        if(binaryOp->value.type == GenericValue::Type::Undefined) {
             warn("[Parser] Couldn't resolve operator return type (Missing impl.) on line {}. Children:\n", binaryOp->token.line);
             fmt::print("LHS: {}RHS: {}\n", *binaryOp->children[0], *binaryOp->children[1]);
         }
@@ -145,13 +137,20 @@ class Parser : public Scoped {
                     returnNode->value.type = returnNode->children[0]->value.type;
                     break;
                 }
+
+                // Constants
+                case Tokenizer::Token::Type::Boolean: {
+                    if(!parse_boolean(tokens, it, currNode))
+                        return false;
+                    break;
+                }
                 case Tokenizer::Token::Type::Digits: {
                     if(!parse_digits(tokens, it, currNode))
                         return false;
                     break;
                 }
-                case Tokenizer::Token::Type::Boolean: {
-                    if(!parse_boolean(tokens, it, currNode))
+                case Tokenizer::Token::Type::Float: {
+                    if(!parse_float(tokens, it, currNode))
                         return false;
                     break;
                 }
@@ -160,6 +159,7 @@ class Parser : public Scoped {
                         return false;
                     break;
                 }
+
                 case Tokenizer::Token::Type::Operator: {
                     if(!parse_binary_operator(tokens, it, currNode))
                         return false;
@@ -197,8 +197,9 @@ class Parser : public Scoped {
     bool parse_scope_or_single_statement(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode);
     bool parse_while(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode);
     bool parse_function_declaration(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode);
-    bool parse_digits(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode);
     bool parse_boolean(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode);
+    bool parse_digits(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode);
+    bool parse_float(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode);
     bool parse_string(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode);
     bool parse_binary_operator(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode);
     bool parse_variable_declaration(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode);

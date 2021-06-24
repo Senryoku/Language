@@ -56,13 +56,18 @@ bool Parser::parse_next_expression(const std::span<Tokenizer::Token>& tokens, st
         // TODO: Check other types!
         switch(it->type) {
             using enum Tokenizer::Token::Type;
+            case Boolean: {
+                if(!parse_boolean(tokens, it, exprNode))
+                    return false;
+                break;
+            }
             case Digits: {
                 if(!parse_digits(tokens, it, exprNode))
                     return false;
                 break;
             }
-            case Boolean: {
-                if(!parse_boolean(tokens, it, exprNode))
+            case Float: {
+                if(!parse_float(tokens, it, exprNode))
                     return false;
                 break;
             }
@@ -272,6 +277,14 @@ bool Parser::parse_function_declaration(const std::span<Tokenizer::Token>& token
     return true;
 }
 
+bool Parser::parse_boolean(const std::span<Tokenizer::Token>&, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode) {
+    auto boolNode = currNode->add_child(new AST::Node(AST::Node::Type::ConstantValue, *it));
+    boolNode->value.type = GenericValue::Type::Boolean;
+    boolNode->value.value.as_bool = it->value == "true";
+    ++it;
+    return true;
+}
+
 bool Parser::parse_digits(const std::span<Tokenizer::Token>&, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode) {
     auto integer = currNode->add_child(new AST::Node(AST::Node::Type::ConstantValue, *it));
     integer->value.type = GenericValue::Type::Integer;
@@ -280,10 +293,10 @@ bool Parser::parse_digits(const std::span<Tokenizer::Token>&, std::span<Tokenize
     return true;
 }
 
-bool Parser::parse_boolean(const std::span<Tokenizer::Token>&, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode) {
-    auto boolNode = currNode->add_child(new AST::Node(AST::Node::Type::ConstantValue, *it));
-    boolNode->value.type = GenericValue::Type::Boolean;
-    boolNode->value.value.as_bool = it->value == "true";
+bool Parser::parse_float(const std::span<Tokenizer::Token>&, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode) {
+    auto floatNode = currNode->add_child(new AST::Node(AST::Node::Type::ConstantValue, *it));
+    floatNode->value.type = GenericValue::Type::Float;
+    auto result = std::from_chars(&*(it->value.begin()), &*(it->value.begin()) + it->value.length(), floatNode->value.value.as_float);
     ++it;
     return true;
 }
