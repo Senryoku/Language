@@ -24,12 +24,13 @@ void print(Args&&... args) {
 }
 
 struct Indenter {
-    size_t indent = 0;
+    const size_t tab_size = 4;
+    size_t       indent = 0;
 
-    void group() { indent += 4; }
+    void group() { indent += tab_size; }
     void end() {
-        if(indent >= 4)
-            indent -= 4;
+        if(indent >= tab_size)
+            indent -= tab_size;
         else
             indent = 0;
     }
@@ -37,6 +38,11 @@ struct Indenter {
     template <typename... Args>
     void print(fmt::string_view format_str, Args&&... args) {
         fmt::print("{:{}}", "", indent);
+        fmt::print(format_str, std::forward<Args>(args)...);
+    }
+
+    template <typename... Args>
+    void print_same_line(fmt::string_view format_str, Args&&... args) {
         fmt::print(format_str, std::forward<Args>(args)...);
     }
 };
