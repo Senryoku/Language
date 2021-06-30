@@ -27,8 +27,9 @@ class Interpreter : public Scoped {
 
     void execute(const AST& ast) { execute(ast.getRoot()); }
 
-    void allocate_array(Variable& var) {
+    void allocate_array(Variable& var, uint32_t size) {
         assert(var.type == GenericValue::Type::Array);
+        var.value.as_array.capacity = size;
         auto arr = new GenericValue[var.value.as_array.capacity];
         _allocated_arrays.push_back(arr);
         var.value.as_array.items = arr;
@@ -110,8 +111,11 @@ class Interpreter : public Scoped {
             case VariableDeclaration: {
                 assert(!get_scope().is_declared(node.token.value));
                 get_scope().declare_variable(node);
-                if(node.value.type == GenericValue::Type::Array)
-                    allocate_array(get_scope().get(node.token.value));
+                if(node.value.type == GenericValue::Type::Array) {
+                    auto capacity = execute(*node.children[0]);           // Compute requested capacity
+                    assert(capacity.type == GenericValue::Type::Integer); // FIXME: Turn this into a runtime error
+                    allocate_array(get_scope().get(node.token.value), capacity.value.as_int32_t);
+                }
                 return node.value; // FIXME
                 break;
             }
@@ -125,10 +129,11 @@ class Interpreter : public Scoped {
                     if(node.children.size() == 1) { // Accessed using an index
                         auto index = execute(*node.children[0]);
                         assert(index.type == GenericValue::Type::Integer);
-                        assert((size_t)index.value.as_int32_t < node.value.value.as_array.capacity); // FIXME: Should be a runtime error?
+                        assert((size_t)index.value.as_int32_t < pVar->value.as_array.capacity); // FIXME: Should be a runtime error?
                         return pVar->value.as_array.items[index.value.as_int32_t];
                     }
                 }
+                _return_value = *pVar;
                 return *pVar; // FIXME: Make sure GenericValue & Variable are transparent? Remove the 'Variable' type?
                 break;
             }

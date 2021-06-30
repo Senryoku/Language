@@ -348,8 +348,12 @@ bool Parser::parse_variable_declaration(const std::span<Tokenizer::Token>& token
         varDecNode->value.value.as_array.type = varDecNode->value.type;
         varDecNode->value.type = GenericValue::Type::Array;
         ++it;
-        std::from_chars(&*(it->value.begin()), &*(it->value.begin()) + it->value.length(), varDecNode->value.value.as_array.capacity);
-        ++it;
+        if(!parse_next_expression(tokens, it, varDecNode, 0)) {
+            return false;
+        }
+        assert(varDecNode->children.size() == 1);
+        // TODO: Check if size expression could be simplified to a constant here?
+        // std::from_chars(&*(it->value.begin()), &*(it->value.begin()) + it->value.length(), varDecNode->value.value.as_array.capacity);
         if(it == tokens.end()) {
             error("[Parser] Syntax error: Expected ']', got end-of-document.");
             return false;
