@@ -18,6 +18,13 @@ struct GenericValue {
         Undefined
     };
 
+    static bool is_numeric(Type t) { return t == Type::Integer || t == Type::Float; }
+    static Type common_type(Type t0, Type t1) {
+        if(t0 == Type::Float || t1 == Type::Float)
+            return Type::Float;
+        return Type::Integer;
+    }
+
     struct StringView {
         const char* begin;
         uint32_t    size;
@@ -91,11 +98,43 @@ struct GenericValue {
     GenericValue operator<(const GenericValue& rhs) {
         GenericValue r{.type = Type::Boolean};
         r.value.as_bool = false;
-        if(type != rhs.type) // TODO: Hanlde implicit conversion?
-            return r;
+        if(type != rhs.type) { // TODO: Hanlde implicit conversion?
+            if(is_numeric(type) && is_numeric(rhs.type)) {
+                Type t = common_type(type, rhs.type);
+                switch(t) {
+                    case Type::Integer: r.value.as_bool = to_int32_t() < rhs.to_int32_t(); break;
+                    case Type::Float: r.value.as_bool = to_float() < rhs.to_float(); break;
+                    default: assert(false); break;
+                }
+            }
+            return r; // We don't know what to do! (yet?)
+        }
         switch(type) {
             case Type::Integer: r.value.as_bool = value.as_int32_t < rhs.value.as_int32_t; break;
             case Type::Float: r.value.as_bool = value.as_float < rhs.value.as_float; break;
+            case Type::String: assert(false); break; // TODO
+            default: assert(false); break;
+        }
+        return r;
+    }
+
+    GenericValue operator<=(const GenericValue& rhs) {
+        GenericValue r{.type = Type::Boolean};
+        r.value.as_bool = false;
+        if(type != rhs.type) { // TODO: Hanlde implicit conversion?
+            if(is_numeric(type) && is_numeric(rhs.type)) {
+                Type t = common_type(type, rhs.type);
+                switch(t) {
+                    case Type::Integer: r.value.as_bool = to_int32_t() <= rhs.to_int32_t(); break;
+                    case Type::Float: r.value.as_bool = to_float() <= rhs.to_float(); break;
+                    default: assert(false); break;
+                }
+            }
+            return r; // We don't know what to do! (yet?)
+        }
+        switch(type) {
+            case Type::Integer: r.value.as_bool = value.as_int32_t <= rhs.value.as_int32_t; break;
+            case Type::Float: r.value.as_bool = value.as_float <= rhs.value.as_float; break;
             case Type::String: assert(false); break; // TODO
             case Type::Boolean: r.value.as_bool = value.as_bool == rhs.value.as_bool; break;
             default: assert(false); break;
@@ -106,11 +145,43 @@ struct GenericValue {
     GenericValue operator>(const GenericValue& rhs) {
         GenericValue r{.type = Type::Boolean};
         r.value.as_bool = false;
-        if(type != rhs.type) // TODO: Hanlde implicit conversion?
-            return r;
+        if(type != rhs.type) { // TODO: Hanlde implicit conversion?
+            if(is_numeric(type) && is_numeric(rhs.type)) {
+                Type t = common_type(type, rhs.type);
+                switch(t) {
+                    case Type::Integer: r.value.as_bool = to_int32_t() > rhs.to_int32_t(); break;
+                    case Type::Float: r.value.as_bool = to_float() > rhs.to_float(); break;
+                    default: assert(false); break;
+                }
+            }
+            return r; // We don't know what to do! (yet?)
+        }
         switch(type) {
             case Type::Integer: r.value.as_bool = value.as_int32_t > rhs.value.as_int32_t; break;
             case Type::Float: r.value.as_bool = value.as_float > rhs.value.as_float; break;
+            case Type::String: assert(false); break; // TODO
+            default: assert(false); break;
+        }
+        return r;
+    }
+
+    GenericValue operator>=(const GenericValue& rhs) {
+        GenericValue r{.type = Type::Boolean};
+        r.value.as_bool = false;
+        if(type != rhs.type) { // TODO: Hanlde implicit conversion?
+            if(is_numeric(type) && is_numeric(rhs.type)) {
+                Type t = common_type(type, rhs.type);
+                switch(t) {
+                    case Type::Integer: r.value.as_bool = to_int32_t() >= rhs.to_int32_t(); break;
+                    case Type::Float: r.value.as_bool = to_float() >= rhs.to_float(); break;
+                    default: assert(false); break;
+                }
+            }
+            return r; // We don't know what to do! (yet?)
+        }
+        switch(type) {
+            case Type::Integer: r.value.as_bool = value.as_int32_t >= rhs.value.as_int32_t; break;
+            case Type::Float: r.value.as_bool = value.as_float >= rhs.value.as_float; break;
             case Type::String: assert(false); break; // TODO
             case Type::Boolean: r.value.as_bool = value.as_bool == rhs.value.as_bool; break;
             default: assert(false); break;
@@ -230,6 +301,23 @@ struct GenericValue {
             default: assert(false); break;
         }
         return r;
+    }
+
+    // Conversion utilities
+    float to_float() const {
+        if(type == Type::Integer)
+            return static_cast<float>(value.as_int32_t);
+        if(type == Type::Float)
+            return value.as_float;
+        assert(false);
+    }
+
+    int32_t to_int32_t() const {
+        if(type == Type::Integer)
+            return value.as_int32_t;
+        if(type == Type::Float)
+            return static_cast<int32_t>(value.as_float);
+        assert(false);
     }
 
     Type       type;
