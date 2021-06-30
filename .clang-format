@@ -16,3 +16,5 @@ AllowShortBlocksOnASingleLine: true
 AllowShortCaseLabelsOnASingleLine: true
 AllowShortFunctionsOnASingleLine: Inline
 AlignConsecutiveMacros: true
+SpaceAfterTemplateKeyword: false
+SpacesInAngles: false

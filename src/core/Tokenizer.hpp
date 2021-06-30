@@ -77,7 +77,7 @@ class Tokenizer {
         ';', '(', ')', '{', '}', '[', ']',
     };
 
-    template <size_t N>
+    template<size_t N>
     static bool is(char c, std::array<char, N> arr) {
         for(const auto& s : arr)
             if(s == c)
@@ -85,12 +85,13 @@ class Tokenizer {
         return false;
     }
 
-    const het_unordered_map<Token::Type> binary_operators{{"=", Token::Type::Operator}, {"*", Token::Type::Operator}, {"+", Token::Type::Operator},  {"-", Token::Type::Operator},
-                                                          {"/", Token::Type::Operator}, {"^", Token::Type::Operator}, {"==", Token::Type::Operator}, {"!=", Token::Type::Operator},
-                                                          {">", Token::Type::Operator}, {"<", Token::Type::Operator}, {">=", Token::Type::Operator}, {"<=", Token::Type::Operator}};
+    const het_unordered_map<Token::Type> binary_operators{
+        {"=", Token::Type::Operator},  {"*", Token::Type::Operator},  {"+", Token::Type::Operator},  {"-", Token::Type::Operator},  {"/", Token::Type::Operator},
+        {"^", Token::Type::Operator},  {"==", Token::Type::Operator}, {"!=", Token::Type::Operator}, {">", Token::Type::Operator},  {"<", Token::Type::Operator},
+        {">=", Token::Type::Operator}, {"<=", Token::Type::Operator}, {"&&", Token::Type::Operator}, {"||", Token::Type::Operator}, {"%", Token::Type::Operator}};
 
     // FIXME: This is a workaround, not a proper way to recognize operators :)
-    static inline bool is_allowed_in_operators(char c) { return (c >= '*' && c <= '/') || (c >= '<' && c <= '>'); }
+    static inline bool is_allowed_in_operators(char c) { return (c >= '*' && c <= '/') || (c >= '<' && c <= '>') || (c == '&' || c == '|' || c == '%'); }
 
     const het_unordered_map<Token::Type> keywords{
         {"function", Token::Type::Function},  {"return", Token::Type::Return},    {"if", Token::Type::If},           {"else", Token::Type::Else},
@@ -165,7 +166,7 @@ class Tokenizer {
 #include <fmt/core.h>
 #include <fmt/format.h>
 
-template <>
+template<>
 struct fmt::formatter<Tokenizer::Token> {
     constexpr auto parse(format_parse_context& ctx) {
         auto it = ctx.begin(), end = ctx.end();
@@ -174,13 +175,13 @@ struct fmt::formatter<Tokenizer::Token> {
         return it;
     }
 
-    template <typename FormatContext>
+    template<typename FormatContext>
     auto format(const Tokenizer::Token& t, FormatContext& ctx) {
         return format_to(ctx.out(), fg(fmt::color::gray), "T({} {:12} {:3})", t.type, t.value, t.line);
     }
 };
 
-template <>
+template<>
 struct fmt::formatter<Tokenizer::Token::Type> {
     constexpr auto parse(format_parse_context& ctx) {
         auto it = ctx.begin(), end = ctx.end();
@@ -188,7 +189,7 @@ struct fmt::formatter<Tokenizer::Token::Type> {
             throw format_error("Invalid format for Tokenizer::Token::Type");
         return it;
     }
-    template <typename FormatContext>
+    template<typename FormatContext>
     auto format(const Tokenizer::Token::Type& t, FormatContext& ctx) {
         switch(t) {
             case Tokenizer::Token::Type::Control: return format_to(ctx.out(), "{:12}", "Control");

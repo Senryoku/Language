@@ -22,8 +22,8 @@ class Parser : public Scoped {
 
     // FIXME: For many reasons (string creations...) Just correctly type the node from the start (i.e. token stage) I guess?
     inline static const std::unordered_map<std::string, uint8_t> operator_precedence{
-        {"=", (uint8_t)0},  {"==", (uint8_t)1}, {"!=", (uint8_t)1}, {">", (uint8_t)1}, {"<", (uint8_t)1}, {">=", (uint8_t)1},
-        {"<=", (uint8_t)1}, {"+", (uint8_t)2},  {"-", (uint8_t)2},  {"*", (uint8_t)3}, {"/", (uint8_t)3}, {"^", (uint8_t)4},
+        {"=", (uint8_t)0},  {"||", (uint8_t)1}, {"&&", (uint8_t)2}, {"==", (uint8_t)3}, {"!=", (uint8_t)3}, {">", (uint8_t)3}, {"<", (uint8_t)3}, {">=", (uint8_t)3},
+        {"<=", (uint8_t)3}, {"<=", (uint8_t)3}, {"-", (uint8_t)4},  {"+", (uint8_t)4},  {"*", (uint8_t)5},  {"/", (uint8_t)5}, {"^", (uint8_t)5},
     };
 
     static void resolve_operator_type(AST::Node* binaryOp) {

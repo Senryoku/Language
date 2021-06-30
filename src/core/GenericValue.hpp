@@ -50,7 +50,7 @@ struct GenericValue {
 
     static GenericValue::Type resolve_operator_type(const std::string_view& op, GenericValue::Type lhs, GenericValue::Type rhs) {
         // TODO: Cleanup?
-        if(op == "==" || op == "!=" || op == "<" || op == ">" || op == "=>" || op == "<=")
+        if(op == "==" || op == "!=" || op == "<" || op == ">" || op == "=>" || op == "<=" || op == "&&" || op == "||")
             return GenericValue::Type::Boolean;
         else if(lhs == GenericValue::Type::Integer && rhs == GenericValue::Type::Integer)
             return GenericValue::Type::Integer;
@@ -113,6 +113,36 @@ struct GenericValue {
             case Type::Float: r.value.as_bool = value.as_float > rhs.value.as_float; break;
             case Type::String: assert(false); break; // TODO
             case Type::Boolean: r.value.as_bool = value.as_bool == rhs.value.as_bool; break;
+            default: assert(false); break;
+        }
+        return r;
+    }
+
+    GenericValue operator&&(const GenericValue& rhs) {
+        GenericValue r{.type = Type::Boolean};
+        r.value.as_bool = false;
+        if(type != rhs.type) // TODO: Hanlde implicit conversion?
+            return r;
+        switch(type) {
+            case Type::Integer: r.value.as_bool = value.as_int32_t != 0 && rhs.value.as_int32_t != 0; break;
+            case Type::Float: r.value.as_bool = value.as_float != 0 && rhs.value.as_float != 0; break;
+            case Type::String: assert(false); break; // TODO
+            case Type::Boolean: r.value.as_bool = value.as_bool && rhs.value.as_bool; break;
+            default: assert(false); break;
+        }
+        return r;
+    }
+
+    GenericValue operator||(const GenericValue& rhs) {
+        GenericValue r{.type = Type::Boolean};
+        r.value.as_bool = false;
+        if(type != rhs.type) // TODO: Hanlde implicit conversion?
+            return r;
+        switch(type) {
+            case Type::Integer: r.value.as_bool = value.as_int32_t != 0 || rhs.value.as_int32_t != 0; break;
+            case Type::Float: r.value.as_bool = value.as_float != 0 || rhs.value.as_float != 0; break;
+            case Type::String: assert(false); break; // TODO
+            case Type::Boolean: r.value.as_bool = value.as_bool || rhs.value.as_bool; break;
             default: assert(false); break;
         }
         return r;
@@ -219,7 +249,7 @@ inline static GenericValue::Type parse_type(const std::string_view& str) {
     return Undefined;
 }
 
-template <>
+template<>
 struct fmt::formatter<GenericValue::StringView> {
     constexpr auto parse(format_parse_context& ctx) {
         auto it = ctx.begin(), end = ctx.end();
@@ -227,14 +257,14 @@ struct fmt::formatter<GenericValue::StringView> {
             throw format_error("Invalid format for StringView");
         return it;
     }
-    template <typename FormatContext>
+    template<typename FormatContext>
     auto format(const GenericValue::StringView& v, FormatContext& ctx) {
         std::string_view str{v.begin, v.begin + v.size};
         return format_to(ctx.out(), "{}", str);
     }
 };
 
-template <>
+template<>
 struct fmt::formatter<GenericValue> {
     constexpr auto parse(format_parse_context& ctx) {
         auto it = ctx.begin(), end = ctx.end();
@@ -242,7 +272,7 @@ struct fmt::formatter<GenericValue> {
             throw format_error("Invalid format for GenericValue");
         return it;
     }
-    template <typename FormatContext>
+    template<typename FormatContext>
     auto format(const GenericValue& v, FormatContext& ctx) {
         switch(v.type) {
             using enum GenericValue::Type;
@@ -265,7 +295,7 @@ struct fmt::formatter<GenericValue> {
     }
 };
 
-template <>
+template<>
 struct fmt::formatter<GenericValue::Type> {
     constexpr auto parse(format_parse_context& ctx) {
         auto it = ctx.begin(), end = ctx.end();
@@ -273,7 +303,7 @@ struct fmt::formatter<GenericValue::Type> {
             throw format_error("Invalid format for GenericValue");
         return it;
     }
-    template <typename FormatContext>
+    template<typename FormatContext>
     auto format(const GenericValue::Type& t, FormatContext& ctx) {
         switch(t) {
             using enum GenericValue::Type;
