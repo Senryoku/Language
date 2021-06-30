@@ -71,6 +71,11 @@ bool Parser::parse_next_expression(const std::span<Tokenizer::Token>& tokens, st
                     return false;
                 break;
             }
+            case CharLiteral: {
+                if(!parse_char(tokens, it, exprNode))
+                    return false;
+                break;
+            }
             case StringLiteral: {
                 if(!parse_string(tokens, it, exprNode))
                     return false;
@@ -120,8 +125,15 @@ bool Parser::parse_next_expression(const std::span<Tokenizer::Token>& tokens, st
 
     // Evaluate Expression final return type
     // FIXME
-    if(exprNode->children.size() == 1)
-        exprNode->value.type = exprNode->children[0]->value.type;
+    if(exprNode->children.size() == 1) {
+        // FIXME: This is a hack to propagate the proper type of array elements accessed by subscript and should not be there. (Create a proper new node type?)
+        if(exprNode->children[0]->type == AST::Node::Type::Variable && exprNode->children[0]->value.type == GenericValue::Type::Array &&
+           exprNode->children[0]->children.size() == 1) {
+            exprNode->value.type = exprNode->children[0]->value.value.as_array.type;
+        } else {
+            exprNode->value.type = exprNode->children[0]->value.type;
+        }
+    }
 
     if(search_for_matching_bracket) // Skip ending bracket
         ++it;
@@ -162,17 +174,21 @@ bool Parser::parse_identifier(const std::span<Tokenizer::Token>& tokens, std::sp
 
         auto varNode = currNode->add_child(new AST::Node(AST::Node::Type::Variable, *it));
         varNode->value.type = variable.type;
+        // FIXME: The resulting node is not of the correct type, it should be the type of the array elements
         if(it + 1 != tokens.end() && (it + 1)->value == "[") { // Array accessor
-            if(variable.type != GenericValue::Type::Array) {
-                error("[Parser] Syntax Error: Variable '{}' on line {} is not an array.\n", it->value, it->line);
+            if(variable.type != GenericValue::Type::Array && variable.type != GenericValue::Type::String) {
+                error("[Parser] Syntax Error: Subscript operator on variable '{}' on line {} which neither an array nor a string.\n", it->value, it->line);
                 return false;
             }
-            varNode->value.value.as_array.type = variable.value.as_array.type;
-            varNode->value.value.as_array.capacity = variable.value.as_array.capacity;
+            if(variable.type == GenericValue::Type::Array) {
+                varNode->value.value.as_array.type = variable.value.as_array.type;
+                varNode->value.value.as_array.capacity = variable.value.as_array.capacity; // FIXME: Not known anymore at this stage
+            }
             it += 2;
             // Get the index and add it as a child.
             if(!parse_next_expression(tokens, it, varNode, 0, false))
                 return false;
+            // TODO: Make sure this is an integer?
             assert(it->value == "]");
             ++it; // Skip ']'
         } else {
@@ -297,6 +313,14 @@ bool Parser::parse_float(const std::span<Tokenizer::Token>&, std::span<Tokenizer
     auto floatNode = currNode->add_child(new AST::Node(AST::Node::Type::ConstantValue, *it));
     floatNode->value.type = GenericValue::Type::Float;
     auto result = std::from_chars(&*(it->value.begin()), &*(it->value.begin()) + it->value.length(), floatNode->value.value.as_float);
+    ++it;
+    return true;
+}
+
+bool Parser::parse_char(const std::span<Tokenizer::Token>&, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode) {
+    auto strNode = currNode->add_child(new AST::Node(AST::Node::Type::ConstantValue, *it));
+    strNode->value.type = GenericValue::Type::Char;
+    strNode->value.value.as_char = it->value[0];
     ++it;
     return true;
 }

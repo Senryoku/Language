@@ -18,6 +18,7 @@ class Tokenizer {
             // Constants
             Digits,
             Float,
+            CharLiteral,
             StringLiteral,
             Boolean,
 
@@ -85,6 +86,8 @@ class Tokenizer {
         return false;
     }
 
+    static constexpr char escaped_char[] = {'?', '\'', '\"', '\?', '\a', '\b', '\f', '\n', '\r', '\t', '\v'};
+
     const het_unordered_map<Token::Type> binary_operators{
         {"=", Token::Type::Operator},  {"*", Token::Type::Operator},  {"+", Token::Type::Operator},  {"-", Token::Type::Operator},  {"/", Token::Type::Operator},
         {"^", Token::Type::Operator},  {"==", Token::Type::Operator}, {"!=", Token::Type::Operator}, {">", Token::Type::Operator},  {"<", Token::Type::Operator},
@@ -94,9 +97,9 @@ class Tokenizer {
     static inline bool is_allowed_in_operators(char c) { return (c >= '*' && c <= '/') || (c >= '<' && c <= '>') || (c == '&' || c == '|' || c == '%'); }
 
     const het_unordered_map<Token::Type> keywords{
-        {"function", Token::Type::Function},  {"return", Token::Type::Return},    {"if", Token::Type::If},           {"else", Token::Type::Else},
-        {"while", Token::Type::While},        {"bool", Token::Type::BuiltInType}, {"int", Token::Type::BuiltInType}, {"float", Token::Type::BuiltInType},
-        {"string", Token::Type::BuiltInType}, {"true", Token::Type::Boolean},     {"false", Token::Type::Boolean},
+        {"function", Token::Type::Function}, {"return", Token::Type::Return},      {"if", Token::Type::If},           {"else", Token::Type::Else},
+        {"while", Token::Type::While},       {"bool", Token::Type::BuiltInType},   {"int", Token::Type::BuiltInType}, {"float", Token::Type::BuiltInType},
+        {"char", Token::Type::BuiltInType},  {"string", Token::Type::BuiltInType}, {"true", Token::Type::Boolean},    {"false", Token::Type::Boolean},
     };
 
     Token search_next(size_t& pointer) const {
@@ -109,6 +112,32 @@ class Tokenizer {
             if(first_char == ',') {
                 pointer += 1;
                 type = Token::Type::Control;
+            } else if(first_char == '\'') {
+                ++pointer;
+                type = Token::Type::CharLiteral;
+                if(_source[pointer] == '\\') { // Escaped character
+                    ++pointer;
+                    size_t c = 0;
+                    switch(_source[pointer]) {
+                        case '\'': c = 1; break;
+                        case '"': c = 2; break;
+                        case '?': c = 3; break;
+                        case '\\': c = 4; break;
+                        case 'a': c = 4; break;
+                        case 'b': c = 5; break;
+                        case 'f': c = 6; break;
+                        case 'n': c = 7; break;
+                        case 'r': c = 8; break;
+                        case 't': c = 9; break;
+                        case 'v': c = 10; break;
+                        default: error("[Tokenizer:{}] Unknown escape sequence: \\{}.\n", __LINE__, _source[pointer]);
+                    }
+                    pointer += 2;
+                    return Token{type, std::string_view{escaped_char + c, escaped_char + c + 1}, _current_line};
+                } else {
+                    pointer += 2;
+                    return Token{type, std::string_view{_source.begin() + begin + 1, _source.begin() + (pointer - 1)}, _current_line};
+                }
             } else if(first_char == '"') {
                 ++pointer; // Skip '"'
                 while(pointer < _source.length() && _source[pointer] != '"')

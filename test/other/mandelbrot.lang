@@ -1,12 +1,13 @@
-int sx = 32;
+int sx = 64;
 int sy = 24;
 int[sx * sy] results;
-int max_iteration = 500;
+int max_iteration = 1000;
+string grey = "$@B%8&WM#*oahkbdpqwmZO0QLCJUYXzcvunxrjft/\|()1{}[]?-_+~<>i!lI;:,^`'. ";
 
-int px = 0;
-while(px < sx) {
-	int py = 0;
-	while(py < sy) {
+int py = 0;
+while(py < sy) {
+	int px = 0;
+	while(px < sx) {
 		float xz = (0 - 2.5) + 3.5 * ((0.0 + px) / sx);
 		float yz = (0 - 1.0) + 2.0 * ((0.0 + py) / sy);
 		float x = 0;
@@ -20,9 +21,11 @@ while(px < sx) {
 		}
 		results[sx * py + px] = iteration;
 
-		py = py + 1;
+		put(grey[68 * ((1.0 * iteration) / max_iteration)]);
+		px = px + 1;
 	}
-	px = px + 1;
+	put('\n');
+	py = py + 1;
 }
 
-return results;
+return true;

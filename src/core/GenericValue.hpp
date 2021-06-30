@@ -6,12 +6,15 @@
 #include <fmt/core.h>
 #include <fmt/format.h>
 
+#include <Logger.hpp>
+
 struct GenericValue {
     enum class Type
     {
         Boolean,
         Integer,
         Float,
+        Char,
         String,
         Array,
         Composite,
@@ -51,6 +54,7 @@ struct GenericValue {
         bool       as_bool;
         int32_t    as_int32_t;
         float      as_float;
+        char       as_char;
         StringView as_string; // Not sure if this is the right choice?
         Array      as_array;
     };
@@ -69,6 +73,21 @@ struct GenericValue {
         else if(lhs == GenericValue::Type::String && rhs == GenericValue::Type::String)
             return GenericValue::Type::String;
         return GenericValue::Type::Undefined;
+    }
+
+    GenericValue& assign(const GenericValue& rhs) {
+        switch(type) {
+            case GenericValue::Type::Integer: value.as_int32_t = rhs.to_int32_t(); return *this;
+            case GenericValue::Type::Float: value.as_float = rhs.to_float(); return *this;
+            case GenericValue::Type::String: {
+                if(rhs.type == GenericValue::Type::String) {
+                    value.as_string = rhs.value.as_string;
+                    return *this;
+                }
+                break;
+            }
+        }
+        error("[GenericValue:{}] Error assigning {} to {}.\n", __LINE__, rhs, *this);
     }
 
     // Boolean operators
@@ -364,6 +383,8 @@ inline static GenericValue::Type parse_type(const std::string_view& str) {
         return Float;
     else if(str == "bool")
         return Boolean;
+    else if(str == "char")
+        return Char;
     else if(str == "string")
         return String;
     return Undefined;
@@ -398,6 +419,7 @@ struct fmt::formatter<GenericValue> {
             using enum GenericValue::Type;
             case Integer: return format_to(ctx.out(), "{}:{}", v.type, v.value.as_int32_t);
             case Float: return format_to(ctx.out(), "{}:{}", v.type, v.value.as_float);
+            case Char: return format_to(ctx.out(), "{}:{}", v.type, v.value.as_char);
             case String: return format_to(ctx.out(), "{}:{}", v.type, v.value.as_string.to_std_string_view());
             case Boolean: return format_to(ctx.out(), "{}:{}", v.type, v.value.as_bool ? "True" : "False");
             case Array: {
@@ -410,7 +432,8 @@ struct fmt::formatter<GenericValue> {
                 }
                 return r;
             }
-            default: return format_to(ctx.out(), fg(fmt::color::gray), "{}", "Undefined");
+            case Undefined: return format_to(ctx.out(), fg(fmt::color::gray), "{}", "Undefined");
+            default: return format_to(ctx.out(), fg(fmt::color::red), "{}", "Unknown");
         }
     }
 };
@@ -429,10 +452,12 @@ struct fmt::formatter<GenericValue::Type> {
             using enum GenericValue::Type;
             case Integer: return format_to(ctx.out(), fg(fmt::color::golden_rod), "{}", "Integer");
             case Float: return format_to(ctx.out(), fg(fmt::color::golden_rod), "{}", "Float");
+            case Char: return format_to(ctx.out(), fg(fmt::color::burly_wood), "{}", "Char");
             case String: return format_to(ctx.out(), fg(fmt::color::burly_wood), "{}", "String");
             case Boolean: return format_to(ctx.out(), fg(fmt::color::royal_blue), "{}", "Boolean");
             case Array: return format_to(ctx.out(), "{}", "Array");
-            default: return format_to(ctx.out(), fg(fmt::color::gray), "{}", "Undefined");
+            case Undefined: return format_to(ctx.out(), fg(fmt::color::gray), "{}", "Undefined");
+            default: return format_to(ctx.out(), fg(fmt::color::red), "{}", "Unknown");
         }
     }
 };

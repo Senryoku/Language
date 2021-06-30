@@ -160,6 +160,11 @@ class Parser : public Scoped {
                         return false;
                     break;
                 }
+                case Tokenizer::Token::Type::CharLiteral: {
+                    if(!parse_char(tokens, it, currNode))
+                        return false;
+                    break;
+                }
                 case Tokenizer::Token::Type::StringLiteral: {
                     if(!parse_string(tokens, it, currNode))
                         return false;
@@ -206,6 +211,7 @@ class Parser : public Scoped {
     bool parse_boolean(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode);
     bool parse_digits(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode);
     bool parse_float(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode);
+    bool parse_char(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode);
     bool parse_string(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode);
     bool parse_binary_operator(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode);
     bool parse_variable_declaration(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode);

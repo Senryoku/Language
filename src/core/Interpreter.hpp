@@ -7,7 +7,8 @@
 
 constexpr bool is_assignable(const GenericValue& var, const GenericValue& val) {
     // TODO
-    return var.type == val.type || (var.type == GenericValue::Type::Array && (var.value.as_array.type == val.type));
+    return var.type == val.type || (GenericValue::is_numeric(var.type) && GenericValue::is_numeric(val.type)) ||
+           (var.type == GenericValue::Type::Array && (var.value.as_array.type == val.type));
 }
 
 class Interpreter : public Scoped {
@@ -17,6 +18,9 @@ class Interpreter : public Scoped {
         _builtin_print.reset(new AST::Node(AST::Node::Type::BuiltInFunctionDeclaration));
         _builtin_print->token.value = "print"; // We have to provide a name via the token.
         get_scope().declare_function(*_builtin_print);
+        _builtin_put.reset(new AST::Node(AST::Node::Type::BuiltInFunctionDeclaration));
+        _builtin_put->token.value = "put"; // We have to provide a name via the token.
+        get_scope().declare_function(*_builtin_put);
     }
 
     ~Interpreter() {
@@ -87,9 +91,16 @@ class Interpreter : public Scoped {
                     break;
                 }
                 if(functionNode->type == BuiltInFunctionDeclaration) {
-                    fmt::print("Call to builtin function.\n");
-                    for(size_t i = 0; i < node.children.size(); ++i) {
-                        fmt::print("  {}\n", execute(*node.children[i]));
+                    if(functionNode->token.value == "put") {
+                        assert(node.children.size() == 1);
+                        auto c = execute(*node.children[0]);
+                        assert(c.type == GenericValue::Type::Char);
+                        std::putchar(c.value.as_char);
+                    } else {
+                        fmt::print("Call to builtin function.\n");
+                        for(size_t i = 0; i < node.children.size(); ++i) {
+                            fmt::print("  {}\n", execute(*node.children[i]));
+                        }
                     }
                     break;
                 }
@@ -138,7 +149,25 @@ class Interpreter : public Scoped {
                         auto index = execute(*node.children[0]);
                         assert(index.type == GenericValue::Type::Integer);
                         assert((size_t)index.value.as_int32_t < pVar->value.as_array.capacity); // FIXME: Should be a runtime error?
+                        _return_value = pVar->value.as_array.items[index.value.as_int32_t];
                         return pVar->value.as_array.items[index.value.as_int32_t];
+                    }
+                } else if(node.value.type == GenericValue::Type::String) {
+                    // FIXME: This would be much cleaner if string was just a char[]...
+                    if(node.children.size() == 1) { // Accessed using an index
+                        auto index = execute(*node.children[0]);
+                        // Automatically convert float indices to integer, because we don't have in-language easy conversion (yet?)
+                        // FIXME: I don't think this should be handled here.
+                        if(index.type == GenericValue::Type::Float) {
+                            index.value.as_int32_t = static_cast<int32_t>(index.value.as_float);
+                            index.type = GenericValue::Type::Integer;
+                        }
+                        assert(index.type == GenericValue::Type::Integer);
+                        assert((size_t)index.value.as_int32_t < pVar->value.as_string.size); // FIXME: Should be a runtime error?
+                        GenericValue ret{.type = GenericValue::Type::Char};
+                        ret.value.as_char = *(pVar->value.as_string.begin + index.value.as_int32_t);
+                        _return_value = ret;
+                        return ret;
                     }
                 }
                 _return_value = *pVar;
@@ -167,11 +196,13 @@ class Interpreter : public Scoped {
                             v = v->value.as_array.items + index.value.as_int32_t;
                             v->type = rhs.type;
                         }
-                        // TODO: Handle others types and implicit conversions.
-                        v->value.as_int32_t = rhs.value.as_int32_t;
+                        v->assign(rhs);
                         _return_value.type = v->type;
                         _return_value.value = v->value;
+                        break;
                     }
+                    error("[Interpreter:{}] Unimplemented assignment.\n", __LINE__);
+                    error("{}\n{}\n", lhs, rhs);
                     break;
                 }
 
@@ -218,4 +249,5 @@ class Interpreter : public Scoped {
 
     // FIXME
     std::shared_ptr<AST::Node> _builtin_print{nullptr};
+    std::shared_ptr<AST::Node> _builtin_put{nullptr};
 };
