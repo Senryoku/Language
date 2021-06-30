@@ -1,0 +1,6 @@
+int i = 0; 
+while(i < 5) {
+	int c = 1;
+	i = i + c;
+}
+return i;

@@ -123,6 +123,11 @@ TEST(Keywords, While) {
     EXPECT_EQ(interpreter.get_return_value().value.as_int32_t, 10);
 }
 
+TEST(Keywords, VariableDeclarationInWhile) {
+    LOAD_PARSE_INTERP("basic/declare_in_while.lang");
+    EXPECT_EQ(interpreter.get_return_value().value.as_int32_t, 5);
+}
+
 TEST(Function, Declaration) {
     LOAD_PARSE_INTERP("function/declaration.lang");
 }

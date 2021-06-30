@@ -39,12 +39,20 @@ class Interpreter : public Scoped {
         switch(node.type) {
             using enum AST::Node::Type;
             case Root:
-            case Scope: {
                 for(const auto& child : node.children) {
                     execute(*child);
                     if(_returning_value)
                         break;
                 }
+                break;
+            case Scope: {
+                push_scope();
+                for(const auto& child : node.children) {
+                    execute(*child);
+                    if(_returning_value)
+                        break;
+                }
+                pop_scope();
                 break;
             }
             case Expression: {
