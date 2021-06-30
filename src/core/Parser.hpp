@@ -28,8 +28,14 @@ class Parser : public Scoped {
 
     static void resolve_operator_type(AST::Node* binaryOp) {
         assert(binaryOp->type == AST::Node::Type::BinaryOperator);
-        const auto lhs = binaryOp->children[0]->value.type;
-        const auto rhs = binaryOp->children[1]->value.type;
+        auto lhs = binaryOp->children[0]->value.type;
+        auto rhs = binaryOp->children[1]->value.type;
+        // FIXME: Here we're getting the item type if we're accessing array items. This should be done automatically elsewhere I think (wrap the indexed access in an expression, or
+        // another node type?)
+        if(lhs == GenericValue::Type::Array && binaryOp->children[0]->children.size() > 0)
+            lhs = binaryOp->children[0]->value.value.as_array.type;
+        if(rhs == GenericValue::Type::Array && binaryOp->children[1]->children.size() > 0)
+            rhs = binaryOp->children[1]->value.value.as_array.type;
         binaryOp->value.type = GenericValue::resolve_operator_type(binaryOp->token.value, lhs, rhs);
         if(binaryOp->value.type == GenericValue::Type::Undefined) {
             warn("[Parser] Couldn't resolve operator return type (Missing impl.) on line {}. Children:\n", binaryOp->token.line);

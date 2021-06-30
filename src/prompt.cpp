@@ -61,6 +61,7 @@ int main() {
                 tokens.push_back(tokenizer.consume());
 
             auto newNodes = parser.parse(std::span<Tokenizer::Token>{tokens.begin() + first, tokens.end()}, ast);
+            ast.optimize();
             for(auto node : newNodes) {
                 log.group();
                 log.print("Executing ({}) using Interpreter...\n", node->type);

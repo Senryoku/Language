@@ -1,17 +1,17 @@
-int sx = 320;
-int sy = 240;
-int px = 0;
-int py = 0;
+int sx = 32;
+int sy = 24;
 int[sx * sy] results;
+int max_iteration = 500;
 
+int px = 0;
 while(px < sx) {
+	int py = 0;
 	while(py < sy) {
 		float xz = (0 - 2.5) + 3.5 * ((0.0 + px) / sx);
 		float yz = (0 - 1.0) + 2.0 * ((0.0 + py) / sy);
 		float x = 0;
 		float y = 0;
 		int iteration = 0;
-		int max_iteration = 0;
 		while(x * x + y * y <= 2 * 2  && iteration < max_iteration) {
 			float xtemp = x * x - y * y + xz;
 			y = 2 * x * y + yz;
