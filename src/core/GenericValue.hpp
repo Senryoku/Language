@@ -223,8 +223,16 @@ struct GenericValue {
 
     GenericValue operator+(const GenericValue& rhs) {
         GenericValue r{.type = resolve_operator_type("+", type, rhs.type)};
-        if(type != rhs.type)
-            return r;
+        if(type != rhs.type) { // TODO: Hanlde implicit conversion?
+            if(is_numeric(type) && is_numeric(rhs.type)) {
+                switch(r.type) {
+                    case Type::Integer: r.value.as_int32_t = to_int32_t() + rhs.to_int32_t(); break;
+                    case Type::Float: r.value.as_float = to_float() + rhs.to_float(); break;
+                    default: assert(false); break;
+                }
+            }
+            return r; // We don't know what to do! (yet?)
+        }
         switch(type) {
             case Type::Integer: r.value.as_int32_t = value.as_int32_t + rhs.value.as_int32_t; break;
             case Type::Float: r.value.as_float = value.as_float + rhs.value.as_float; break;
@@ -237,8 +245,16 @@ struct GenericValue {
 
     GenericValue operator-(const GenericValue& rhs) {
         GenericValue r{.type = resolve_operator_type("-", type, rhs.type)};
-        if(type != rhs.type)
-            return r;
+        if(type != rhs.type) { // TODO: Hanlde implicit conversion?
+            if(is_numeric(type) && is_numeric(rhs.type)) {
+                switch(r.type) {
+                    case Type::Integer: r.value.as_int32_t = to_int32_t() - rhs.to_int32_t(); break;
+                    case Type::Float: r.value.as_float = to_float() - rhs.to_float(); break;
+                    default: assert(false); break;
+                }
+            }
+            return r; // We don't know what to do! (yet?)
+        }
         switch(type) {
             case Type::Integer: r.value.as_int32_t = value.as_int32_t - rhs.value.as_int32_t; break;
             case Type::Float: r.value.as_float = value.as_float - rhs.value.as_float; break;
@@ -251,8 +267,16 @@ struct GenericValue {
 
     GenericValue operator*(const GenericValue& rhs) {
         GenericValue r{.type = resolve_operator_type("*", type, rhs.type)};
-        if(type != rhs.type)
-            return r;
+        if(type != rhs.type) { // TODO: Hanlde implicit conversion?
+            if(is_numeric(type) && is_numeric(rhs.type)) {
+                switch(r.type) {
+                    case Type::Integer: r.value.as_int32_t = to_int32_t() * rhs.to_int32_t(); break;
+                    case Type::Float: r.value.as_float = to_float() * rhs.to_float(); break;
+                    default: assert(false); break;
+                }
+            }
+            return r; // We don't know what to do! (yet?)
+        }
         switch(type) {
             case Type::Integer: r.value.as_int32_t = value.as_int32_t * rhs.value.as_int32_t; break;
             case Type::Float: r.value.as_float = value.as_float * rhs.value.as_float; break;
@@ -265,8 +289,16 @@ struct GenericValue {
 
     GenericValue operator/(const GenericValue& rhs) {
         GenericValue r{.type = resolve_operator_type("/", type, rhs.type)};
-        if(type != rhs.type)
-            return r;
+        if(type != rhs.type) { // TODO: Hanlde implicit conversion?
+            if(is_numeric(type) && is_numeric(rhs.type)) {
+                switch(r.type) {
+                    case Type::Integer: r.value.as_int32_t = to_int32_t() / rhs.to_int32_t(); break;
+                    case Type::Float: r.value.as_float = to_float() / rhs.to_float(); break;
+                    default: assert(false); break;
+                }
+            }
+            return r; // We don't know what to do! (yet?)
+        }
         switch(type) {
             case Type::Integer: r.value.as_int32_t = value.as_int32_t / rhs.value.as_int32_t; break;
             case Type::Float: r.value.as_float = value.as_float / rhs.value.as_float; break;
