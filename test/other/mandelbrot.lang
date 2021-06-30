@@ -1,7 +1,7 @@
-int sx = 64;
-int sy = 24;
+int sx = 160;
+int sy = 60;
 int[sx * sy] results;
-int max_iteration = 1000;
+int max_iteration = 70;
 string grey = "$@B%8&WM#*oahkbdpqwmZO0QLCJUYXzcvunxrjft/\|()1{}[]?-_+~<>i!lI;:,^`'. ";
 
 int py = 0;
