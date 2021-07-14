@@ -3,23 +3,35 @@
 #include <fmt/color.h>
 #include <fmt/core.h>
 
-template <typename... Args>
-void error(Args&&... args) {
+inline std::string link(const std::string_view& url, const std::string_view& text) {
+    return fmt::format("\x1B]8;;{}\x1B\\{}\x1B]8;;\x1B\\", url, text);
+}
+
+inline std::string link(const std::string_view& url) {
+    return link(url, url);
+}
+
+inline void print_link(const std::string_view& url, const std::string_view& text) {
+    fmt::print(link(url, text));
+}
+
+template<typename... Args>
+inline void error(Args&&... args) {
     fmt::print(fg(fmt::color::red), std::forward<Args>(args)...);
 }
 
-template <typename... Args>
-void warn(Args&&... args) {
+template<typename... Args>
+inline void warn(Args&&... args) {
     fmt::print(fg(fmt::color::yellow), std::forward<Args>(args)...);
 }
 
-template <typename... Args>
-void success(Args&&... args) {
+template<typename... Args>
+inline void success(Args&&... args) {
     fmt::print(fg(fmt::color::green), std::forward<Args>(args)...);
 }
 
-template <typename... Args>
-void print(Args&&... args) {
+template<typename... Args>
+inline void print(Args&&... args) {
     fmt::print(std::forward<Args>(args)...);
 }
 
@@ -35,13 +47,13 @@ struct Indenter {
             indent = 0;
     }
 
-    template <typename... Args>
+    template<typename... Args>
     void print(fmt::string_view format_str, Args&&... args) {
         fmt::print("{:{}}", "", indent);
         fmt::print(format_str, std::forward<Args>(args)...);
     }
 
-    template <typename... Args>
+    template<typename... Args>
     void print_same_line(fmt::string_view format_str, Args&&... args) {
         fmt::print(format_str, std::forward<Args>(args)...);
     }

@@ -13,8 +13,9 @@
 
 int main() {
     fmt::print(R"(
-# Welcome to <insert Langage name> prompt. Enter 'q' to quit, 'help' for more commands.
-)");
+# Welcome to {} prompt. Enter 'q' to quit, 'help' for more commands.
+)",
+               link("http://lang.com", "<insert language name>"));
     Indenter log;
 
     std::vector<std::string>      lines;
