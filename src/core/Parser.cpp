@@ -365,6 +365,10 @@ bool Parser::parse_binary_operator(const std::span<Tokenizer::Token>& tokens, st
 bool Parser::parse_variable_declaration(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode) {
     assert(it->type == Tokenizer::Token::Type::BuiltInType);
     auto varDecNode = currNode->add_child(new AST::Node(AST::Node::Type::VariableDeclaration, *it));
+    auto cleanup_on_error = [&]() {
+        currNode->pop_child();
+        delete varDecNode;
+    };
     varDecNode->value.type = parse_type(it->value);
     ++it;
     // Array declaration
@@ -373,6 +377,7 @@ bool Parser::parse_variable_declaration(const std::span<Tokenizer::Token>& token
         varDecNode->value.type = GenericValue::Type::Array;
         ++it;
         if(!parse_next_expression(tokens, it, varDecNode, 0)) {
+            cleanup_on_error();
             return false;
         }
         assert(varDecNode->children.size() == 1);
@@ -380,21 +385,27 @@ bool Parser::parse_variable_declaration(const std::span<Tokenizer::Token>& token
         // std::from_chars(&*(it->value.begin()), &*(it->value.begin()) + it->value.length(), varDecNode->value.value.as_array.capacity);
         if(it == tokens.end()) {
             error("[Parser] Syntax error: Expected ']', got end-of-document.");
+            cleanup_on_error();
             return false;
         } else if(it->value != "]") {
             error("[Parser] Syntax error: Expected ']', got {}.", *it);
+            cleanup_on_error();
             return false;
         }
         ++it;
     }
     if(it == tokens.end()) {
         error("[Parser] Syntax error: Expected variable identifier, got end-of-document.");
+        cleanup_on_error();
         return false;
     }
     auto next = *it; // Hopefully a name
     if(next.type == Tokenizer::Token::Type::Identifier) {
         varDecNode->token = next; // We'll be getting the function name from the token. This may still be a FIXME?...
-        get_scope().declare_variable(*varDecNode, next.line);
+        if(!get_scope().declare_variable(*varDecNode, next.line)) {
+            cleanup_on_error();
+            return false;
+        }
         ++it;
         // Also push a variable identifier for initialisation
         if(it != tokens.end() && it->value == "=") {
@@ -403,6 +414,7 @@ bool Parser::parse_variable_declaration(const std::span<Tokenizer::Token>& token
         }
     } else {
         error("[Parser] Syntax error: Expected Identifier for variable declaration, got {}.\n", next);
+        cleanup_on_error();
         return false;
     }
     return true;

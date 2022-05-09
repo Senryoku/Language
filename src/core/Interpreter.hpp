@@ -128,7 +128,8 @@ class Interpreter : public Scoped {
                 break;
             }
             case VariableDeclaration: {
-                assert(!get_scope().is_declared(node.token.value));
+                if(get_scope().is_declared(node.token.value))
+                    error("Interpreter::execute: Variable '{}' already defined in scope.", node.token.value);
                 get_scope().declare_variable(node);
                 if(node.value.type == GenericValue::Type::Array) {
                     auto capacity = execute(*node.children[0]);           // Compute requested capacity
@@ -239,7 +240,9 @@ class Interpreter : public Scoped {
         return _return_value;
     }
 
-    const GenericValue& get_return_value() const { return _return_value; }
+    const GenericValue& get_return_value() const {
+        return _return_value;
+    }
 
   private:
     bool         _returning_value = false;
