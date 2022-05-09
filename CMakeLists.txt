@@ -30,12 +30,14 @@ file(GLOB HEADERS src/**/*.hpp)
 
 add_executable(compiler ${SOURCES} ${HEADERS} src/compiler.cpp)
 add_executable(prompt ${SOURCES} ${HEADERS} src/prompt.cpp)
+add_executable(assembler_test ${SOURCES} ${HEADERS} src/assembler_test.cpp)
 add_executable(tester ${SOURCES} ${TEST_FILES} ${HEADERS} test/main.cpp)
 
 target_include_directories(compiler PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/ext")
 
 set_property(TARGET compiler PROPERTY CXX_STANDARD 20)
 set_property(TARGET prompt PROPERTY CXX_STANDARD 20)
+set_property(TARGET assembler_test PROPERTY CXX_STANDARD 20)
 set_property(TARGET tester PROPERTY CXX_STANDARD 20)
 
 # Use included version of FMT

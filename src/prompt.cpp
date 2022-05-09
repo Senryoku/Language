@@ -10,12 +10,17 @@
 #include <Logger.hpp>
 #include <Parser.hpp>
 #include <Tokenizer.hpp>
+#include <utils/CLIArg.hpp>
 
-int main() {
+int main(int argc, char* argv[]) {
     fmt::print(R"(
 # Welcome to {} prompt. Enter 'q' to quit, 'help' for more commands.
 )",
                link("http://lang.com", "<insert language name>"));
+
+    CLIArg args;
+    args.parse(argc, argv);
+
     Indenter log;
 
     std::vector<std::string>      lines;
@@ -24,6 +29,41 @@ int main() {
     Parser                        parser;
     Interpreter                   interpreter;
     std::string                   input;
+
+    auto load = [&](const auto& path) {
+        std::ifstream file(path);
+        if(!file) {
+            error("Couldn't open file '{}' (Running from {}).\n", path, std::filesystem::current_path().string());
+            return;
+        }
+        lines.push_back(std::string((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>()));
+        auto& source = lines.back();
+        log.group();
+        log.print("Parsing '{}'...\n", path);
+        Tokenizer tokenizer(source);
+        auto      first = tokens.size();
+        while(tokenizer.has_more())
+            tokens.push_back(tokenizer.consume());
+
+        auto newNodes = parser.parse(std::span<Tokenizer::Token>{tokens.begin() + first, tokens.end()}, ast);
+        ast.optimize();
+        for(auto node : newNodes) {
+            log.group();
+            log.print("Executing ({}) using Interpreter...\n", node->type);
+            auto clock = std::chrono::steady_clock();
+            auto start = clock.now();
+            interpreter.execute(*node);
+            auto end = clock.now();
+            log.print("Done in {}ms, returned: '{}'.\n", std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count(), interpreter.get_return_value());
+            log.end();
+        }
+        log.end();
+    };
+
+    if(args.get_default_arg() != "") {
+        load(args.get_default_arg());
+    }
+
     lines.reserve(64 * 1024); // FIXME: Tokens are referencing these strings, this a workaround to avoid reallocation of the vector, which would be fatal :)
     do {
         std::cout << " > ";
@@ -46,34 +86,7 @@ int main() {
     help        Displays this help.
 )");
         } else if(input.starts_with("load ")) {
-            const auto    path = input.substr(5);
-            std::ifstream file(path);
-            if(!file) {
-                error("Couldn't open file '{}' (Running from {}).\n", path, std::filesystem::current_path().string());
-                continue;
-            }
-            lines.push_back(std::string((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>()));
-            auto& source = lines.back();
-            log.group();
-            log.print("Parsing '{}'...\n", path);
-            Tokenizer tokenizer(source);
-            auto      first = tokens.size();
-            while(tokenizer.has_more())
-                tokens.push_back(tokenizer.consume());
-
-            auto newNodes = parser.parse(std::span<Tokenizer::Token>{tokens.begin() + first, tokens.end()}, ast);
-            ast.optimize();
-            for(auto node : newNodes) {
-                log.group();
-                log.print("Executing ({}) using Interpreter...\n", node->type);
-                auto clock = std::chrono::steady_clock();
-                auto start = clock.now();
-                interpreter.execute(*node);
-                auto end = clock.now();
-                log.print("Done in {}ms, returned: '{}'.\n", std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count(), interpreter.get_return_value());
-                log.end();
-            }
-            log.end();
+            load(input.substr(5));
         } else if(input == "optimize") {
             ast.optimize();
         } else if(input == "dump") {

@@ -86,7 +86,7 @@ class AST {
     Node* optimize(Node*);
 };
 
-template <>
+template<>
 struct fmt::formatter<AST> {
     constexpr auto parse(format_parse_context& ctx) {
         auto it = ctx.begin(), end = ctx.end();
@@ -94,13 +94,13 @@ struct fmt::formatter<AST> {
             throw format_error("Invalid format for AST");
         return it;
     }
-    template <typename FormatContext>
+    template<typename FormatContext>
     auto format(const AST& t, FormatContext& ctx) {
         return format_to(ctx.out(), "AST Dump: {:}\n", t.getRoot());
     }
 };
 
-template <>
+template<>
 struct fmt::formatter<AST::Node> {
     constexpr static bool is_digit(char c) { return c >= '0' && c <= '9'; }
 
@@ -119,7 +119,7 @@ struct fmt::formatter<AST::Node> {
         return it;
     }
 
-    template <typename FormatContext>
+    template<typename FormatContext>
     auto format(const AST::Node& t, FormatContext& ctx) {
         auto r = ctx.out();
         for(size_t i = 0; i < indent.length(); ++i) {
@@ -166,7 +166,7 @@ struct fmt::formatter<AST::Node> {
     }
 };
 
-template <>
+template<>
 struct fmt::formatter<AST::Node::Type> {
     constexpr auto parse(format_parse_context& ctx) {
         auto it = ctx.begin(), end = ctx.end();
@@ -175,7 +175,7 @@ struct fmt::formatter<AST::Node::Type> {
         return it;
     }
 
-    template <typename FormatContext>
+    template<typename FormatContext>
     auto format(const AST::Node::Type& t, FormatContext& ctx) {
         switch(t) {
             case AST::Node::Type::Root: return format_to(ctx.out(), "{}", "Root");
