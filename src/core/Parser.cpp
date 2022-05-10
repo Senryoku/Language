@@ -9,20 +9,19 @@ bool Parser::parse_next_scope(const std::span<Tokenizer::Token>& tokens, std::sp
         return false;
     }
     auto   begin = it + 1;
-    auto   end = begin;
-    size_t inner_scopes = 0;
+    auto   end = it;
+    size_t opened_scopes = 0;
     while(end != tokens.end()) {
         if(end->value == "{")
-            ++inner_scopes;
+            ++opened_scopes;
         if(end->value == "}") {
-            if(inner_scopes == 0)
+            --opened_scopes;
+            if(opened_scopes == 0)
                 break;
-            else
-                --inner_scopes;
         }
         ++end;
     }
-    if(end == tokens.end()) {
+    if(opened_scopes > 0) {
         error("Syntax error: no matching 'closing bracket', got end-of-document.\n");
         return false;
     }
@@ -47,7 +46,10 @@ bool Parser::parse_next_expression(const std::span<Tokenizer::Token>& tokens, st
 
     if(it->type == Tokenizer::Token::Type::Control && it->value == "(") {
         ++it;
-        parse_next_expression(tokens, it, exprNode, 0, true);
+        if(!parse_next_expression(tokens, it, exprNode, 0, true)) {
+            delete currNode->pop_child();
+            return false;
+        }
     }
 
     bool stop = false;
@@ -57,40 +59,54 @@ bool Parser::parse_next_expression(const std::span<Tokenizer::Token>& tokens, st
         switch(it->type) {
             using enum Tokenizer::Token::Type;
             case Boolean: {
-                if(!parse_boolean(tokens, it, exprNode))
+                if(!parse_boolean(tokens, it, exprNode)) {
+                    delete currNode->pop_child();
                     return false;
+                }
                 break;
             }
             case Digits: {
-                if(!parse_digits(tokens, it, exprNode))
+                if(!parse_digits(tokens, it, exprNode)) {
+                    delete currNode->pop_child();
                     return false;
+                }
                 break;
             }
             case Float: {
-                if(!parse_float(tokens, it, exprNode))
+                if(!parse_float(tokens, it, exprNode)) {
+                    delete currNode->pop_child();
                     return false;
+                }
                 break;
             }
             case CharLiteral: {
-                if(!parse_char(tokens, it, exprNode))
+                if(!parse_char(tokens, it, exprNode)) {
+                    delete currNode->pop_child();
                     return false;
+                }
                 break;
             }
             case StringLiteral: {
-                if(!parse_string(tokens, it, exprNode))
+                if(!parse_string(tokens, it, exprNode)) {
+                    delete currNode->pop_child();
                     return false;
+                }
                 break;
             }
             case Identifier: {
-                if(!parse_identifier(tokens, it, exprNode))
+                if(!parse_identifier(tokens, it, exprNode)) {
+                    delete currNode->pop_child();
                     return false;
+                }
                 break;
             }
             case Operator: {
                 auto p = operator_precedence.at(std::string(it->value));
                 if(p > precedence) {
-                    if(!parse_operator(tokens, it, exprNode))
+                    if(!parse_operator(tokens, it, exprNode)) {
+                        delete currNode->pop_child();
                         return false;
+                    }
                 } else {
                     stop = true;
                 }
@@ -98,8 +114,10 @@ bool Parser::parse_next_expression(const std::span<Tokenizer::Token>& tokens, st
             }
             case Control: {
                 if(it->value == "(") {
-                    if(!parse_next_expression(tokens, it, exprNode, 0))
+                    if(!parse_next_expression(tokens, it, exprNode, 0)) {
+                        delete currNode->pop_child();
                         return false;
+                    }
                 } else if(it->value == ")") {
                     stop = true;
                 } else if(it->value == "]") {
@@ -109,6 +127,7 @@ bool Parser::parse_next_expression(const std::span<Tokenizer::Token>& tokens, st
             }
             default: {
                 warn("[parse_next_expression] Unexpected Token Type '{}' ({}).\n", it->type, *it);
+                delete currNode->pop_child();
                 return false;
                 break;
             }
@@ -120,6 +139,7 @@ bool Parser::parse_next_expression(const std::span<Tokenizer::Token>& tokens, st
             error("Unmatched '(' after reaching end-of-document.\n");
         else
             error("Unmatched '(' on line {}.\n", it->line);
+        delete currNode->pop_child();
         return false;
     }
 
@@ -153,13 +173,16 @@ bool Parser::parse_identifier(const std::span<Tokenizer::Token>& tokens, std::sp
         it += 2;
         // Parse arguments
         while(it != tokens.end() && it->value != ")") {
-            if(!parse_next_expression(tokens, it, callNode, 0))
+            if(!parse_next_expression(tokens, it, callNode, 0)) {
+                delete currNode->pop_child();
                 return false;
+            }
             if(it != tokens.end() && it->value == ",")
                 ++it;
         }
         if(it == tokens.end()) {
             error("[Parser] Syntax error: Unmatched '(' on line {}, got to end-of-file.\n", start->line);
+            delete currNode->pop_child();
             return false;
         }
         ++it;
@@ -178,6 +201,7 @@ bool Parser::parse_identifier(const std::span<Tokenizer::Token>& tokens, std::sp
         if(it + 1 != tokens.end() && (it + 1)->value == "[") { // Array accessor
             if(variable.type != GenericValue::Type::Array && variable.type != GenericValue::Type::String) {
                 error("[Parser] Syntax Error: Subscript operator on variable '{}' on line {} which neither an array nor a string.\n", it->value, it->line);
+                delete currNode->pop_child();
                 return false;
             }
             if(variable.type == GenericValue::Type::Array) {
@@ -186,8 +210,10 @@ bool Parser::parse_identifier(const std::span<Tokenizer::Token>& tokens, std::sp
             }
             it += 2;
             // Get the index and add it as a child.
-            if(!parse_next_expression(tokens, it, varNode, 0, false))
+            if(!parse_next_expression(tokens, it, varNode, 0, false)) {
+                delete currNode->pop_child();
                 return false;
+            }
             // TODO: Make sure this is an integer?
             assert(it->value == "]");
             ++it; // Skip ']'
@@ -219,20 +245,26 @@ bool Parser::parse_while(const std::span<Tokenizer::Token>& tokens, std::span<To
     ++it;
     if(it->value != "(") {
         error("Expected '(' after while on line {}, got {}.\n", it->line, it->value);
+        delete currNode->pop_child();
         return false;
     }
     // Parse condition and add it as first child
     ++it; // Point to the beginning of the expression until ')' ('search_for_matching_bracket': true)
-    if(!parse_next_expression(tokens, it, whileNode, 0, true))
-        return false;
-
-    if(it == tokens.end()) {
-        error("Expected while body on line {}, got end-of-file.\n", it->line);
+    if(!parse_next_expression(tokens, it, whileNode, 0, true)) {
+        delete currNode->pop_child();
         return false;
     }
 
-    if(!parse_scope_or_single_statement(tokens, it, whileNode))
+    if(it == tokens.end()) {
+        error("Expected while body on line {}, got end-of-file.\n", it->line);
+        delete currNode->pop_child();
         return false;
+    }
+
+    if(!parse_scope_or_single_statement(tokens, it, whileNode)) {
+        delete currNode->pop_child();
+        return false;
+    }
     return true;
 }
 
@@ -248,48 +280,62 @@ bool Parser::parse_function_declaration(const std::span<Tokenizer::Token>& token
     ++it;
     if(it->value != "(") {
         error("Expected '(' in function declaration on line {}, got {}.\n", it->line, it->value);
+        delete currNode->pop_child();
         return false;
     }
 
     push_scope(); // FIXME: Restrict function parameters to this scope, do better.
 
+    auto cleanup_on_error = [&]() {
+        delete currNode->pop_child();
+        pop_scope();
+    };
+
     ++it;
     // Parse parameters
     while(it != tokens.end() && it->value != ")") {
-        if(!parse_variable_declaration(tokens, it, functionNode))
+        if(!parse_variable_declaration(tokens, it, functionNode)) {
+            cleanup_on_error();
             return false;
+        }
         if(it->value == ",")
             ++it;
         else if(it->value != ")") {
             error("Expected ',' in function declaration argument list on line {}, got {}.\n", it->line, it->value);
+            cleanup_on_error();
             return false;
         }
     }
     if(it == tokens.end() || it->value != ")") {
         error("Unmatched '(' in function declaration on line {}.\n", it->line);
+        cleanup_on_error();
         return false;
     }
 
     ++it;
     if(it == tokens.end()) {
         error("Expected function body on line {}, got end-of-file.\n", it->line);
+        cleanup_on_error();
         return false;
     }
 
     if(it->value == "{") {
-        if(!parse_next_scope(tokens, it, functionNode))
+        if(!parse_next_scope(tokens, it, functionNode)) {
+            cleanup_on_error();
             return false;
+        }
     } else {
         // FIXME: Probably
         auto end = it;
         while(end != tokens.end() && end->value != ";")
             ++end;
-        if(!parse({it, end}, functionNode))
+        if(!parse({it, end}, functionNode)) {
+            cleanup_on_error();
             return false;
+        }
     }
 
     pop_scope();
-
     return true;
 }
 
@@ -339,8 +385,10 @@ bool Parser::parse_operator(const std::span<Tokenizer::Token>& tokens, std::span
         AST::Node* unaryOperatorNode = currNode->add_child(new AST::Node(AST::Node::Type::UnaryOperator, *it));
         auto       precedence = operator_precedence.at(std::string(it->value));
         ++it;
-        if(!parse_next_expression(tokens, it, unaryOperatorNode, precedence))
+        if(!parse_next_expression(tokens, it, unaryOperatorNode, precedence)) {
+            delete currNode->pop_child();
             return false;
+        }
         resolve_operator_type(unaryOperatorNode);
         return true;
     }
@@ -358,12 +406,15 @@ bool Parser::parse_operator(const std::span<Tokenizer::Token>& tokens, std::span
     auto precedence = operator_precedence.at(std::string(it->value));
     if((it + 1) == tokens.end()) {
         error("Syntax error: Reached end of document without a right-hand side operand for {} on line {}.\n", it->value, it->line);
+        delete currNode->pop_child();
         return false;
     }
     ++it;
     // Lookahead for rhs
-    if(!parse_next_expression(tokens, it, binaryOperatorNode, precedence))
+    if(!parse_next_expression(tokens, it, binaryOperatorNode, precedence)) {
+        delete currNode->pop_child();
         return false;
+    }
     // TODO: Test if types are compatible (with the operator and between each other)
 
     resolve_operator_type(binaryOperatorNode);
@@ -376,10 +427,7 @@ bool Parser::parse_operator(const std::span<Tokenizer::Token>& tokens, std::span
 bool Parser::parse_variable_declaration(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode) {
     assert(it->type == Tokenizer::Token::Type::BuiltInType);
     auto varDecNode = currNode->add_child(new AST::Node(AST::Node::Type::VariableDeclaration, *it));
-    auto cleanup_on_error = [&]() {
-        currNode->pop_child();
-        delete varDecNode;
-    };
+    auto cleanup_on_error = [&]() { delete currNode->pop_child(); };
     varDecNode->value.type = parse_type(it->value);
     ++it;
     // Array declaration

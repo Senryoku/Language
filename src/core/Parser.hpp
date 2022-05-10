@@ -124,10 +124,13 @@ class Parser : public Scoped {
                     }
                     auto ifNode = currNode->add_child(new AST::Node(AST::Node::Type::IfStatement));
                     ++it;
-                    if(!parse_next_expression(tokens, it, ifNode, 0, true))
+                    if(!parse_next_expression(tokens, it, ifNode, 0, true)) {
+                        delete currNode->pop_child();
                         return false;
+                    }
                     if(!parse_scope_or_single_statement(tokens, it, ifNode)) {
                         error("Syntax error: expected 'new scope' after 'if'.\n");
+                        delete currNode->pop_child();
                         return false;
                     }
                     // TODO: Handle Else here?
@@ -143,8 +146,7 @@ class Parser : public Scoped {
                     auto returnNode = currNode->add_child(new AST::Node(AST::Node::Type::ReturnStatement, *it));
                     ++it;
                     if(!parse_next_expression(tokens, it, returnNode, 0)) {
-                        delete returnNode;
-                        currNode->children.pop_back();
+                        delete currNode->pop_child();
                         return false;
                     }
                     returnNode->value.type = returnNode->children[0]->value.type;
