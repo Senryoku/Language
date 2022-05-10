@@ -12,8 +12,7 @@ class AST {
   public:
     class Node {
       public:
-        enum class Type
-        {
+        enum class Type {
             Root,
             Scope,
             Expression,
@@ -28,6 +27,7 @@ class AST {
             BuiltInFunctionDeclaration,
             // BuiltInFunctionCall,
             ConstantValue,
+            UnaryOperator,
             BinaryOperator,
 
             Undefined
@@ -190,6 +190,7 @@ struct fmt::formatter<AST::Node::Type> {
             case AST::Node::Type::FunctionCall: return format_to(ctx.out(), fg(fmt::color::light_yellow), "{}", "FunctionCall");
             case AST::Node::Type::Variable: return format_to(ctx.out(), fg(fmt::color::light_blue), "{}", "Variable");
             case AST::Node::Type::ConstantValue: return format_to(ctx.out(), "{}", "ConstantValue");
+            case AST::Node::Type::UnaryOperator: return format_to(ctx.out(), "{}", "UnaryOperator");
             case AST::Node::Type::BinaryOperator: return format_to(ctx.out(), "{}", "BinaryOperator");
             default: assert(false); return format_to(ctx.out(), "{}", "MissingFormat for AST::Node::Type!");
         }

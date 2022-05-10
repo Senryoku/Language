@@ -23,22 +23,30 @@ AST::Node* AST::optimize(AST::Node* currNode) {
         currNode = child;
     }
 
+    auto execute_node = [&]() {
+        Interpreter interp;
+        interp.execute(*currNode);
+        delete currNode;
+        currNode = new AST::Node(AST::Node::Type::ConstantValue);
+        currNode->value = interp.get_return_value();
+    };
+
     // Compute const expression when possible
+    if(currNode->type == AST::Node::Type::UnaryOperator && currNode->children.size() == 1) {
+        auto child = currNode->children[0];
+        if(child->type == AST::Node::Type::ConstantValue) {
+            assert(child->children.size() == 0);
+            execute_node();
+        }
+    }
+
     if(currNode->type == AST::Node::Type::BinaryOperator && currNode->children.size() == 2) {
         auto lhs = currNode->children[0];
         auto rhs = currNode->children[1];
         if(lhs->type == AST::Node::Type::ConstantValue && rhs->type == AST::Node::Type::ConstantValue && compatible(lhs->value.type, rhs->value.type)) {
             assert(lhs->children.size() == 0);
             assert(rhs->children.size() == 0);
-
-            Interpreter interp;
-            interp.execute(*currNode);
-            currNode->children.clear();
-            delete currNode;
-            currNode = new AST::Node(AST::Node::Type::ConstantValue);
-            currNode->value = interp.get_return_value();
-            delete lhs;
-            delete rhs;
+            execute_node();
         }
     }
 

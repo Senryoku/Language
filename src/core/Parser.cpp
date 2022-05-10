@@ -89,7 +89,7 @@ bool Parser::parse_next_expression(const std::span<Tokenizer::Token>& tokens, st
             case Operator: {
                 auto p = operator_precedence.at(std::string(it->value));
                 if(p > precedence) {
-                    if(!parse_binary_operator(tokens, it, exprNode))
+                    if(!parse_operator(tokens, it, exprNode))
                         return false;
                 } else {
                     stop = true;
@@ -333,7 +333,18 @@ bool Parser::parse_string(const std::span<Tokenizer::Token>&, std::span<Tokenize
     return true;
 }
 
-bool Parser::parse_binary_operator(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode) {
+bool Parser::parse_operator(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode) {
+    // Unary operators
+    if((it->value == "+" || it->value == "-") && currNode->children.empty()) {
+        AST::Node* unaryOperatorNode = currNode->add_child(new AST::Node(AST::Node::Type::UnaryOperator, *it));
+        auto       precedence = operator_precedence.at(std::string(it->value));
+        ++it;
+        if(!parse_next_expression(tokens, it, unaryOperatorNode, precedence))
+            return false;
+        resolve_operator_type(unaryOperatorNode);
+        return true;
+    }
+
     if(currNode->children.empty()) {
         error("Syntax error: unexpected binary operator: {}.\n", *it);
         return false;

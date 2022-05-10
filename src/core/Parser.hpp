@@ -26,20 +26,27 @@ class Parser : public Scoped {
         {"<=", (uint8_t)3}, {"<=", (uint8_t)3}, {"-", (uint8_t)4},  {"+", (uint8_t)4},  {"*", (uint8_t)5},  {"/", (uint8_t)5}, {"^", (uint8_t)5},
     };
 
-    static void resolve_operator_type(AST::Node* binaryOp) {
-        assert(binaryOp->type == AST::Node::Type::BinaryOperator);
-        auto lhs = binaryOp->children[0]->value.type;
-        auto rhs = binaryOp->children[1]->value.type;
-        // FIXME: Here we're getting the item type if we're accessing array items. This should be done automatically elsewhere I think (wrap the indexed access in an expression, or
-        // another node type?)
-        if(lhs == GenericValue::Type::Array && binaryOp->children[0]->children.size() > 0)
-            lhs = binaryOp->children[0]->value.value.as_array.type;
-        if(rhs == GenericValue::Type::Array && binaryOp->children[1]->children.size() > 0)
-            rhs = binaryOp->children[1]->value.value.as_array.type;
-        binaryOp->value.type = GenericValue::resolve_operator_type(binaryOp->token.value, lhs, rhs);
-        if(binaryOp->value.type == GenericValue::Type::Undefined) {
-            warn("[Parser] Couldn't resolve operator return type (Missing impl.) on line {}. Children:\n", binaryOp->token.line);
-            fmt::print("LHS: {}RHS: {}\n", *binaryOp->children[0], *binaryOp->children[1]);
+    static void resolve_operator_type(AST::Node* opNode) {
+        assert(opNode->type == AST::Node::Type::BinaryOperator || opNode->type == AST::Node::Type::UnaryOperator);
+        if(opNode->type == AST::Node::Type::UnaryOperator) {
+            auto rhs = opNode->children[0]->value.type;
+            if(rhs == GenericValue::Type::Array && opNode->children[0]->children.size() > 0)
+                rhs = opNode->children[0]->value.value.as_array.type;
+            opNode->value.type = rhs;
+        } else {
+            auto lhs = opNode->children[0]->value.type;
+            auto rhs = opNode->children[1]->value.type;
+            // FIXME: Here we're getting the item type if we're accessing array items. This should be done automatically elsewhere I think (wrap the indexed access in an
+            // expression, or another node type?)
+            if(lhs == GenericValue::Type::Array && opNode->children[0]->children.size() > 0)
+                lhs = opNode->children[0]->value.value.as_array.type;
+            if(rhs == GenericValue::Type::Array && opNode->children[1]->children.size() > 0)
+                rhs = opNode->children[1]->value.value.as_array.type;
+            opNode->value.type = GenericValue::resolve_operator_type(opNode->token.value, lhs, rhs);
+        }
+        if(opNode->value.type == GenericValue::Type::Undefined) {
+            warn("[Parser] Couldn't resolve operator return type (Missing impl.) on line {}. Node:\n", opNode->token.line);
+            fmt::print("{}\n", *opNode);
         }
     }
 
@@ -172,7 +179,7 @@ class Parser : public Scoped {
                 }
 
                 case Tokenizer::Token::Type::Operator: {
-                    if(!parse_binary_operator(tokens, it, currNode))
+                    if(!parse_operator(tokens, it, currNode))
                         return false;
                     break;
                 }
@@ -213,6 +220,6 @@ class Parser : public Scoped {
     bool parse_float(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode);
     bool parse_char(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode);
     bool parse_string(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode);
-    bool parse_binary_operator(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode);
+    bool parse_operator(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode);
     bool parse_variable_declaration(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode);
 };

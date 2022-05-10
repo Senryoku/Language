@@ -9,8 +9,7 @@
 #include <Logger.hpp>
 
 struct GenericValue {
-    enum class Type
-    {
+    enum class Type {
         Boolean,
         Integer,
         Float,
@@ -240,7 +239,23 @@ struct GenericValue {
 
     // Arithmetic operators
 
-    GenericValue operator+(const GenericValue& rhs) {
+    GenericValue operator+() const {
+        assert(is_numeric(type));
+        return *this;
+    }
+
+    GenericValue operator-() const {
+        assert(is_numeric(type));
+        GenericValue r = *this;
+        switch(r.type) {
+            case Type::Integer: r.value.as_int32_t = -r.value.as_int32_t; break;
+            case Type::Float: r.value.as_float = -r.value.as_float; break;
+            default: assert(false); break;
+        }
+        return r;
+    }
+
+    GenericValue operator+(const GenericValue& rhs) const {
         GenericValue r{.type = resolve_operator_type("+", type, rhs.type)};
         if(type != rhs.type) { // TODO: Hanlde implicit conversion?
             if(is_numeric(type) && is_numeric(rhs.type)) {

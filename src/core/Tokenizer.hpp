@@ -10,8 +10,7 @@
 class Tokenizer {
   public:
     struct Token {
-        enum class Type
-        {
+        enum class Type {
             Control,
             Function,
             Return,
@@ -164,8 +163,8 @@ class Tokenizer {
                 else
                     type = Token::Type::Digits;
             } else {
-                // Binary Operators
-                // FIXME
+                // Operators
+                // FIXME (Better solution than is_allowed_in_operators?)
                 while(pointer < _source.length() && !is_discardable(_source[pointer]) && is_allowed_in_operators(_source[pointer]))
                     ++pointer;
                 if(binary_operators.contains(std::string_view{_source.begin() + begin, _source.begin() + pointer})) {

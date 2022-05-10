@@ -175,6 +175,16 @@ class Interpreter : public Scoped {
                 return *pVar; // FIXME: Make sure GenericValue & Variable are transparent? Remove the 'Variable' type?
                 break;
             }
+            case UnaryOperator: {
+                assert(node.children.size() == 1);
+                auto rhs = execute(*node.children[0]);
+                switch(node.token.value[0]) {
+                    case '-': return _return_value = -rhs; break;
+                    case '+': return _return_value = rhs; break;
+                }
+                return _return_value;
+                break;
+            }
             case BinaryOperator: {
                 assert(node.children.size() == 2);
                 auto lhs = execute(*node.children[0]);

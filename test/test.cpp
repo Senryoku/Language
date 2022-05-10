@@ -88,6 +88,16 @@ TEST(Arithmetic, RightMul2) {
     EXPECT_EQ(interpreter.get_return_value().value.as_int32_t, 83);
 }
 
+TEST(Arithmetic, UnarySub) {
+    PARSE_INTERP("-5684;");
+    EXPECT_EQ(interpreter.get_return_value().value.as_int32_t, -5684);
+}
+
+TEST(Arithmetic, UnaryAdd) {
+    PARSE_INTERP("+4185;");
+    EXPECT_EQ(interpreter.get_return_value().value.as_int32_t, +4185);
+}
+
 TEST(Arithmetic, Order) {
     PARSE_INTERP("2 * (6 * 1 + 2) / 4 * (4 + 1)");
     EXPECT_EQ(interpreter.get_return_value().value.as_int32_t, 20);
