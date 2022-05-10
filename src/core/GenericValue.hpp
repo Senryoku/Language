@@ -87,6 +87,7 @@ struct GenericValue {
             }
         }
         error("[GenericValue:{}] Error assigning {} to {}.\n", __LINE__, rhs, *this);
+        return *this;
     }
 
     // Boolean operators
@@ -243,7 +244,6 @@ struct GenericValue {
         assert(is_numeric(type));
         return *this;
     }
-
     GenericValue operator-() const {
         assert(is_numeric(type));
         GenericValue r = *this;
@@ -376,6 +376,7 @@ struct GenericValue {
         if(type == Type::Float)
             return value.as_float;
         assert(false);
+        return value.as_float;
     }
 
     int32_t to_int32_t() const {
@@ -384,6 +385,7 @@ struct GenericValue {
         if(type == Type::Float)
             return static_cast<int32_t>(value.as_float);
         assert(false);
+        return value.as_int32_t;
     }
 
     Type       type;
