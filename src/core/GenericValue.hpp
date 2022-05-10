@@ -343,6 +343,17 @@ struct GenericValue {
         return r;
     }
 
+    GenericValue operator%(const GenericValue& rhs) {
+        GenericValue r{.type = resolve_operator_type("%", type, rhs.type)};
+        assert(type == rhs.type);
+        switch(type) {
+            case Type::Integer: r.value.as_int32_t = value.as_int32_t % rhs.value.as_int32_t; break;
+            case Type::Float: r.value.as_float = std::fmod(value.as_float, rhs.value.as_float); break;
+            default: assert(false); break;
+        }
+        return r;
+    }
+
     GenericValue operator^(const GenericValue& rhs) {
         GenericValue r{.type = resolve_operator_type("^", type, rhs.type)};
         if(type != rhs.type)

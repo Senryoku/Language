@@ -223,7 +223,7 @@ class Interpreter : public Scoped {
         _return_value = lhs O rhs;
 
                 OP(+)
-                else OP(-) else OP(*) else OP(/) else OP(<) else OP(>) else OP(<=) else OP(>=) else OP(==) else OP(!=) else OP(&&) else OP(||) else error(
+                else OP(-) else OP(*) else OP(/) else OP(%) else OP(<) else OP(>) else OP(<=) else OP(>=) else OP(==) else OP(!=) else OP(&&) else OP(||) else error(
                     "BinaryOperator: Unsupported operation ('{}') on {} and {}.\n", node.token.value, lhs, rhs);
 #undef OP
 

@@ -28,10 +28,10 @@ aux_source_directory("src/core" SOURCES)
 aux_source_directory("test/" TEST_FILES)
 file(GLOB HEADERS src/**/*.hpp)
 
-add_executable(compiler ${SOURCES} ${HEADERS} src/compiler.cpp)
-add_executable(prompt ${SOURCES} ${HEADERS} src/prompt.cpp)
-add_executable(assembler_test ${SOURCES} ${HEADERS} src/assembler_test.cpp)
-add_executable(tester ${SOURCES} ${TEST_FILES} ${HEADERS} test/main.cpp)
+add_executable(compiler ${SOURCES} ${HEADERS} src/compiler.cpp "src/core/Tokenizer.cpp")
+add_executable(prompt ${SOURCES} ${HEADERS} src/prompt.cpp "src/core/Tokenizer.cpp")
+add_executable(assembler_test ${SOURCES} ${HEADERS} src/assembler_test.cpp "src/core/Tokenizer.cpp")
+add_executable(tester ${SOURCES} ${TEST_FILES} ${HEADERS} test/main.cpp "src/core/Tokenizer.cpp")
 
 target_include_directories(compiler PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/ext")
 

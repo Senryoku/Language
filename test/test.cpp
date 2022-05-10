@@ -88,6 +88,21 @@ TEST(Arithmetic, RightMul2) {
     EXPECT_EQ(interpreter.get_return_value().value.as_int32_t, 83);
 }
 
+TEST(Arithmetic, Modulo) {
+    PARSE_INTERP("5 % 2");
+    EXPECT_EQ(interpreter.get_return_value().value.as_int32_t, 1);
+}
+
+TEST(Arithmetic, ModuloPrecedence) {
+    PARSE_INTERP("(46 + 20) % 12");
+    EXPECT_EQ(interpreter.get_return_value().value.as_int32_t, 6);
+}
+
+TEST(Arithmetic, FloatModulo) {
+    PARSE_INTERP("25.6 % 1.8");
+    EXPECT_EQ(interpreter.get_return_value().value.as_float, 0.4);
+}
+
 TEST(Arithmetic, UnarySub) {
     PARSE_INTERP("-5684;");
     EXPECT_EQ(interpreter.get_return_value().value.as_int32_t, -5684);
