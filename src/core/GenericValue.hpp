@@ -409,72 +409,72 @@ inline static GenericValue::Type parse_type(const std::string_view& str) {
 
 template<>
 struct fmt::formatter<GenericValue::StringView> {
-    constexpr auto parse(format_parse_context& ctx) {
+    constexpr auto parse(format_parse_context& ctx) -> decltype(ctx.begin()) {
         auto it = ctx.begin(), end = ctx.end();
         if(it != end && *it != '}')
             throw format_error("Invalid format for StringView");
         return it;
     }
     template<typename FormatContext>
-    auto format(const GenericValue::StringView& v, FormatContext& ctx) {
+    auto format(const GenericValue::StringView& v, FormatContext& ctx) -> decltype(ctx.out()) {
         std::string_view str{v.begin, v.begin + v.size};
         return format_to(ctx.out(), "{}", str);
     }
 };
 
 template<>
-struct fmt::formatter<GenericValue> {
-    constexpr auto parse(format_parse_context& ctx) {
+struct fmt::formatter<GenericValue::Type> {
+    constexpr auto parse(format_parse_context& ctx) -> decltype(ctx.begin()) {
         auto it = ctx.begin(), end = ctx.end();
         if(it != end && *it != '}')
             throw format_error("Invalid format for GenericValue");
         return it;
     }
     template<typename FormatContext>
-    auto format(const GenericValue& v, FormatContext& ctx) {
-        switch(v.type) {
+    auto format(const GenericValue::Type& t, FormatContext& ctx) -> decltype(ctx.out()) {
+        switch(t) {
             using enum GenericValue::Type;
-            case Integer: return format_to(ctx.out(), "{}:{}", v.type, v.value.as_int32_t);
-            case Float: return format_to(ctx.out(), "{}:{}", v.type, v.value.as_float);
-            case Char: return format_to(ctx.out(), "{}:{}", v.type, v.value.as_char);
-            case String: return format_to(ctx.out(), "{}:{}", v.type, v.value.as_string.to_std_string_view());
-            case Boolean: return format_to(ctx.out(), "{}:{}", v.type, v.value.as_bool ? "True" : "False");
-            case Array: {
-                auto r = format_to(ctx.out(), "{}:{}[{}]", v.type, v.value.as_array.type, v.value.as_array.capacity);
-                if(v.value.as_array.items) {
-                    r = format_to(ctx.out(), " [");
-                    for(size_t i = 0; i < v.value.as_array.capacity; ++i)
-                        r = format_to(ctx.out(), "{}, ", v.value.as_array.items[i]);
-                    r = format_to(ctx.out(), "]");
-                }
-                return r;
-            }
-            case Undefined: return format_to(ctx.out(), fg(fmt::color::gray), "{}", "Undefined");
-            default: return format_to(ctx.out(), fg(fmt::color::red), "{}", "Unknown");
+            case Integer: return fmt::format_to(ctx.out(), fg(fmt::color::golden_rod), "{}", "Integer");
+            case Float: return fmt::format_to(ctx.out(), fg(fmt::color::golden_rod), "{}", "Float");
+            case Char: return fmt::format_to(ctx.out(), fg(fmt::color::burly_wood), "{}", "Char");
+            case String: return fmt::format_to(ctx.out(), fg(fmt::color::burly_wood), "{}", "String");
+            case Boolean: return fmt::format_to(ctx.out(), fg(fmt::color::royal_blue), "{}", "Boolean");
+            case Array: return fmt::format_to(ctx.out(), "{}", "Array");
+            case Undefined: return fmt::format_to(ctx.out(), fg(fmt::color::gray), "{}", "Undefined");
+            default: return fmt::format_to(ctx.out(), fg(fmt::color::red), "{}", "Unknown");
         }
     }
 };
 
 template<>
-struct fmt::formatter<GenericValue::Type> {
-    constexpr auto parse(format_parse_context& ctx) {
+struct fmt::formatter<GenericValue> {
+    constexpr auto parse(format_parse_context& ctx) -> decltype(ctx.begin()) {
         auto it = ctx.begin(), end = ctx.end();
         if(it != end && *it != '}')
             throw format_error("Invalid format for GenericValue");
         return it;
     }
     template<typename FormatContext>
-    auto format(const GenericValue::Type& t, FormatContext& ctx) {
-        switch(t) {
+    auto format(const GenericValue& v, FormatContext& ctx) const -> decltype(ctx.out()) {
+        switch(v.type) {
             using enum GenericValue::Type;
-            case Integer: return format_to(ctx.out(), fg(fmt::color::golden_rod), "{}", "Integer");
-            case Float: return format_to(ctx.out(), fg(fmt::color::golden_rod), "{}", "Float");
-            case Char: return format_to(ctx.out(), fg(fmt::color::burly_wood), "{}", "Char");
-            case String: return format_to(ctx.out(), fg(fmt::color::burly_wood), "{}", "String");
-            case Boolean: return format_to(ctx.out(), fg(fmt::color::royal_blue), "{}", "Boolean");
-            case Array: return format_to(ctx.out(), "{}", "Array");
-            case Undefined: return format_to(ctx.out(), fg(fmt::color::gray), "{}", "Undefined");
-            default: return format_to(ctx.out(), fg(fmt::color::red), "{}", "Unknown");
+            case Integer: return fmt::format_to(ctx.out(), "{}:{}", v.type, v.value.as_int32_t);
+            case Float: return fmt::format_to(ctx.out(), "{}:{}", v.type, v.value.as_float);
+            case Char: return fmt::format_to(ctx.out(), "{}:{}", v.type, v.value.as_char);
+            case String: return fmt::format_to(ctx.out(), "{}:{}", v.type, v.value.as_string.to_std_string_view());
+            case Boolean: return fmt::format_to(ctx.out(), "{}:{}", v.type, v.value.as_bool ? "True" : "False");
+            case Array: {
+                auto r = fmt::format_to(ctx.out(), "{}:{}[{}]", v.type, v.value.as_array.type, v.value.as_array.capacity);
+                if(v.value.as_array.items) {
+                    r = fmt::format_to(ctx.out(), " [");
+                    for(size_t i = 0; i < v.value.as_array.capacity; ++i)
+                        r = fmt::format_to(ctx.out(), "{}, ", v.value.as_array.items[i]);
+                    r = fmt::format_to(ctx.out(), "]");
+                }
+                return r;
+            }
+            case Undefined: return fmt::format_to(ctx.out(), fg(fmt::color::gray), "{}", "Undefined");
+            default: return fmt::format_to(ctx.out(), fg(fmt::color::red), "{}", "Unknown");
         }
     }
 };

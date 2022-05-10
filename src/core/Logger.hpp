@@ -14,7 +14,7 @@ inline std::string link(const std::string_view& url) {
 }
 
 inline void print_link(const std::string_view& url, const std::string_view& text) {
-    fmt::print(link(url, text));
+    fmt::print(fmt::runtime(link(url, text)));
 }
 
 template<typename... Args>
@@ -52,11 +52,11 @@ struct Indenter {
     template<typename... Args>
     void print(fmt::string_view format_str, Args&&... args) {
         fmt::print("{:{}}", "", indent);
-        fmt::print(format_str, std::forward<Args>(args)...);
+        fmt::print(fmt::runtime(format_str), std::forward<Args>(args)...);
     }
 
     template<typename... Args>
     void print_same_line(fmt::string_view format_str, Args&&... args) {
-        fmt::print(format_str, std::forward<Args>(args)...);
+        fmt::print(fmt::runtime(format_str), std::forward<Args>(args)...);
     }
 };

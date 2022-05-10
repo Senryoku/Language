@@ -196,7 +196,7 @@ class Tokenizer {
 
 template<>
 struct fmt::formatter<Tokenizer::Token> {
-    constexpr auto parse(format_parse_context& ctx) {
+    constexpr auto parse(format_parse_context& ctx) -> decltype(ctx.begin()) {
         auto it = ctx.begin(), end = ctx.end();
         if(it != end && *it != '}')
             throw format_error("Invalid format for Tokenizer::Token");
@@ -204,34 +204,34 @@ struct fmt::formatter<Tokenizer::Token> {
     }
 
     template<typename FormatContext>
-    auto format(const Tokenizer::Token& t, FormatContext& ctx) {
-        return format_to(ctx.out(), fg(fmt::color::gray), "T({} {:12} {:3})", t.type, t.value, t.line);
+    auto format(const Tokenizer::Token& t, FormatContext& ctx) const -> decltype(ctx.out()) {
+        return fmt::format_to(ctx.out(), fg(fmt::color::gray), "T({} {:12} {:3})", t.type, t.value, t.line);
     }
 };
 
 template<>
 struct fmt::formatter<Tokenizer::Token::Type> {
-    constexpr auto parse(format_parse_context& ctx) {
+    constexpr auto parse(format_parse_context& ctx) -> decltype(ctx.begin()) {
         auto it = ctx.begin(), end = ctx.end();
         if(it != end && *it != '}')
             throw format_error("Invalid format for Tokenizer::Token::Type");
         return it;
     }
     template<typename FormatContext>
-    auto format(const Tokenizer::Token::Type& t, FormatContext& ctx) {
+    auto format(const Tokenizer::Token::Type& t, FormatContext& ctx) const -> decltype(ctx.out()) {
         switch(t) {
-            case Tokenizer::Token::Type::Control: return format_to(ctx.out(), "{:12}", "Control");
-            case Tokenizer::Token::Type::Function: return format_to(ctx.out(), fg(fmt::color::orchid), "{:12}", "Function");
-            case Tokenizer::Token::Type::While: return format_to(ctx.out(), fg(fmt::color::orchid), "{:12}", "While");
-            case Tokenizer::Token::Type::If: return format_to(ctx.out(), fg(fmt::color::orchid), "{:12}", "If");
-            case Tokenizer::Token::Type::Else: return format_to(ctx.out(), fg(fmt::color::orchid), "{:12}", "Else");
-            case Tokenizer::Token::Type::Digits: return format_to(ctx.out(), "{:12}", "Digits");
-            case Tokenizer::Token::Type::Boolean: return format_to(ctx.out(), "{:12}", "Boolean");
-            case Tokenizer::Token::Type::BuiltInType: return format_to(ctx.out(), "{:12}", "BuiltInType");
-            case Tokenizer::Token::Type::Operator: return format_to(ctx.out(), "{:12}", "Operator");
-            case Tokenizer::Token::Type::Identifier: return format_to(ctx.out(), fg(fmt::color::light_blue), "{:12}", "Identifier");
+            case Tokenizer::Token::Type::Control: return fmt::format_to(ctx.out(), "{:12}", "Control");
+            case Tokenizer::Token::Type::Function: return fmt::format_to(ctx.out(), fg(fmt::color::orchid), "{:12}", "Function");
+            case Tokenizer::Token::Type::While: return fmt::format_to(ctx.out(), fg(fmt::color::orchid), "{:12}", "While");
+            case Tokenizer::Token::Type::If: return fmt::format_to(ctx.out(), fg(fmt::color::orchid), "{:12}", "If");
+            case Tokenizer::Token::Type::Else: return fmt::format_to(ctx.out(), fg(fmt::color::orchid), "{:12}", "Else");
+            case Tokenizer::Token::Type::Digits: return fmt::format_to(ctx.out(), "{:12}", "Digits");
+            case Tokenizer::Token::Type::Boolean: return fmt::format_to(ctx.out(), "{:12}", "Boolean");
+            case Tokenizer::Token::Type::BuiltInType: return fmt::format_to(ctx.out(), "{:12}", "BuiltInType");
+            case Tokenizer::Token::Type::Operator: return fmt::format_to(ctx.out(), "{:12}", "Operator");
+            case Tokenizer::Token::Type::Identifier: return fmt::format_to(ctx.out(), fg(fmt::color::light_blue), "{:12}", "Identifier");
             default:
-            case Tokenizer::Token::Type::Unknown: return format_to(ctx.out(), "{:12}", "Unknown");
+            case Tokenizer::Token::Type::Unknown: return fmt::format_to(ctx.out(), "{:12}", "Unknown");
         }
     }
 };

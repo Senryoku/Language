@@ -41,7 +41,8 @@ set_property(TARGET assembler_test PROPERTY CXX_STANDARD 20)
 set_property(TARGET tester PROPERTY CXX_STANDARD 20)
 
 # Use included version of FMT
-add_subdirectory("ext/fmt-7.1.3")
+add_subdirectory("ext/fmt-8.1.1")
+include_directories("ext/fmt-8.1.1/include")
 target_link_libraries(compiler fmt::fmt)
 target_link_libraries(prompt fmt::fmt)
 target_link_libraries(tester fmt::fmt)

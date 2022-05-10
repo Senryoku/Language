@@ -95,8 +95,8 @@ struct fmt::formatter<AST> {
         return it;
     }
     template<typename FormatContext>
-    auto format(const AST& t, FormatContext& ctx) {
-        return format_to(ctx.out(), "AST Dump: {:}\n", t.getRoot());
+    auto format(const AST& t, FormatContext& ctx) const -> decltype(ctx.out()) {
+        return fmt::format_to(ctx.out(), "AST Dump: {:}\n", t.getRoot());
     }
 };
 
@@ -120,7 +120,7 @@ struct fmt::formatter<AST::Node> {
     }
 
     template<typename FormatContext>
-    auto format(const AST::Node& t, FormatContext& ctx) {
+    auto format(const AST::Node& t, FormatContext& ctx) const -> decltype(ctx.out()) {
         auto r = ctx.out();
         for(size_t i = 0; i < indent.length(); ++i) {
             const char c = indent[i];
@@ -138,17 +138,17 @@ struct fmt::formatter<AST::Node> {
         }
 
         switch(t.type) {
-            case AST::Node::Type::ConstantValue: r = format_to(ctx.out(), "{}:{}", t.type, t.value); break;
-            case AST::Node::Type::ReturnStatement: r = format_to(ctx.out(), "{}:{}", t.type, t.value.type); break;
-            case AST::Node::Type::WhileStatement: r = format_to(ctx.out(), "{}", t.type); break;
-            case AST::Node::Type::Variable: r = format_to(ctx.out(), "{}:{}:{}", t.type, t.token.value, t.value.type); break;
-            case AST::Node::Type::FunctionDeclaration: r = format_to(ctx.out(), "{}:{}", t.type, t.token.value); break;
-            case AST::Node::Type::FunctionCall: r = format_to(ctx.out(), "{}:{}()", t.type, t.token.value); break;
-            case AST::Node::Type::VariableDeclaration: r = format_to(ctx.out(), "{}:{} {}", t.type, t.value.type, t.token.value); break;
+            case AST::Node::Type::ConstantValue: r = fmt::format_to(ctx.out(), "{}:{}", t.type, t.value); break;
+            case AST::Node::Type::ReturnStatement: r = fmt::format_to(ctx.out(), "{}:{}", t.type, t.value.type); break;
+            case AST::Node::Type::WhileStatement: r = fmt::format_to(ctx.out(), "{}", t.type); break;
+            case AST::Node::Type::Variable: r = fmt::format_to(ctx.out(), "{}:{}:{}", t.type, t.token.value, t.value.type); break;
+            case AST::Node::Type::FunctionDeclaration: r = fmt::format_to(ctx.out(), "{}:{}", t.type, t.token.value); break;
+            case AST::Node::Type::FunctionCall: r = fmt::format_to(ctx.out(), "{}:{}()", t.type, t.token.value); break;
+            case AST::Node::Type::VariableDeclaration: r = fmt::format_to(ctx.out(), "{}:{} {}", t.type, t.value.type, t.token.value); break;
             case AST::Node::Type::BinaryOperator:
-                r = format_to(ctx.out(), "{} {}:{}", fmt::format(fmt::emphasis::bold | fg(fmt::color::black) | bg(fmt::color::dim_gray), t.token.value), t.type, t.value.type);
+                r = fmt::format_to(ctx.out(), "{} {}:{}", fmt::format(fmt::emphasis::bold | fg(fmt::color::black) | bg(fmt::color::dim_gray), t.token.value), t.type, t.value.type);
                 break;
-            default: r = format_to(ctx.out(), "{}", t.type);
+            default: r = fmt::format_to(ctx.out(), "{}", t.type);
         }
 
         auto token_str = t.token.type == Tokenizer::Token::Type::Unknown ? "None" : fmt::format("{}", t.token);
@@ -157,10 +157,10 @@ struct fmt::formatter<AST::Node> {
         // Forward then backward
         // r = format_to(ctx.out(), "\033[999C\033[{}D{}\n", length, token_str);
         // Backward then forward
-        r = format_to(ctx.out(), "\033[999D\033[{}C{}\n", 50, token_str);
+        r = fmt::format_to(ctx.out(), "\033[999D\033[{}C{}\n", 50, token_str);
 
         for(size_t i = 0; i < t.children.size(); ++i)
-            r = format_to(r, "{:" + indent + (i == t.children.size() - 1 ? "e" : "i") + "}", *t.children[i]);
+            r = fmt::format_to(r, fmt::runtime("{:" + indent + (i == t.children.size() - 1 ? "e" : "i") + "}"), *t.children[i]);
 
         return r;
     }
@@ -168,7 +168,7 @@ struct fmt::formatter<AST::Node> {
 
 template<>
 struct fmt::formatter<AST::Node::Type> {
-    constexpr auto parse(format_parse_context& ctx) {
+    constexpr auto parse(format_parse_context& ctx) -> decltype(ctx.begin()) {
         auto it = ctx.begin(), end = ctx.end();
         if(it != end && *it != '}')
             throw format_error("Invalid format for AST::Node::Type");
@@ -176,23 +176,23 @@ struct fmt::formatter<AST::Node::Type> {
     }
 
     template<typename FormatContext>
-    auto format(const AST::Node::Type& t, FormatContext& ctx) {
+    auto format(const AST::Node::Type& t, FormatContext& ctx) -> decltype(ctx.out()) {
         switch(t) {
-            case AST::Node::Type::Root: return format_to(ctx.out(), "{}", "Root");
-            case AST::Node::Type::Expression: return format_to(ctx.out(), "{}", "Expression");
-            case AST::Node::Type::IfStatement: return format_to(ctx.out(), fg(fmt::color::orchid), "{}", "IfStatement");
-            case AST::Node::Type::ElseStatement: return format_to(ctx.out(), fg(fmt::color::orchid), "{}", "ElseStatement");
-            case AST::Node::Type::WhileStatement: return format_to(ctx.out(), fg(fmt::color::orchid), "{}", "WhileStatement");
-            case AST::Node::Type::ReturnStatement: return format_to(ctx.out(), fg(fmt::color::orchid), "{}", "ReturnStatement");
-            case AST::Node::Type::Scope: return format_to(ctx.out(), "{}", "Scope {");
-            case AST::Node::Type::VariableDeclaration: return format_to(ctx.out(), fg(fmt::color::light_blue), "{}", "VariableDeclaration");
-            case AST::Node::Type::FunctionDeclaration: return format_to(ctx.out(), fg(fmt::color::light_yellow), "{}", "FunctionDeclaration");
-            case AST::Node::Type::FunctionCall: return format_to(ctx.out(), fg(fmt::color::light_yellow), "{}", "FunctionCall");
-            case AST::Node::Type::Variable: return format_to(ctx.out(), fg(fmt::color::light_blue), "{}", "Variable");
-            case AST::Node::Type::ConstantValue: return format_to(ctx.out(), "{}", "ConstantValue");
-            case AST::Node::Type::UnaryOperator: return format_to(ctx.out(), "{}", "UnaryOperator");
-            case AST::Node::Type::BinaryOperator: return format_to(ctx.out(), "{}", "BinaryOperator");
-            default: assert(false); return format_to(ctx.out(), "{}", "MissingFormat for AST::Node::Type!");
+            case AST::Node::Type::Root: return fmt::format_to(ctx.out(), "{}", "Root");
+            case AST::Node::Type::Expression: return fmt::format_to(ctx.out(), "{}", "Expression");
+            case AST::Node::Type::IfStatement: return fmt::format_to(ctx.out(), fg(fmt::color::orchid), "{}", "IfStatement");
+            case AST::Node::Type::ElseStatement: return fmt::format_to(ctx.out(), fg(fmt::color::orchid), "{}", "ElseStatement");
+            case AST::Node::Type::WhileStatement: return fmt::format_to(ctx.out(), fg(fmt::color::orchid), "{}", "WhileStatement");
+            case AST::Node::Type::ReturnStatement: return fmt::format_to(ctx.out(), fg(fmt::color::orchid), "{}", "ReturnStatement");
+            case AST::Node::Type::Scope: return fmt::format_to(ctx.out(), "{}", "Scope {");
+            case AST::Node::Type::VariableDeclaration: return fmt::format_to(ctx.out(), fg(fmt::color::light_blue), "{}", "VariableDeclaration");
+            case AST::Node::Type::FunctionDeclaration: return fmt::format_to(ctx.out(), fg(fmt::color::light_yellow), "{}", "FunctionDeclaration");
+            case AST::Node::Type::FunctionCall: return fmt::format_to(ctx.out(), fg(fmt::color::light_yellow), "{}", "FunctionCall");
+            case AST::Node::Type::Variable: return fmt::format_to(ctx.out(), fg(fmt::color::light_blue), "{}", "Variable");
+            case AST::Node::Type::ConstantValue: return fmt::format_to(ctx.out(), "{}", "ConstantValue");
+            case AST::Node::Type::UnaryOperator: return fmt::format_to(ctx.out(), "{}", "UnaryOperator");
+            case AST::Node::Type::BinaryOperator: return fmt::format_to(ctx.out(), "{}", "BinaryOperator");
+            default: assert(false); return fmt::format_to(ctx.out(), "{}", "MissingFormat for AST::Node::Type!");
         }
     }
 };
