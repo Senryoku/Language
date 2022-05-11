@@ -45,14 +45,14 @@ int main(int argc, char* argv[]) {
         while(tokenizer.has_more())
             tokens.push_back(tokenizer.consume());
 
-        auto newNodes = parser.parse(std::span<Tokenizer::Token>{tokens.begin() + first, tokens.end()}, ast);
+        auto newNode = parser.parse(std::span<Tokenizer::Token>{tokens.begin() + first, tokens.end()}, ast);
         ast.optimize();
-        for(auto node : newNodes) {
+        if(newNode) {
             log.group();
-            log.print("Executing ({}) using Interpreter...\n", node->type);
+            log.print("Executing ({}) using Interpreter...\n", newNode->type);
             auto clock = std::chrono::steady_clock();
             auto start = clock.now();
-            interpreter.execute(*node);
+            interpreter.execute(*newNode);
             auto end = clock.now();
             log.print("Done in {}ms, returned: '{}'.\n", std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count(), interpreter.get_return_value());
             log.end();
@@ -117,13 +117,13 @@ int main(int argc, char* argv[]) {
             while(tokenizer.has_more())
                 tokens.push_back(tokenizer.consume());
 
-            auto newNodes = parser.parse(std::span<Tokenizer::Token>{tokens.begin() + first, tokens.end()}, ast);
-            for(auto node : newNodes) {
+            auto newNode = parser.parse(std::span<Tokenizer::Token>{tokens.begin() + first, tokens.end()}, ast);
+            if(newNode) {
                 log.group();
-                log.print("Executing ({}) using Interpreter...\n", node->type);
+                log.print("Executing ({}) using Interpreter...\n", newNode->type);
                 auto clock = std::chrono::steady_clock();
                 auto start = clock.now();
-                interpreter.execute(*node);
+                interpreter.execute(*newNode);
                 auto end = clock.now();
                 log.print("Done in {}ms, returned: '{}'.\n", std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count(), interpreter.get_return_value());
                 log.end();

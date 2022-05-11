@@ -381,7 +381,7 @@ bool Parser::parse_string(const std::span<Tokenizer::Token>&, std::span<Tokenize
 
 bool Parser::parse_operator(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode) {
     // Unary operators
-    if((it->value == "+" || it->value == "-") && currNode->children.empty()) {
+    if((it->value == "+" || it->value == "-" || it->value == "++" || it->value == "--") && currNode->children.empty()) {
         AST::Node* unaryOperatorNode = currNode->add_child(new AST::Node(AST::Node::Type::UnaryOperator, *it));
         auto       precedence = operator_precedence.at(std::string(it->value));
         ++it;
@@ -389,6 +389,17 @@ bool Parser::parse_operator(const std::span<Tokenizer::Token>& tokens, std::span
             delete currNode->pop_child();
             return false;
         }
+        resolve_operator_type(unaryOperatorNode);
+        return true;
+    }
+
+    if((it->value == "++" || it->value == "--") && !currNode->children.empty()) {
+        auto       prevNode = currNode->pop_child();
+        AST::Node* unaryOperatorNode = currNode->add_child(new AST::Node(AST::Node::Type::UnaryOperator, *it));
+        // auto   precedence = operator_precedence.at(std::string(it->value));
+        // FIXME: How do we use the precedence here?
+        unaryOperatorNode->add_child(prevNode);
+        ++it;
         resolve_operator_type(unaryOperatorNode);
         return true;
     }

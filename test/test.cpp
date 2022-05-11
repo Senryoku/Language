@@ -100,7 +100,7 @@ TEST(Arithmetic, ModuloPrecedence) {
 
 TEST(Arithmetic, FloatModulo) {
     PARSE_INTERP("25.6 % 1.8");
-    EXPECT_EQ(interpreter.get_return_value().value.as_float, 0.4);
+    EXPECT_EQ(interpreter.get_return_value().value.as_float, std::fmod(25.6, 1.8));
 }
 
 TEST(Arithmetic, UnarySub) {
@@ -111,6 +111,21 @@ TEST(Arithmetic, UnarySub) {
 TEST(Arithmetic, UnaryAdd) {
     PARSE_INTERP("+4185;");
     EXPECT_EQ(interpreter.get_return_value().value.as_int32_t, +4185);
+}
+
+TEST(Arithmetic, Increment) {
+    PARSE_INTERP("int i = 0; ++i;");
+    EXPECT_EQ(interpreter.get_return_value().value.as_int32_t, 1);
+}
+
+TEST(Arithmetic, PostFixIncrement) {
+    PARSE_INTERP("int i = 0; i++; return i;");
+    EXPECT_EQ(interpreter.get_return_value().value.as_int32_t, 1);
+}
+
+TEST(Arithmetic, PostFixIncrementReturnValue) {
+    PARSE_INTERP("int i = 0; i++;");
+    EXPECT_EQ(interpreter.get_return_value().value.as_int32_t, 0);
 }
 
 TEST(Arithmetic, Order) {

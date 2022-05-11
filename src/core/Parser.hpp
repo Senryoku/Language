@@ -21,9 +21,10 @@ class Parser : public Scoped {
     }
 
     // FIXME: For many reasons (string creations...) Just correctly type the node from the start (i.e. token stage) I guess?
+    // FIXME: Pre and postfix versions of --/++ should habe different precedence (3 and 2 respectively)
     inline static const std::unordered_map<std::string, uint8_t> operator_precedence{
-        {"=", (uint8_t)0},  {"||", (uint8_t)1}, {"&&", (uint8_t)2}, {"==", (uint8_t)3}, {"!=", (uint8_t)3}, {">", (uint8_t)3}, {"<", (uint8_t)3}, {">=", (uint8_t)3},
-        {"<=", (uint8_t)3}, {"<=", (uint8_t)3}, {"-", (uint8_t)4},  {"+", (uint8_t)4},  {"*", (uint8_t)5},  {"/", (uint8_t)5}, {"%", (uint8_t)5}, {"^", (uint8_t)5},
+        {"=", 0},  {"||", 1}, {"&&", 2}, {"++", 2}, {"--", 2}, {"==", 3}, {"!=", 3}, {">", 3}, {"<", 3},
+        {">=", 3}, {"<=", 3}, {"<=", 3}, {"-", 4},  {"+", 4},  {"*", 5},  {"/", 5},  {"%", 5}, {"^", 5},
     };
 
     static void resolve_operator_type(AST::Node* opNode) {
@@ -65,12 +66,16 @@ class Parser : public Scoped {
     }
 
     // Append to an existing AST and return the added children
-    std::span<AST::Node*> parse(const std::span<Tokenizer::Token>& tokens, AST& ast) {
+    AST::Node* parse(const std::span<Tokenizer::Token>& tokens, AST& ast) {
         auto first = ast.getRoot().children.size();
-        bool r = parse(tokens, &(ast.getRoot()));
-        if(!r)
+        auto root = ast.getRoot().add_child(new AST::Node{AST::Node::Type::Root});
+        bool r = parse(tokens, root);
+        if(!r) {
             error("Error while parsing!\n");
-        return std::span<AST::Node*>{ast.getRoot().children.begin() + first, ast.getRoot().children.end()};
+            delete ast.getRoot().pop_child();
+            return nullptr;
+        }
+        return root;
     }
 
     bool parse(const std::span<Tokenizer::Token>& tokens, AST::Node* currNode) {

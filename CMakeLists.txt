@@ -40,8 +40,10 @@ set_property(TARGET prompt PROPERTY CXX_STANDARD 20)
 set_property(TARGET assembler_test PROPERTY CXX_STANDARD 20)
 set_property(TARGET tester PROPERTY CXX_STANDARD 20)
 
+set_property(TARGET tester PROPERTY VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/test")
+
 # Use included version of FMT
-add_subdirectory("ext/fmt-8.1.1")
+add_subdirectory("./ext/fmt-8.1.1")
 include_directories("ext/fmt-8.1.1/include")
 target_link_libraries(compiler fmt::fmt)
 target_link_libraries(prompt fmt::fmt)

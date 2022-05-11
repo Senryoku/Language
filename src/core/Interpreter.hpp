@@ -177,11 +177,25 @@ class Interpreter : public Scoped {
             }
             case UnaryOperator: {
                 assert(node.children.size() == 1);
-                auto rhs = execute(*node.children[0]);
-                switch(node.token.value[0]) {
-                    case '-': return _return_value = -rhs; break;
-                    case '+': return _return_value = rhs; break;
-                }
+                if(node.token.value == "-") {
+                    auto rhs = execute(*node.children[0]);
+                    _return_value = -rhs;
+                } else if(node.token.value == "+") {
+                    auto rhs = execute(*node.children[0]);
+                    _return_value = rhs;
+                } // FIXME: No distinction between pre and postfix
+                else if(node.token.value == "++") {
+                    assert(node.children.size() == 1);
+                    assert(node.children[0]->type == Variable);
+                    GenericValue* v = get(node.children[0]->token.value);
+                    _return_value = ++(*v);
+                } else if(node.token.value == "--") {
+                    assert(node.children.size() == 1);
+                    assert(node.children[0]->type == Variable);
+                    GenericValue* v = get(node.children[0]->token.value);
+                    _return_value = --(*v);
+                } else
+                    error("Unknown unary operator: '{}'\n", node.token.value);
                 return _return_value;
                 break;
             }
