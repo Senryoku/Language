@@ -145,32 +145,6 @@ class Interpreter : public Scoped {
                     error("Syntax error: Undeclared variable '{}' on line {}.\n", node.token.value, node.token.line);
                     break;
                 }
-                if(node.value.type == GenericValue::Type::Array) {
-                    if(node.children.size() == 1) { // Accessed using an index
-                        auto index = execute(*node.children[0]);
-                        assert(index.type == GenericValue::Type::Integer);
-                        assert((size_t)index.value.as_int32_t < pVar->value.as_array.capacity); // FIXME: Should be a runtime error?
-                        _return_value = pVar->value.as_array.items[index.value.as_int32_t];
-                        return pVar->value.as_array.items[index.value.as_int32_t];
-                    }
-                } else if(node.value.type == GenericValue::Type::String) {
-                    // FIXME: This would be much cleaner if string was just a char[]...
-                    if(node.children.size() == 1) { // Accessed using an index
-                        auto index = execute(*node.children[0]);
-                        // Automatically convert float indices to integer, because we don't have in-language easy conversion (yet?)
-                        // FIXME: I don't think this should be handled here.
-                        if(index.type == GenericValue::Type::Float) {
-                            index.value.as_int32_t = static_cast<int32_t>(index.value.as_float);
-                            index.type = GenericValue::Type::Integer;
-                        }
-                        assert(index.type == GenericValue::Type::Integer);
-                        assert((size_t)index.value.as_int32_t < pVar->value.as_string.size); // FIXME: Should be a runtime error?
-                        GenericValue ret{.type = GenericValue::Type::Char};
-                        ret.value.as_char = *(pVar->value.as_string.begin + index.value.as_int32_t);
-                        _return_value = ret;
-                        return ret;
-                    }
-                }
                 _return_value = *pVar;
                 return *pVar; // FIXME: Make sure GenericValue & Variable are transparent? Remove the 'Variable' type?
                 break;
@@ -231,15 +205,42 @@ class Interpreter : public Scoped {
                     break;
                 }
 
-                // Call the appropriate operator, see GenericValue operator overloads
+                if(node.token.value == "(") {
+                } else if(node.token.value == "[") {
+                    auto variableNode = node.children[0];
+                    auto pVar = get(variableNode->token.value);
+                    auto index = execute(*node.children[1]);
+                    if(variableNode->value.type == GenericValue::Type::Array) {
+                        assert(index.type == GenericValue::Type::Integer);
+                        assert((size_t)index.value.as_int32_t < pVar->value.as_array.capacity); // FIXME: Should be a runtime error?
+                        _return_value = pVar->value.as_array.items[index.value.as_int32_t];
+                        return pVar->value.as_array.items[index.value.as_int32_t];
+                    } else if(variableNode->value.type == GenericValue::Type::String) {
+                        // FIXME: This would be much cleaner if string was just a char[]...
+                        // Automatically convert float indices to integer, because we don't have in-language easy conversion (yet?)
+                        // FIXME: I don't think this should be handled here.
+                        if(index.type == GenericValue::Type::Float) {
+                            index.value.as_int32_t = static_cast<int32_t>(index.value.as_float);
+                            index.type = GenericValue::Type::Integer;
+                        }
+                        assert(index.type == GenericValue::Type::Integer);
+                        assert((size_t)index.value.as_int32_t < pVar->value.as_string.size); // FIXME: Should be a runtime error?
+                        GenericValue ret{.type = GenericValue::Type::Char};
+                        ret.value.as_char = *(pVar->value.as_string.begin + index.value.as_int32_t);
+                        _return_value = ret;
+                        return ret;
+                    }
+                } else {
+                    // Call the appropriate operator, see GenericValue operator overloads
 #define OP(O)                  \
     if(node.token.value == #O) \
         _return_value = lhs O rhs;
 
-                OP(+)
-                else OP(-) else OP(*) else OP(/) else OP(%) else OP(<) else OP(>) else OP(<=) else OP(>=) else OP(==) else OP(!=) else OP(&&) else OP(||) else error(
-                    "BinaryOperator: Unsupported operation ('{}') on {} and {}.\n", node.token.value, lhs, rhs);
+                    OP(+)
+                    else OP(-) else OP(*) else OP(/) else OP(%) else OP(<) else OP(>) else OP(<=) else OP(>=) else OP(==) else OP(!=) else OP(&&) else OP(||) else error(
+                        "BinaryOperator: Unsupported operation ('{}') on {} and {}.\n", node.token.value, lhs, rhs);
 #undef OP
+                }
 
                 return _return_value;
 

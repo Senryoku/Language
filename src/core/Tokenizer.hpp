@@ -75,7 +75,9 @@ class Tokenizer {
     }
 
     constexpr static std::array<char, 7> control_characters{
-        ';', '(', ')', '{', '}', '[', ']',
+        ';',
+        '{',
+        '}',
     };
 
     template<size_t N>
@@ -92,11 +94,14 @@ class Tokenizer {
         {"=", Token::Type::Operator},  {"*", Token::Type::Operator},  {"+", Token::Type::Operator},  {"-", Token::Type::Operator},  {"/", Token::Type::Operator},
         {"^", Token::Type::Operator},  {"==", Token::Type::Operator}, {"!=", Token::Type::Operator}, {">", Token::Type::Operator},  {"<", Token::Type::Operator},
         {">=", Token::Type::Operator}, {"<=", Token::Type::Operator}, {"&&", Token::Type::Operator}, {"||", Token::Type::Operator}, {"%", Token::Type::Operator},
-        {"++", Token::Type::Operator}, {"--", Token::Type::Operator},
+        {"++", Token::Type::Operator}, {"--", Token::Type::Operator}, {"(", Token::Type::Operator},  {")", Token::Type::Operator},  {"[", Token::Type::Operator},
+        {"]", Token::Type::Operator},
     };
 
     // FIXME: This is a workaround, not a proper way to recognize operators :)
-    static inline bool is_allowed_in_operators(char c) { return (c >= '*' && c <= '/') || (c >= '<' && c <= '>') || (c == '&' || c == '|' || c == '%'); }
+    static inline bool is_allowed_in_operators(char c) {
+        return (c >= '*' && c <= '/') || (c >= '<' && c <= '>') || (c == '&' || c == '|' || c == '%' || c == '[' || c == ']' || c == '(' || c == ')');
+    }
 
     const het_unordered_map<Token::Type> keywords{
         {"function", Token::Type::Function}, {"return", Token::Type::Return},      {"if", Token::Type::If},           {"else", Token::Type::Else},

@@ -21,10 +21,10 @@ class Parser : public Scoped {
     }
 
     // FIXME: For many reasons (string creations...) Just correctly type the node from the start (i.e. token stage) I guess?
-    // FIXME: Pre and postfix versions of --/++ should habe different precedence (3 and 2 respectively)
+    // FIXME: Pre and postfix versions of --/++ should have different precedences
     inline static const std::unordered_map<std::string, uint8_t> operator_precedence{
-        {"=", 0},  {"||", 1}, {"&&", 2}, {"++", 2}, {"--", 2}, {"==", 3}, {"!=", 3}, {">", 3}, {"<", 3},
-        {">=", 3}, {"<=", 3}, {"<=", 3}, {"-", 4},  {"+", 4},  {"*", 5},  {"/", 5},  {"%", 5}, {"^", 5},
+        {"=", 0}, {"||", 1}, {"==", 3}, {"!=", 3}, {">", 3},  {"<", 3},  {">=", 3}, {"<=", 3}, {"<=", 3}, {"-", 4}, {"+", 4},
+        {"*", 5}, {"/", 5},  {"%", 5},  {"^", 5},  {"++", 6}, {"--", 6}, {"(", 7},  {"[", 7},  {")", 7},  {"]", 7},
     };
 
     static void resolve_operator_type(AST::Node* opNode) {
