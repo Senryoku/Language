@@ -42,6 +42,7 @@ bool Parser::parse_next_expression(const std::span<Tokenizer::Token>& tokens, st
         return false;
     }
 
+    // Temporary expression node. Will be replace by its child when we're done parsing it.
     auto exprNode = currNode->add_child(new AST::Node(AST::Node::Type::Expression));
 
     if(it->type == Tokenizer::Token::Type::Operator && it->value == "(") {
@@ -145,17 +146,12 @@ bool Parser::parse_next_expression(const std::span<Tokenizer::Token>& tokens, st
         return false;
     }
 
-    // Evaluate Expression final return type
-    // FIXME
-    if(exprNode->children.size() == 1) {
-        // FIXME: This is a hack to propagate the proper type of array elements accessed by subscript and should not be there. (Create a proper new node type?)
-        if(exprNode->children[0]->type == AST::Node::Type::Variable && exprNode->children[0]->value.type == GenericValue::Type::Array &&
-           exprNode->children[0]->children.size() == 1) {
-            exprNode->value.type = exprNode->children[0]->value.value.as_array.type;
-        } else {
-            exprNode->value.type = exprNode->children[0]->value.type;
-        }
-    }
+    assert(exprNode->children.size() == 1);
+
+    currNode->pop_child();
+    auto child = exprNode->pop_child();
+    currNode->add_child(child);
+    delete exprNode;
 
     if(search_for_matching_bracket) // Skip ending bracket
         ++it;
@@ -166,7 +162,7 @@ bool Parser::parse_next_expression(const std::span<Tokenizer::Token>& tokens, st
 bool Parser::parse_identifier(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode) {
     assert(it->type == Tokenizer::Token::Type::Identifier);
     // Function Call
-    if(it + 1 != tokens.end() && (it + 1)->value == "(") {
+    if(peek(tokens, it, Tokenizer::Token::Type::Operator, "(")) {
         const auto start = (it + 1);
         // TODO: Check if the function has been declared (or is a built-in?) & Fetch corresponding FunctionDeclaration Node.
         auto callNode = currNode->add_child(new AST::Node(AST::Node::Type::FunctionCall, *it));
@@ -199,30 +195,31 @@ bool Parser::parse_identifier(const std::span<Tokenizer::Token>& tokens, std::sp
 
         auto variable_node = currNode->add_child(new AST::Node(AST::Node::Type::Variable, *it));
         variable_node->value.type = variable.type;
-        if(it + 1 != tokens.end() && (it + 1)->value == "[") { // Array accessor
+        if(peek(tokens, it, Tokenizer::Token::Type::Operator, "[")) { // Array accessor
             if(variable.type != GenericValue::Type::Array && variable.type != GenericValue::Type::String) {
                 error("[Parser] Syntax Error: Subscript operator on variable '{}' on line {} which neither an array nor a string.\n", it->value, it->line);
                 delete currNode->pop_child();
                 return false;
             }
-
             variable_node = currNode->pop_child();
             auto access_operator_node = currNode->add_child(new AST::Node(AST::Node::Type::BinaryOperator, *(it + 1)));
             access_operator_node->add_child(variable_node);
 
             if(variable.type == GenericValue::Type::Array) {
-                access_operator_node->value.type = variable_node->value.value.as_array.type;
+                variable_node->value.value.as_array.type = variable.value.as_array.type;
                 variable_node->value.value.as_array.capacity = variable.value.as_array.capacity; // FIXME: Not known anymore at this stage
+                access_operator_node->value.type = variable_node->value.value.as_array.type;
             }
 
             it += 2;
             // Get the index and add it as a child.
+            // FIXME: Search the matching ']' here?
             if(!parse_next_expression(tokens, it, access_operator_node, 0, false)) {
                 delete currNode->pop_child();
                 return false;
             }
 
-            // TODO: Make sure this is an integer?
+            // TODO: Make sure this is an integer? And compile-time constant?
             assert(it->value == "]");
             ++it; // Skip ']'
         } else {

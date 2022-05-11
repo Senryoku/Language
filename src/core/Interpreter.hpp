@@ -175,37 +175,47 @@ class Interpreter : public Scoped {
             }
             case BinaryOperator: {
                 assert(node.children.size() == 2);
-                auto lhs = execute(*node.children[0]);
                 auto rhs = execute(*node.children[1]);
 
                 // Assignment (Should probably be its own Node::Type...)
                 if(node.token.value.length() == 1 && node.token.value[0] == '=') {
-                    if(node.children[0]->type != Variable) {
-                        error("[Interpreter] Trying to assign to something ({}) that's not a variable?\n", node.children[0]->token);
-                        break;
-                    }
-                    if(is_assignable(node.children[0]->value, node.children[1]->value)) {
-                        GenericValue* v = get(node.children[0]->token.value);
-                        assert(v);
-                        if(v->type == GenericValue::Type::Array) {
-                            assert(node.children[0]->children.size() == 1);
-                            const auto index = execute(*node.children[0]->children[0]);
-                            assert(index.type == GenericValue::Type::Integer);
+                    // Search for an l-value (FIXME: should execute the whole left-hand side)
+                    if(node.children[0]->type == Variable) { // Variable
+                        if(is_assignable(node.children[0]->value, node.children[1]->value)) {
+                            GenericValue* v = get(node.children[0]->token.value);
+                            assert(v);
+                            v->assign(rhs);
+                            _return_value.type = v->type;
+                            _return_value.value = v->value;
+                            break;
+                        } else
+                            error("[Interpreter] {} can't be assigned to {}\n", node.children[0]->token, node.children[1]->token);
+                    } else if(node.children[0]->type == BinaryOperator && node.children[0]->token.value == "[") { // Array accessor
+                        assert(node.children[0]->children.size() == 2);
+                        const auto index = execute(*node.children[0]->children[1]);
+                        assert(index.type == GenericValue::Type::Integer);
+                        if(is_assignable(node.children[0]->children[1]->value, node.children[1]->value)) {
+                            GenericValue* v = get(node.children[0]->children[0]->token.value);
+                            assert(v);
                             assert((size_t)index.value.as_int32_t < v->value.as_array.capacity); // FIXME: Runtime error?
                             v = v->value.as_array.items + index.value.as_int32_t;
                             v->type = rhs.type;
-                        }
-                        v->assign(rhs);
-                        _return_value.type = v->type;
-                        _return_value.value = v->value;
+                            v->assign(rhs);
+                            _return_value.type = v->type;
+                            _return_value.value = v->value;
+                            break;
+                        } else
+                            error("[Interpreter] {}[{}] can't be assigned to {}\n", node.children[0]->children[0]->token, index, node.children[1]->token);
+                    } else {
+                        error("[Interpreter] Trying to assign to something ({}) that's not neither a variable or an array?\n", node.children[0]->token);
                         break;
                     }
-                    error("[Interpreter:{}] Unimplemented assignment.\n", __LINE__);
-                    error("{}\n{}\n", lhs, rhs);
-                    break;
                 }
 
+                auto lhs = execute(*node.children[0]);
+
                 if(node.token.value == "(") {
+                    // FIXME
                 } else if(node.token.value == "[") {
                     auto variableNode = node.children[0];
                     auto pVar = get(variableNode->token.value);

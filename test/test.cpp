@@ -202,10 +202,9 @@ TEST(Function, isPrime) {
         while(next_tokens.has_more())
             tokens.push_back(next_tokens.consume());
         EXPECT_GT(tokens.size(), first);
-        auto newNodes = parser.parse(std::span<Tokenizer::Token>{tokens.begin() + first, tokens.end()}, *ast);
-        ASSERT_TRUE(newNodes.size() > 0);
-        for(auto node : newNodes)
-            interpreter.execute(*node);
+        auto newNode = parser.parse(std::span<Tokenizer::Token>{tokens.begin() + first, tokens.end()}, *ast);
+        ASSERT_TRUE(newNode);
+        interpreter.execute(*newNode);
         EXPECT_EQ(interpreter.get_return_value().value.as_bool, is_prime(i));
     }
 }
@@ -230,10 +229,9 @@ TEST(Function, RecursionFibonacci) {
         while(next_tokens.has_more())
             tokens.push_back(next_tokens.consume());
         EXPECT_GT(tokens.size(), first);
-        auto newNodes = parser.parse(std::span<Tokenizer::Token>{tokens.begin() + first, tokens.end()}, *ast);
-        ASSERT_TRUE(newNodes.size() > 0);
-        for(auto node : newNodes)
-            interpreter.execute(*node);
+        auto newNode = parser.parse(std::span<Tokenizer::Token>{tokens.begin() + first, tokens.end()}, *ast);
+        ASSERT_TRUE(newNode);
+        interpreter.execute(*newNode);
         EXPECT_EQ(interpreter.get_return_value().value.as_int32_t, fib(i));
     }
 }
@@ -250,10 +248,9 @@ TEST(Function, ArrayFibonacci) {
         while(next_tokens.has_more())
             tokens.push_back(next_tokens.consume());
         EXPECT_GT(tokens.size(), first);
-        auto newNodes = parser.parse(std::span<Tokenizer::Token>{tokens.begin() + first, tokens.end()}, *ast);
-        ASSERT_TRUE(newNodes.size() > 0);
-        for(auto node : newNodes)
-            interpreter.execute(*node);
+        auto newNode = parser.parse(std::span<Tokenizer::Token>{tokens.begin() + first, tokens.end()}, *ast);
+        ASSERT_TRUE(newNode);
+        interpreter.execute(*newNode);
         EXPECT_EQ(interpreter.get_return_value().value.as_int32_t, fib(i));
     }
 }

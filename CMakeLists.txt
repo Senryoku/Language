@@ -30,15 +30,15 @@ file(GLOB HEADERS src/**/*.hpp)
 
 add_executable(compiler ${SOURCES} ${HEADERS} src/compiler.cpp "src/core/Tokenizer.cpp")
 add_executable(prompt ${SOURCES} ${HEADERS} src/prompt.cpp "src/core/Tokenizer.cpp")
-add_executable(assembler_test ${SOURCES} ${HEADERS} src/assembler_test.cpp "src/core/Tokenizer.cpp")
 add_executable(tester ${SOURCES} ${TEST_FILES} ${HEADERS} test/main.cpp "src/core/Tokenizer.cpp")
+add_executable(assembler_test ${SOURCES} ${HEADERS} src/assembler_test.cpp "src/core/Tokenizer.cpp")
 
 target_include_directories(compiler PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/ext")
 
 set_property(TARGET compiler PROPERTY CXX_STANDARD 20)
 set_property(TARGET prompt PROPERTY CXX_STANDARD 20)
-set_property(TARGET assembler_test PROPERTY CXX_STANDARD 20)
 set_property(TARGET tester PROPERTY CXX_STANDARD 20)
+set_property(TARGET assembler_test PROPERTY CXX_STANDARD 20)
 
 set_property(TARGET tester PROPERTY VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/test")
 
@@ -48,6 +48,7 @@ include_directories("ext/fmt-8.1.1/include")
 target_link_libraries(compiler fmt::fmt)
 target_link_libraries(prompt fmt::fmt)
 target_link_libraries(tester fmt::fmt)
+target_link_libraries(assembler_test fmt::fmt)
 
 # Get GTest online
 include(FetchContent)

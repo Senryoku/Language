@@ -141,7 +141,12 @@ struct fmt::formatter<AST::Node> {
             case AST::Node::Type::ConstantValue: r = fmt::format_to(ctx.out(), "{}:{}", t.type, t.value); break;
             case AST::Node::Type::ReturnStatement: r = fmt::format_to(ctx.out(), "{}:{}", t.type, t.value.type); break;
             case AST::Node::Type::WhileStatement: r = fmt::format_to(ctx.out(), "{}", t.type); break;
-            case AST::Node::Type::Variable: r = fmt::format_to(ctx.out(), "{}:{}:{}", t.type, t.token.value, t.value.type); break;
+            case AST::Node::Type::Variable:
+                if(t.value.type == GenericValue::Type::Array)
+                    r = fmt::format_to(ctx.out(), "{}:{}:{} of {}", t.type, t.token.value, t.value.type, t.value.value.as_array.type);
+                else
+                    r = fmt::format_to(ctx.out(), "{}:{}:{}", t.type, t.token.value, t.value.type);
+                break;
             case AST::Node::Type::FunctionDeclaration: r = fmt::format_to(ctx.out(), "{}:{}", t.type, t.token.value); break;
             case AST::Node::Type::FunctionCall: r = fmt::format_to(ctx.out(), "{}:{}()", t.type, t.token.value); break;
             case AST::Node::Type::VariableDeclaration: r = fmt::format_to(ctx.out(), "{}:{} {}", t.type, t.value.type, t.token.value); break;

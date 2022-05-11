@@ -78,6 +78,12 @@ class Parser : public Scoped {
         return root;
     }
 
+    // Returns true if the next token exists and matches the supplied type and value.
+    // Doesn't advance the iterator.
+    bool peek(const std::span<Tokenizer::Token>& tokens, const std::span<Tokenizer::Token>::iterator& it, const Tokenizer::Token::Type& type, const std::string& value) {
+        return it + 1 != tokens.end() && (it + 1)->type == type && (it + 1)->value == value;
+    }
+
     bool parse(const std::span<Tokenizer::Token>& tokens, AST::Node* currNode) {
         auto it = tokens.begin();
         while(it != tokens.end()) {
