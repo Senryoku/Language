@@ -62,12 +62,17 @@ Tokenizer::Token Tokenizer::search_next(size_t& pointer) const {
             else
                 type = Token::Type::Digits;
         } else {
+            type = Token::Type::Operator;
             // Operators
             // FIXME (Better solution than is_allowed_in_operators?)
             while(pointer < _source.length() && !is_discardable(_source[pointer]) && is_allowed_in_operators(_source[pointer]))
                 ++pointer;
-            if(operators.contains(std::string_view{_source.begin() + begin, _source.begin() + pointer})) {
-                type = Token::Type::Operator;
+            const auto end = pointer;
+            while(pointer != begin && !operators.contains(std::string_view{_source.begin() + begin, _source.begin() + pointer})) {
+                --pointer;
+            }
+            if(pointer == begin) {
+                error("[Tokenizer] Error: Not matching operator for '{}'.", std::string_view{_source.begin() + begin, _source.begin() + end});
             }
         }
     } else {
