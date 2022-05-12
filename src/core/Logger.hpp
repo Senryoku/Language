@@ -37,6 +37,11 @@ inline void print(Args&&... args) {
     fmt::print(std::forward<Args>(args)...);
 }
 
+template<typename Format, typename... Args>
+inline void print(Format&& format, Args&&... args) {
+    fmt::print(fmt::runtime(format), std::forward<Args>(args)...);
+}
+
 struct Indenter {
     const size_t tab_size = 4;
     size_t       indent = 0;
