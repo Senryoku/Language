@@ -86,6 +86,8 @@ class Interpreter : public Scoped {
                 break;
             }
             case FunctionCall: {
+                // FIXME: Get Function name from the first children.
+                // execute(*node->children.front());
                 auto functionNode = get_function(node.token.value);
                 if(!functionNode) {
                     error("Runtime error: function {} as not been declared in this scope (line {}).\n", node.token.value, node.token.line);
@@ -106,10 +108,11 @@ class Interpreter : public Scoped {
                     break;
                 }
                 // TODO: Check arguments count and type
-                assert(node.children.size() == functionNode->children.size() - 1); // FIXME: Turn this into a runtime error and handle optional arguments
+                //     Name + Arguments            Parameters Declaration + Function Body
+                assert(node.children.size() - 1 == functionNode->children.size() - 1); // FIXME: Turn this into a runtime error and handle optional arguments
                 // Execute argement in the caller scope.
                 std::vector<GenericValue> arguments_values;
-                for(size_t i = 0; i < functionNode->children.size() - 1; ++i)
+                for(size_t i = 1; i < node.children.size(); ++i)
                     arguments_values.push_back(execute(*node.children[i]));
                 push_scope();
                 // Declare and bind arguments (Last child in functionNode is the function body)

@@ -102,12 +102,7 @@ bool Parser::parse_next_expression(const std::span<Tokenizer::Token>& tokens, st
                 break;
             }
             case Operator: {
-                if(it->value == "(") {
-                    if(!parse_next_expression(tokens, it, exprNode, 0)) {
-                        delete currNode->pop_child();
-                        return false;
-                    }
-                } else if(it->value == ")") {
+                if(it->value == ")") {
                     stop = true;
                     break;
                 } else if(it->value == "]") {
@@ -162,71 +157,56 @@ bool Parser::parse_next_expression(const std::span<Tokenizer::Token>& tokens, st
 bool Parser::parse_identifier(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode) {
     assert(it->type == Tokenizer::Token::Type::Identifier);
     // Function Call
+    // FIXME: Should be handled by parse_operator for () to be a generic operator!
+    //        Or realise that this is a function, somehow (keep track of declaration).
     if(peek(tokens, it, Tokenizer::Token::Type::Operator, "(")) {
-        const auto start = (it + 1);
         // TODO: Check if the function has been declared (or is a built-in?) & Fetch corresponding FunctionDeclaration Node.
-        auto callNode = currNode->add_child(new AST::Node(AST::Node::Type::FunctionCall, *it));
-        callNode->value.type = GenericValue::Type::Integer; // TODO: Actually compute the return type (Could it be depend on the actual parameter type at the call site? Like
-                                                            // automatic (albeit maybe only on explicit request at function declaration) templating?).
-        it += 2;
-        // Parse arguments
-        while(it != tokens.end() && it->value != ")") {
-            if(!parse_next_expression(tokens, it, callNode, 0)) {
-                delete currNode->pop_child();
-                return false;
-            }
-            if(it != tokens.end() && it->value == ",")
-                ++it;
-        }
-        if(it == tokens.end()) {
-            error("[Parser] Syntax error: Unmatched '(' on line {}, got to end-of-file.\n", start->line);
+        currNode->add_child(new AST::Node(AST::Node::Type::Variable, *it)); // FIXME: Use another node type
+        ++it;
+        return true;
+    }
+
+    auto maybe_variable = get(it->value);
+    if(!maybe_variable) {
+        error("[Parser] Syntax Error: Variable '{}' has not been declared on line.\n", it->value, it->line);
+        return false;
+    }
+    const auto& variable = *maybe_variable;
+
+    auto variable_node = currNode->add_child(new AST::Node(AST::Node::Type::Variable, *it));
+    variable_node->value.type = variable.type;
+    if(peek(tokens, it, Tokenizer::Token::Type::Operator, "[")) { // Array accessor
+        if(variable.type != GenericValue::Type::Array && variable.type != GenericValue::Type::String) {
+            error("[Parser] Syntax Error: Subscript operator on variable '{}' on line {} which neither an array nor a string.\n", it->value, it->line);
             delete currNode->pop_child();
             return false;
         }
-        ++it;
-        return true;
-    } else { // Variable
-        auto maybe_variable = get(it->value);
-        if(!maybe_variable) {
-            error("[Parser] Syntax Error: Variable '{}' has not been declared on line.\n", it->value, it->line);
+        variable_node = currNode->pop_child();
+        auto access_operator_node = currNode->add_child(new AST::Node(AST::Node::Type::BinaryOperator, *(it + 1)));
+        access_operator_node->add_child(variable_node);
+
+        if(variable.type == GenericValue::Type::Array) {
+            variable_node->value.value.as_array.type = variable.value.as_array.type;
+            variable_node->value.value.as_array.capacity = variable.value.as_array.capacity; // FIXME: Not known anymore at this stage
+            access_operator_node->value.type = variable_node->value.value.as_array.type;
+        }
+
+        it += 2;
+        // Get the index and add it as a child.
+        // FIXME: Search the matching ']' here?
+        if(!parse_next_expression(tokens, it, access_operator_node, 0, false)) {
+            delete currNode->pop_child();
             return false;
         }
-        const auto& variable = *maybe_variable;
 
-        auto variable_node = currNode->add_child(new AST::Node(AST::Node::Type::Variable, *it));
-        variable_node->value.type = variable.type;
-        if(peek(tokens, it, Tokenizer::Token::Type::Operator, "[")) { // Array accessor
-            if(variable.type != GenericValue::Type::Array && variable.type != GenericValue::Type::String) {
-                error("[Parser] Syntax Error: Subscript operator on variable '{}' on line {} which neither an array nor a string.\n", it->value, it->line);
-                delete currNode->pop_child();
-                return false;
-            }
-            variable_node = currNode->pop_child();
-            auto access_operator_node = currNode->add_child(new AST::Node(AST::Node::Type::BinaryOperator, *(it + 1)));
-            access_operator_node->add_child(variable_node);
-
-            if(variable.type == GenericValue::Type::Array) {
-                variable_node->value.value.as_array.type = variable.value.as_array.type;
-                variable_node->value.value.as_array.capacity = variable.value.as_array.capacity; // FIXME: Not known anymore at this stage
-                access_operator_node->value.type = variable_node->value.value.as_array.type;
-            }
-
-            it += 2;
-            // Get the index and add it as a child.
-            // FIXME: Search the matching ']' here?
-            if(!parse_next_expression(tokens, it, access_operator_node, 0, false)) {
-                delete currNode->pop_child();
-                return false;
-            }
-
-            // TODO: Make sure this is an integer? And compile-time constant?
-            assert(it->value == "]");
-            ++it; // Skip ']'
-        } else {
-            ++it;
-        }
-        return true;
+        // TODO: Make sure this is an integer? And compile-time constant?
+        assert(it->value == "]");
+        ++it; // Skip ']'
+    } else {
+        ++it;
     }
+    return true;
+    //}
 }
 
 bool Parser::parse_scope_or_single_statement(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode) {
@@ -376,25 +356,25 @@ bool Parser::parse_string(const std::span<Tokenizer::Token>&, std::span<Tokenize
 bool Parser::parse_operator(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode) {
     // Unary operators
     if((it->value == "+" || it->value == "-" || it->value == "++" || it->value == "--") && currNode->children.empty()) {
-        AST::Node* unaryOperatorNode = currNode->add_child(new AST::Node(AST::Node::Type::UnaryOperator, *it, AST::Node::SubType::Prefix));
+        AST::Node* unary_operator_node = currNode->add_child(new AST::Node(AST::Node::Type::UnaryOperator, *it, AST::Node::SubType::Prefix));
         auto       precedence = operator_precedence.at(std::string(it->value));
         ++it;
-        if(!parse_next_expression(tokens, it, unaryOperatorNode, precedence)) {
+        if(!parse_next_expression(tokens, it, unary_operator_node, precedence)) {
             delete currNode->pop_child();
             return false;
         }
-        resolve_operator_type(unaryOperatorNode);
+        resolve_operator_type(unary_operator_node);
         return true;
     }
 
     if((it->value == "++" || it->value == "--") && !currNode->children.empty()) {
-        auto       prevNode = currNode->pop_child();
-        AST::Node* unaryOperatorNode = currNode->add_child(new AST::Node(AST::Node::Type::UnaryOperator, *it, AST::Node::SubType::Postfix));
+        auto       prev_node = currNode->pop_child();
+        AST::Node* unary_operator_node = currNode->add_child(new AST::Node(AST::Node::Type::UnaryOperator, *it, AST::Node::SubType::Postfix));
         // auto   precedence = operator_precedence.at(std::string(it->value));
         // FIXME: How do we use the precedence here?
-        unaryOperatorNode->add_child(prevNode);
+        unary_operator_node->add_child(prev_node);
         ++it;
-        resolve_operator_type(unaryOperatorNode);
+        resolve_operator_type(unary_operator_node);
         return true;
     }
 
@@ -406,6 +386,36 @@ bool Parser::parse_operator(const std::span<Tokenizer::Token>& tokens, std::span
         // Should have been handled by others parsing functions.
         error("Unmatched ')' on line {}.\n", it->line);
         return false;
+    }
+    if(it->value == "(") {
+        const auto start = (it + 1);
+        auto       function_node = currNode->pop_child();
+        // TODO: Check type of functionNode (is it actually callable?)
+        // FIXME: FunctionCall uses its token for now to get the function name, but this in incorrect, it should look at the
+        // first child and execute it to get a reference to the function. Using the function name token as a temporary workaround.
+        auto call_node = currNode->add_child(new AST::Node(AST::Node::Type::FunctionCall, function_node->token));
+        // auto callNode = currNode->parent->add_child(new AST::Node(AST::Node::Type::FunctionCall, *it));
+        call_node->value.type = GenericValue::Type::Integer; // TODO: Actually compute the return type (Could it be depend on the actual parameter type at the call site? Like
+                                                             // automatic (albeit maybe only on explicit request at function declaration) templating?).
+        call_node->add_child(function_node);
+        ++it;
+        // Parse arguments
+        while(it != tokens.end() && it->value != ")") {
+            if(!parse_next_expression(tokens, it, call_node, 0)) {
+                delete currNode->pop_child();
+                return false;
+            }
+            // Skip ","
+            if(it != tokens.end() && it->value == ",")
+                ++it;
+        }
+        if(it == tokens.end()) {
+            error("[Parser] Syntax error: Unmatched '(' on line {}, got to end-of-file.\n", start->line);
+            delete currNode->pop_child();
+            return false;
+        }
+        ++it;
+        return true;
     }
 
     if(currNode->children.empty()) {
