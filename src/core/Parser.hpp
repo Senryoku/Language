@@ -110,14 +110,6 @@ class Parser : public Scoped {
                             ++it;
                             break;
                         }
-                        case '(': {
-                            if(!parse_next_expression(tokens, it, currNode, 0))
-                                return false;
-                            break;
-                        }
-                        case ')': // Should have been handled by others parsing functions.
-                            error("Unmatched ')' on line {}.\n", it->line);
-                            return false;
                         case ';':
                             currNode = currNode->parent;
                             currNode = currNode->add_child(new AST::Node(AST::Node::Type::Statement, *it));

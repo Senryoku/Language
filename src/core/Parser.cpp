@@ -398,6 +398,16 @@ bool Parser::parse_operator(const std::span<Tokenizer::Token>& tokens, std::span
         return true;
     }
 
+    // '(', but not a function declaration or call operator.
+    if(it->value == "(" && currNode->children.empty())
+        return parse_next_expression(tokens, it, currNode, 0);
+
+    if(it->value == ")") {
+        // Should have been handled by others parsing functions.
+        error("Unmatched ')' on line {}.\n", it->line);
+        return false;
+    }
+
     if(currNode->children.empty()) {
         error("Syntax error: unexpected binary operator: {}.\n", *it);
         return false;
