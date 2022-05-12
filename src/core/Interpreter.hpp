@@ -43,6 +43,7 @@ class Interpreter : public Scoped {
         switch(node.type) {
             using enum AST::Node::Type;
             case Root:
+            case Statement:
                 for(const auto& child : node.children) {
                     execute(*child);
                     if(_returning_value)
@@ -85,6 +86,8 @@ class Interpreter : public Scoped {
                 break;
             }
             case FunctionCall: {
+                // FIXME: Get Function name from the first children.
+                // execute(*node->children.front());
                 auto functionNode = get_function(node.token.value);
                 if(!functionNode) {
                     error("Runtime error: function {} as not been declared in this scope (line {}).\n", node.token.value, node.token.line);
@@ -105,10 +108,11 @@ class Interpreter : public Scoped {
                     break;
                 }
                 // TODO: Check arguments count and type
-                assert(node.children.size() == functionNode->children.size() - 1); // FIXME: Turn this into a runtime error and handle optional arguments
+                //     Name + Arguments            Parameters Declaration + Function Body
+                assert(node.children.size() - 1 == functionNode->children.size() - 1); // FIXME: Turn this into a runtime error and handle optional arguments
                 // Execute argement in the caller scope.
                 std::vector<GenericValue> arguments_values;
-                for(size_t i = 0; i < functionNode->children.size() - 1; ++i)
+                for(size_t i = 1; i < node.children.size(); ++i)
                     arguments_values.push_back(execute(*node.children[i]));
                 push_scope();
                 // Declare and bind arguments (Last child in functionNode is the function body)
@@ -145,18 +149,93 @@ class Interpreter : public Scoped {
                     error("Syntax error: Undeclared variable '{}' on line {}.\n", node.token.value, node.token.line);
                     break;
                 }
-                if(node.value.type == GenericValue::Type::Array) {
-                    if(node.children.size() == 1) { // Accessed using an index
-                        auto index = execute(*node.children[0]);
+                _return_value = *pVar;
+                return *pVar; // FIXME: Make sure GenericValue & Variable are transparent? Remove the 'Variable' type?
+                break;
+            }
+            case UnaryOperator: {
+                assert(node.children.size() == 1);
+                if(node.token.value == "-") {
+                    auto rhs = execute(*node.children[0]);
+                    _return_value = -rhs;
+                } else if(node.token.value == "+") {
+                    auto rhs = execute(*node.children[0]);
+                    _return_value = rhs;
+                } else if(node.token.value == "++") {
+                    assert(node.children.size() == 1);
+                    assert(node.children[0]->type == Variable);
+                    GenericValue* v = get(node.children[0]->token.value);
+                    if(node.subtype == AST::Node::SubType::Prefix)
+                        _return_value = ++(*v);
+                    else
+                        _return_value = (*v)++;
+                } else if(node.token.value == "--") {
+                    assert(node.children.size() == 1);
+                    assert(node.children[0]->type == Variable);
+                    GenericValue* v = get(node.children[0]->token.value);
+                    if(node.subtype == AST::Node::SubType::Prefix)
+                        _return_value = --(*v);
+                    else
+                        _return_value = (*v)--;
+                } else
+                    error("Unknown unary operator: '{}'\n", node.token.value);
+                return _return_value;
+                break;
+            }
+            case BinaryOperator: {
+                assert(node.children.size() == 2);
+                auto rhs = execute(*node.children[1]);
+
+                // Assignment (Should probably be its own Node::Type...)
+                if(node.token.value.length() == 1 && node.token.value[0] == '=') {
+                    // Search for an l-value (FIXME: should execute the whole left-hand side)
+                    if(node.children[0]->type == Variable) { // Variable
+                        if(is_assignable(node.children[0]->value, node.children[1]->value)) {
+                            GenericValue* v = get(node.children[0]->token.value);
+                            assert(v);
+                            v->assign(rhs);
+                            _return_value.type = v->type;
+                            _return_value.value = v->value;
+                            break;
+                        } else
+                            error("[Interpreter] {} can't be assigned to {}\n", node.children[0]->token, node.children[1]->token);
+                    } else if(node.children[0]->type == BinaryOperator && node.children[0]->token.value == "[") { // Array accessor
+                        assert(node.children[0]->children.size() == 2);
+                        const auto index = execute(*node.children[0]->children[1]);
+                        assert(index.type == GenericValue::Type::Integer);
+                        if(is_assignable(node.children[0]->children[1]->value, node.children[1]->value)) {
+                            GenericValue* v = get(node.children[0]->children[0]->token.value);
+                            assert(v);
+                            assert((size_t)index.value.as_int32_t < v->value.as_array.capacity); // FIXME: Runtime error?
+                            v = v->value.as_array.items + index.value.as_int32_t;
+                            v->type = rhs.type;
+                            v->assign(rhs);
+                            _return_value.type = v->type;
+                            _return_value.value = v->value;
+                            break;
+                        } else
+                            error("[Interpreter] {}[{}] can't be assigned to {}\n", node.children[0]->children[0]->token, index, node.children[1]->token);
+                    } else {
+                        error("[Interpreter] Trying to assign to something ({}) that's not neither a variable or an array?\n", node.children[0]->token);
+                        break;
+                    }
+                }
+
+                auto lhs = execute(*node.children[0]);
+
+                if(node.token.value == "(") {
+                    // FIXME
+                } else if(node.token.value == "[") {
+                    auto variableNode = node.children[0];
+                    auto pVar = get(variableNode->token.value);
+                    auto index = execute(*node.children[1]);
+                    if(variableNode->value.type == GenericValue::Type::Array) {
                         assert(index.type == GenericValue::Type::Integer);
                         assert((size_t)index.value.as_int32_t < pVar->value.as_array.capacity); // FIXME: Should be a runtime error?
                         _return_value = pVar->value.as_array.items[index.value.as_int32_t];
                         return pVar->value.as_array.items[index.value.as_int32_t];
-                    }
-                } else if(node.value.type == GenericValue::Type::String) {
-                    // FIXME: This would be much cleaner if string was just a char[]...
-                    if(node.children.size() == 1) { // Accessed using an index
-                        auto index = execute(*node.children[0]);
+                    } else if(variableNode->value.type == GenericValue::Type::String) {
+                        // FIXME: This would be much cleaner if string was just a char[]...
                         // Automatically convert float indices to integer, because we don't have in-language easy conversion (yet?)
                         // FIXME: I don't think this should be handled here.
                         if(index.type == GenericValue::Type::Float) {
@@ -170,62 +249,17 @@ class Interpreter : public Scoped {
                         _return_value = ret;
                         return ret;
                     }
-                }
-                _return_value = *pVar;
-                return *pVar; // FIXME: Make sure GenericValue & Variable are transparent? Remove the 'Variable' type?
-                break;
-            }
-            case UnaryOperator: {
-                assert(node.children.size() == 1);
-                auto rhs = execute(*node.children[0]);
-                switch(node.token.value[0]) {
-                    case '-': return _return_value = -rhs; break;
-                    case '+': return _return_value = rhs; break;
-                }
-                return _return_value;
-                break;
-            }
-            case BinaryOperator: {
-                assert(node.children.size() == 2);
-                auto lhs = execute(*node.children[0]);
-                auto rhs = execute(*node.children[1]);
-
-                // Assignment (Should probably be its own Node::Type...)
-                if(node.token.value.length() == 1 && node.token.value[0] == '=') {
-                    if(node.children[0]->type != Variable) {
-                        error("[Interpreter] Trying to assign to something ({}) that's not a variable?\n", node.children[0]->token);
-                        break;
-                    }
-                    if(is_assignable(node.children[0]->value, node.children[1]->value)) {
-                        GenericValue* v = get(node.children[0]->token.value);
-                        assert(v);
-                        if(v->type == GenericValue::Type::Array) {
-                            assert(node.children[0]->children.size() == 1);
-                            const auto index = execute(*node.children[0]->children[0]);
-                            assert(index.type == GenericValue::Type::Integer);
-                            assert((size_t)index.value.as_int32_t < v->value.as_array.capacity); // FIXME: Runtime error?
-                            v = v->value.as_array.items + index.value.as_int32_t;
-                            v->type = rhs.type;
-                        }
-                        v->assign(rhs);
-                        _return_value.type = v->type;
-                        _return_value.value = v->value;
-                        break;
-                    }
-                    error("[Interpreter:{}] Unimplemented assignment.\n", __LINE__);
-                    error("{}\n{}\n", lhs, rhs);
-                    break;
-                }
-
-                // Call the appropriate operator, see GenericValue operator overloads
+                } else {
+                    // Call the appropriate operator, see GenericValue operator overloads
 #define OP(O)                  \
     if(node.token.value == #O) \
         _return_value = lhs O rhs;
 
-                OP(+)
-                else OP(-) else OP(*) else OP(/) else OP(%) else OP(<) else OP(>) else OP(<=) else OP(>=) else OP(==) else OP(!=) else OP(&&) else OP(||) else error(
-                    "BinaryOperator: Unsupported operation ('{}') on {} and {}.\n", node.token.value, lhs, rhs);
+                    OP(+)
+                    else OP(-) else OP(*) else OP(/) else OP(%) else OP(<) else OP(>) else OP(<=) else OP(>=) else OP(==) else OP(!=) else OP(&&) else OP(||) else error(
+                        "BinaryOperator: Unsupported operation ('{}') on {} and {}.\n", node.token.value, lhs, rhs);
 #undef OP
+                }
 
                 return _return_value;
 

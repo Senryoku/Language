@@ -3,7 +3,8 @@ Toy Language
 
 ## Todo
  - Everything
- - Arrays (Dynamic by default and as a language feature?)
+ - [] and () should be proper binary operators, not weird special cases.
+   - Rewrite builtin Arrays with this in mind.
  - Function return type. Part of a function declaration?
  - Boolean operators (== != < > <= >=)
  - String interning for keyword and symbols
@@ -35,6 +36,10 @@ Toy Language
   }
   ```
 
+## Future Features (Hopefully)
+
+ - String templating
+ - Templates (by 'auto'?); Concepts?
 
 ## Dependencies
  - C++20

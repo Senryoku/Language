@@ -14,6 +14,7 @@ class AST {
       public:
         enum class Type {
             Root,
+            Statement,
             Scope,
             Expression,
             IfStatement,
@@ -33,10 +34,17 @@ class AST {
             Undefined
         };
 
+        enum class SubType {
+            Prefix,
+            Postfix,
+
+            Undefined,
+        };
+
         Node(Type type) noexcept : type(type) {}
         Node(Type type, Node& parent) noexcept : type(type), parent(&parent) {}
-        Node(Type type, Tokenizer::Token token) noexcept : type(type), token(token) {}
-        Node(Node&& o) noexcept : type(o.type), parent(o.parent), token(std::move(o.token)), children(std::move(o.children)), value(o.value) {}
+        Node(Type type, Tokenizer::Token token, SubType subtype = SubType::Undefined) noexcept : type(type), subtype(subtype), token(token) {}
+        Node(Node&& o) noexcept : type(o.type), subtype(o.subtype), parent(o.parent), token(std::move(o.token)), children(std::move(o.children)), value(o.value) {}
         Node& operator=(Node&& o) noexcept {
             type = o.type;
             parent = o.parent;
@@ -47,6 +55,7 @@ class AST {
         }
 
         Type               type = Type::Undefined;
+        SubType            subtype = SubType::Undefined;
         Node*              parent = nullptr;
         Tokenizer::Token   token;
         std::vector<Node*> children;
@@ -141,7 +150,12 @@ struct fmt::formatter<AST::Node> {
             case AST::Node::Type::ConstantValue: r = fmt::format_to(ctx.out(), "{}:{}", t.type, t.value); break;
             case AST::Node::Type::ReturnStatement: r = fmt::format_to(ctx.out(), "{}:{}", t.type, t.value.type); break;
             case AST::Node::Type::WhileStatement: r = fmt::format_to(ctx.out(), "{}", t.type); break;
-            case AST::Node::Type::Variable: r = fmt::format_to(ctx.out(), "{}:{}:{}", t.type, t.token.value, t.value.type); break;
+            case AST::Node::Type::Variable:
+                if(t.value.type == GenericValue::Type::Array)
+                    r = fmt::format_to(ctx.out(), "{}:{}:{} of {}", t.type, t.token.value, t.value.type, t.value.value.as_array.type);
+                else
+                    r = fmt::format_to(ctx.out(), "{}:{}:{}", t.type, t.token.value, t.value.type);
+                break;
             case AST::Node::Type::FunctionDeclaration: r = fmt::format_to(ctx.out(), "{}:{}", t.type, t.token.value); break;
             case AST::Node::Type::FunctionCall: r = fmt::format_to(ctx.out(), "{}:{}()", t.type, t.token.value); break;
             case AST::Node::Type::VariableDeclaration: r = fmt::format_to(ctx.out(), "{}:{} {}", t.type, t.value.type, t.token.value); break;
@@ -179,6 +193,7 @@ struct fmt::formatter<AST::Node::Type> {
     auto format(const AST::Node::Type& t, FormatContext& ctx) -> decltype(ctx.out()) {
         switch(t) {
             case AST::Node::Type::Root: return fmt::format_to(ctx.out(), "{}", "Root");
+            case AST::Node::Type::Statement: return fmt::format_to(ctx.out(), "{}", "Statement");
             case AST::Node::Type::Expression: return fmt::format_to(ctx.out(), "{}", "Expression");
             case AST::Node::Type::IfStatement: return fmt::format_to(ctx.out(), fg(fmt::color::orchid), "{}", "IfStatement");
             case AST::Node::Type::ElseStatement: return fmt::format_to(ctx.out(), fg(fmt::color::orchid), "{}", "ElseStatement");

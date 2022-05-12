@@ -90,17 +90,17 @@ TEST(Arithmetic, RightMul2) {
 
 TEST(Arithmetic, Modulo) {
     PARSE_INTERP("5 % 2");
-    EXPECT_EQ(interpreter.get_return_value().value.as_int32_t, 1);
+    EXPECT_EQ(interpreter.get_return_value().value.as_int32_t, 5 % 2);
 }
 
 TEST(Arithmetic, ModuloPrecedence) {
     PARSE_INTERP("(46 + 20) % 12");
-    EXPECT_EQ(interpreter.get_return_value().value.as_int32_t, 6);
+    EXPECT_EQ(interpreter.get_return_value().value.as_int32_t, (46 + 20) % 12);
 }
 
 TEST(Arithmetic, FloatModulo) {
     PARSE_INTERP("25.6 % 1.8");
-    EXPECT_EQ(interpreter.get_return_value().value.as_float, 0.4);
+    EXPECT_EQ(interpreter.get_return_value().value.as_float, std::fmod(25.6f, 1.8f));
 }
 
 TEST(Arithmetic, UnarySub) {
@@ -111,6 +111,21 @@ TEST(Arithmetic, UnarySub) {
 TEST(Arithmetic, UnaryAdd) {
     PARSE_INTERP("+4185;");
     EXPECT_EQ(interpreter.get_return_value().value.as_int32_t, +4185);
+}
+
+TEST(Arithmetic, Increment) {
+    PARSE_INTERP("int i = 0; ++i;");
+    EXPECT_EQ(interpreter.get_return_value().value.as_int32_t, 1);
+}
+
+TEST(Arithmetic, PostFixIncrement) {
+    PARSE_INTERP("int i = 0; i++; return i;");
+    EXPECT_EQ(interpreter.get_return_value().value.as_int32_t, 1);
+}
+
+TEST(Arithmetic, PostFixIncrementReturnValue) {
+    PARSE_INTERP("int i = 0; i++;");
+    EXPECT_EQ(interpreter.get_return_value().value.as_int32_t, 0);
 }
 
 TEST(Arithmetic, Order) {
@@ -187,10 +202,9 @@ TEST(Function, isPrime) {
         while(next_tokens.has_more())
             tokens.push_back(next_tokens.consume());
         EXPECT_GT(tokens.size(), first);
-        auto newNodes = parser.parse(std::span<Tokenizer::Token>{tokens.begin() + first, tokens.end()}, *ast);
-        ASSERT_TRUE(newNodes.size() > 0);
-        for(auto node : newNodes)
-            interpreter.execute(*node);
+        auto newNode = parser.parse(std::span<Tokenizer::Token>{tokens.begin() + first, tokens.end()}, *ast);
+        ASSERT_TRUE(newNode);
+        interpreter.execute(*newNode);
         EXPECT_EQ(interpreter.get_return_value().value.as_bool, is_prime(i));
     }
 }
@@ -215,10 +229,9 @@ TEST(Function, RecursionFibonacci) {
         while(next_tokens.has_more())
             tokens.push_back(next_tokens.consume());
         EXPECT_GT(tokens.size(), first);
-        auto newNodes = parser.parse(std::span<Tokenizer::Token>{tokens.begin() + first, tokens.end()}, *ast);
-        ASSERT_TRUE(newNodes.size() > 0);
-        for(auto node : newNodes)
-            interpreter.execute(*node);
+        auto newNode = parser.parse(std::span<Tokenizer::Token>{tokens.begin() + first, tokens.end()}, *ast);
+        ASSERT_TRUE(newNode);
+        interpreter.execute(*newNode);
         EXPECT_EQ(interpreter.get_return_value().value.as_int32_t, fib(i));
     }
 }
@@ -235,10 +248,9 @@ TEST(Function, ArrayFibonacci) {
         while(next_tokens.has_more())
             tokens.push_back(next_tokens.consume());
         EXPECT_GT(tokens.size(), first);
-        auto newNodes = parser.parse(std::span<Tokenizer::Token>{tokens.begin() + first, tokens.end()}, *ast);
-        ASSERT_TRUE(newNodes.size() > 0);
-        for(auto node : newNodes)
-            interpreter.execute(*node);
+        auto newNode = parser.parse(std::span<Tokenizer::Token>{tokens.begin() + first, tokens.end()}, *ast);
+        ASSERT_TRUE(newNode);
+        interpreter.execute(*newNode);
         EXPECT_EQ(interpreter.get_return_value().value.as_int32_t, fib(i));
     }
 }

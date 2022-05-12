@@ -8,6 +8,12 @@
 
 #include <Logger.hpp>
 
+// Will be used by the Parser/AST
+struct ConstValue {
+    // TODOOOOOOO!
+};
+
+// Will be used by the interpreter
 struct GenericValue {
     enum class Type {
         Boolean,
@@ -255,6 +261,32 @@ struct GenericValue {
         return r;
     }
 
+    GenericValue operator++() {
+        assert(type == Type::Integer);
+        ++value.as_int32_t;
+        return *this;
+    }
+
+    GenericValue operator++(int) {
+        assert(type == Type::Integer);
+        GenericValue r = *this;
+        ++value.as_int32_t;
+        return r;
+    }
+
+    GenericValue operator--() {
+        assert(type == Type::Integer);
+        --value.as_int32_t;
+        return *this;
+    }
+
+    GenericValue operator--(int) {
+        assert(type == Type::Integer);
+        GenericValue r = *this;
+        --value.as_int32_t;
+        return r;
+    }
+
     GenericValue operator+(const GenericValue& rhs) const {
         GenericValue r{.type = resolve_operator_type("+", type, rhs.type)};
         if(type != rhs.type) { // TODO: Hanlde implicit conversion?
@@ -292,7 +324,7 @@ struct GenericValue {
         switch(type) {
             case Type::Integer: r.value.as_int32_t = value.as_int32_t - rhs.value.as_int32_t; break;
             case Type::Float: r.value.as_float = value.as_float - rhs.value.as_float; break;
-            case Type::String: assert(false); break;  // TODO
+            case Type::String: assert(false); break;  // Invalid
             case Type::Boolean: assert(false); break; // Invalid
             default: assert(false); break;
         }
@@ -314,7 +346,7 @@ struct GenericValue {
         switch(type) {
             case Type::Integer: r.value.as_int32_t = value.as_int32_t * rhs.value.as_int32_t; break;
             case Type::Float: r.value.as_float = value.as_float * rhs.value.as_float; break;
-            case Type::String: assert(false); break;  // TODO
+            case Type::String: assert(false); break;  // Invalid
             case Type::Boolean: assert(false); break; // Invalid
             default: assert(false); break;
         }
@@ -336,7 +368,7 @@ struct GenericValue {
         switch(type) {
             case Type::Integer: r.value.as_int32_t = value.as_int32_t / rhs.value.as_int32_t; break;
             case Type::Float: r.value.as_float = value.as_float / rhs.value.as_float; break;
-            case Type::String: assert(false); break;  // TODO
+            case Type::String: assert(false); break;  // Invalid
             case Type::Boolean: assert(false); break; // Invalid
             default: assert(false); break;
         }

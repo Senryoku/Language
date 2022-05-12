@@ -15,8 +15,8 @@ AST::Node* AST::optimize(AST::Node* currNode) {
     for(size_t i = 0; i < currNode->children.size(); ++i)
         currNode->children[i] = optimize(currNode->children[i]);
 
-    // Remove trivial expression nodes (FIXME: Figure out if we really want to allow an expression with multiple children...)
-    if(currNode->type == AST::Node::Type::Expression && currNode->children.size() == 1) {
+    // Remove trivial expression or statement nodes (FIXME: Figure out if we really want to allow an expression with multiple children...)
+    if((currNode->type == AST::Node::Type::Expression || currNode->type == AST::Node::Type::Statement) && currNode->children.size() == 1) {
         auto child = currNode->children[0];
         currNode->children.clear();
         delete currNode;
