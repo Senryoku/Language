@@ -8,6 +8,12 @@
 
 #include <Logger.hpp>
 
+// Will be used by the Parser/AST
+struct ConstValue {
+    // TODOOOOOOO!
+};
+
+// Will be used by the interpreter
 struct GenericValue {
     enum class Type {
         Boolean,

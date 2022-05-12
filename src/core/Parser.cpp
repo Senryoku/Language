@@ -35,7 +35,7 @@ bool Parser::parse_next_scope(const std::span<Tokenizer::Token>& tokens, std::sp
 }
 
 // TODO: Formely define wtf is an expression :)
-bool Parser::parse_next_expression(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode, uint8_t precedence,
+bool Parser::parse_next_expression(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode, uint32_t precedence,
                                    bool search_for_matching_bracket) {
     if(it == tokens.end()) {
         error("Expected expression, got end-of-file.\n");
@@ -324,20 +324,9 @@ bool Parser::parse_function_declaration(const std::span<Tokenizer::Token>& token
         return false;
     }
 
-    if(it->value == "{") {
-        if(!parse_next_scope(tokens, it, functionNode)) {
-            cleanup_on_error();
-            return false;
-        }
-    } else {
-        // FIXME: Probably
-        auto end = it;
-        while(end != tokens.end() && end->value != ";")
-            ++end;
-        if(!parse({it, end}, functionNode)) {
-            cleanup_on_error();
-            return false;
-        }
+    if(!parse_scope_or_single_statement(tokens, it, functionNode)) {
+        cleanup_on_error();
+        return false;
     }
 
     pop_scope();
@@ -387,7 +376,7 @@ bool Parser::parse_string(const std::span<Tokenizer::Token>&, std::span<Tokenize
 bool Parser::parse_operator(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode) {
     // Unary operators
     if((it->value == "+" || it->value == "-" || it->value == "++" || it->value == "--") && currNode->children.empty()) {
-        AST::Node* unaryOperatorNode = currNode->add_child(new AST::Node(AST::Node::Type::UnaryOperator, *it));
+        AST::Node* unaryOperatorNode = currNode->add_child(new AST::Node(AST::Node::Type::UnaryOperator, *it, AST::Node::SubType::Prefix));
         auto       precedence = operator_precedence.at(std::string(it->value));
         ++it;
         if(!parse_next_expression(tokens, it, unaryOperatorNode, precedence)) {
@@ -400,7 +389,7 @@ bool Parser::parse_operator(const std::span<Tokenizer::Token>& tokens, std::span
 
     if((it->value == "++" || it->value == "--") && !currNode->children.empty()) {
         auto       prevNode = currNode->pop_child();
-        AST::Node* unaryOperatorNode = currNode->add_child(new AST::Node(AST::Node::Type::UnaryOperator, *it));
+        AST::Node* unaryOperatorNode = currNode->add_child(new AST::Node(AST::Node::Type::UnaryOperator, *it, AST::Node::SubType::Postfix));
         // auto   precedence = operator_precedence.at(std::string(it->value));
         // FIXME: How do we use the precedence here?
         unaryOperatorNode->add_child(prevNode);

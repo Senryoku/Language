@@ -43,6 +43,7 @@ class Interpreter : public Scoped {
         switch(node.type) {
             using enum AST::Node::Type;
             case Root:
+            case Statement:
                 for(const auto& child : node.children) {
                     execute(*child);
                     if(_returning_value)
@@ -157,17 +158,22 @@ class Interpreter : public Scoped {
                 } else if(node.token.value == "+") {
                     auto rhs = execute(*node.children[0]);
                     _return_value = rhs;
-                } // FIXME: No distinction between pre and postfix
-                else if(node.token.value == "++") {
+                } else if(node.token.value == "++") {
                     assert(node.children.size() == 1);
                     assert(node.children[0]->type == Variable);
                     GenericValue* v = get(node.children[0]->token.value);
-                    _return_value = ++(*v);
+                    if(node.subtype == AST::Node::SubType::Prefix)
+                        _return_value = ++(*v);
+                    else
+                        _return_value = (*v)++;
                 } else if(node.token.value == "--") {
                     assert(node.children.size() == 1);
                     assert(node.children[0]->type == Variable);
                     GenericValue* v = get(node.children[0]->token.value);
-                    _return_value = --(*v);
+                    if(node.subtype == AST::Node::SubType::Prefix)
+                        _return_value = --(*v);
+                    else
+                        _return_value = (*v)--;
                 } else
                     error("Unknown unary operator: '{}'\n", node.token.value);
                 return _return_value;

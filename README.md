@@ -36,6 +36,10 @@ Toy Language
   }
   ```
 
+## Future Features (Hopefully)
+
+ - String templating
+ - Templates (by 'auto'?); Concepts?
 
 ## Dependencies
  - C++20

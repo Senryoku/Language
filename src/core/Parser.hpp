@@ -22,9 +22,9 @@ class Parser : public Scoped {
 
     // FIXME: For many reasons (string creations...) Just correctly type the node from the start (i.e. token stage) I guess?
     // FIXME: Pre and postfix versions of --/++ should have different precedences
-    inline static const std::unordered_map<std::string, uint8_t> operator_precedence{
-        {"=", 0}, {"||", 1}, {"==", 3}, {"!=", 3}, {">", 3},  {"<", 3},  {">=", 3}, {"<=", 3}, {"<=", 3}, {"-", 4}, {"+", 4},
-        {"*", 5}, {"/", 5},  {"%", 5},  {"^", 5},  {"++", 6}, {"--", 6}, {"(", 7},  {"[", 7},  {")", 7},  {"]", 7},
+    inline static const std::unordered_map<std::string, uint32_t> operator_precedence{
+        {"=", 0u}, {"||", 1u}, {"==", 3u}, {"!=", 3u}, {">", 3u},  {"<", 3u},  {">=", 3u}, {"<=", 3u}, {"<=", 3u}, {"-", 4u}, {"+", 4u},
+        {"*", 5u}, {"/", 5u},  {"%", 5u},  {"^", 5u},  {"++", 6u}, {"--", 6u}, {"(", 7u},  {"[", 7u},  {")", 7u},  {"]", 7u},
     };
 
     static void resolve_operator_type(AST::Node* opNode) {
@@ -53,8 +53,7 @@ class Parser : public Scoped {
 
     std::optional<AST> parse(const std::span<Tokenizer::Token>& tokens, bool optimize = true) {
         std::optional<AST> ast(AST{});
-
-        bool r = parse(tokens, &(*ast).getRoot());
+        bool               r = parse(tokens, &(*ast).getRoot());
         if(!r) {
             error("Error while parsing!\n");
             ast.reset();
@@ -67,7 +66,7 @@ class Parser : public Scoped {
 
     // Append to an existing AST and return the added children
     AST::Node* parse(const std::span<Tokenizer::Token>& tokens, AST& ast) {
-        auto first = ast.getRoot().children.size();
+        // Adds a dummy root node to easily get rid of it on error.
         auto root = ast.getRoot().add_child(new AST::Node{AST::Node::Type::Root});
         bool r = parse(tokens, root);
         if(!r) {
@@ -84,7 +83,9 @@ class Parser : public Scoped {
         return it + 1 != tokens.end() && (it + 1)->type == type && (it + 1)->value == value;
     }
 
+  private:
     bool parse(const std::span<Tokenizer::Token>& tokens, AST::Node* currNode) {
+        currNode = currNode->add_child(new AST::Node(AST::Node::Type::Statement));
         auto it = tokens.begin();
         while(it != tokens.end()) {
             const auto& token = *it;
@@ -117,7 +118,9 @@ class Parser : public Scoped {
                         case ')': // Should have been handled by others parsing functions.
                             error("Unmatched ')' on line {}.\n", it->line);
                             return false;
-                        case ';': // Just do nothing
+                        case ';':
+                            currNode = currNode->parent;
+                            currNode = currNode->add_child(new AST::Node(AST::Node::Type::Statement, *it));
                             ++it;
                             break;
                         default:
@@ -217,12 +220,18 @@ class Parser : public Scoped {
                     break;
             }
         }
+        // Remove empty statements (at end of file)
+        if(currNode->type == AST::Node::Type::Statement && currNode->children.empty()) {
+            auto tmp = currNode;
+            currNode = currNode->parent;
+            currNode->children.erase(std::find(currNode->children.begin(), currNode->children.end(), tmp));
+            delete tmp;
+        }
         return true;
     }
 
-  private:
     bool parse_next_scope(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode);
-    bool parse_next_expression(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode, uint8_t precedence,
+    bool parse_next_expression(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode, uint32_t precedence,
                                bool search_for_matching_bracket = false);
     bool parse_identifier(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode);
     bool parse_scope_or_single_statement(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode);
