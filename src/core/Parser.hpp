@@ -23,8 +23,8 @@ class Parser : public Scoped {
     // FIXME: For many reasons (string creations...) Just correctly type the node from the start (i.e. token stage) I guess?
     // FIXME: Pre and postfix versions of --/++ should have different precedences
     inline static const std::unordered_map<std::string, uint32_t> operator_precedence{
-        {"=", 0u}, {"||", 1u}, {"==", 3u}, {"!=", 3u}, {">", 3u},  {"<", 3u},  {">=", 3u}, {"<=", 3u}, {"<=", 3u}, {"-", 4u}, {"+", 4u},
-        {"*", 5u}, {"/", 5u},  {"%", 5u},  {"^", 5u},  {"++", 6u}, {"--", 6u}, {"(", 7u},  {"[", 7u},  {")", 7u},  {"]", 7u},
+        {"=", 0u}, {"||", 1u}, {"&&", 2u}, {"==", 3u}, {"!=", 3u}, {">", 3u},  {"<", 3u},  {">=", 3u}, {"<=", 3u}, {"<=", 3u}, {"-", 4u},
+        {"+", 4u}, {"*", 5u},  {"/", 5u},  {"%", 5u},  {"^", 5u},  {"++", 6u}, {"--", 6u}, {"(", 7u},  {"[", 7u},  {")", 7u},  {"]", 7u},
     };
 
     static void resolve_operator_type(AST::Node* opNode) {
@@ -123,13 +123,12 @@ class Parser : public Scoped {
                     break;
                 }
                 case Tokenizer::Token::Type::If: {
-                    ++it;
-                    if(it == tokens.end() || it->value != "(") {
+                    if(!peek(tokens, it, Tokenizer::Token::Type::Operator, "(")) {
                         error("Syntax error: expected '(' after 'if'.\n");
                         return false;
                     }
-                    auto ifNode = currNode->add_child(new AST::Node(AST::Node::Type::IfStatement));
-                    ++it;
+                    auto ifNode = currNode->add_child(new AST::Node(AST::Node::Type::IfStatement, *it));
+                    it += 2;
                     if(!parse_next_expression(tokens, it, ifNode, 0, true)) {
                         delete currNode->pop_child();
                         return false;

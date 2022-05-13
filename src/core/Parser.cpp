@@ -26,7 +26,7 @@ bool Parser::parse_next_scope(const std::span<Tokenizer::Token>& tokens, std::sp
         return false;
     }
 
-    auto scope = currNode->add_child(new AST::Node(AST::Node::Type::Scope));
+    auto scope = currNode->add_child(new AST::Node(AST::Node::Type::Scope, *it));
     push_scope();
     bool r = parse({begin, end}, scope);
     pop_scope();

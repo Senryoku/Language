@@ -95,8 +95,8 @@ class Interpreter : public Scoped {
                 }
                 if(functionNode->type == BuiltInFunctionDeclaration) {
                     if(functionNode->token.value == "put") {
-                        assert(node.children.size() == 1);
-                        auto c = execute(*node.children[0]);
+                        assert(node.children.size() == 2);
+                        auto c = execute(*node.children[1]);
                         assert(c.type == GenericValue::Type::Char);
                         std::putchar(c.value.as_char);
                     } else {
