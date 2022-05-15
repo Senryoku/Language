@@ -89,12 +89,11 @@ class AST {
     inline const Node& getRoot() const { return _root; }
 
     // Will perform some really basic optimisations
-    void optimize();
+    void                       optimize();
+    static [[nodiscard]] Node* optimize(Node*);
 
   private:
     Node _root{Node::Type::Root};
-
-    Node* optimize(Node*);
 };
 
 template<>
