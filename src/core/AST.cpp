@@ -7,13 +7,17 @@ void AST::optimize() {
 }
 
 bool compatible(GenericValue::Type lhs, GenericValue::Type rhs) {
-    return lhs == rhs; // TODO
+    // TODO
+    return lhs == rhs || (lhs == GenericValue::Type::Float && rhs == GenericValue::Type::Integer) || (lhs == GenericValue::Type::Integer && rhs == GenericValue::Type::Float);
 }
 
 // Todo: Apply repeatedly until there's no changes?
 AST::Node* AST::optimize(AST::Node* currNode) {
     for(size_t i = 0; i < currNode->children.size(); ++i)
         currNode->children[i] = optimize(currNode->children[i]);
+
+    // TODO: The AST doesn't have a concept of variable declaration, so we can't access the values of "CompileConst" variables.
+    //       It's a missed opportunity.
 
     // Remove trivial expression or statement nodes (FIXME: Figure out if we really want to allow an expression with multiple children...)
     if((currNode->type == AST::Node::Type::Expression || currNode->type == AST::Node::Type::Statement) && currNode->children.size() == 1) {
@@ -29,6 +33,7 @@ AST::Node* AST::optimize(AST::Node* currNode) {
         delete currNode;
         currNode = new AST::Node(AST::Node::Type::ConstantValue);
         currNode->value = interp.get_return_value();
+        currNode->value.flags = GenericValue::Flags::CompileConst;
     };
 
     // Compute const expression when possible

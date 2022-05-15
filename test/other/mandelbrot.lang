@@ -1,15 +1,15 @@
-const int sx = 160;
-const int sy = 60;
+const int sx = 192 / 2;
+const int sy = 64 / 2;
 int[sx * sy] results;
-const int max_iteration = 70;
+const int max_iteration = 69;
 const string grey = "$@B%8&WM#*oahkbdpqwmZO0QLCJUYXzcvunxrjft/\|()1{}[]?-_+~<>i!lI;:,^`'. ";
 
 int py = 0;
 while(py < sy) {
 	int px = 0;
+	const float yz = -1.0 + (2.0 / sy) * py;
 	while(px < sx) {
-		const float xz = -2.5 + 3.5 * px / sx;
-		const float yz = -1.0 + 2.0 * py / sy;
+		const float xz = -2.5 + (3.5 / sx) * px;
 		float x = 0;
 		float y = 0;
 		int iteration = 0;
@@ -21,7 +21,7 @@ while(py < sy) {
 		}
 		results[sx * py + px] = iteration;
 
-		put(grey[68.0 * iteration / max_iteration]);
+		put(grey[68.0 / max_iteration * iteration]);
 		++px;
 	}
 	put('\n');
