@@ -173,6 +173,14 @@ bool Parser::parse_identifier(const std::span<Tokenizer::Token>& tokens, std::sp
     }
     const auto& variable = *maybe_variable;
 
+    // FIXME: Replaces the variable lookup by a constant, should be a net win for the interpreter, but not in general.
+    if(variable.is_constexpr()) {
+        auto constNode = currNode->add_child(new AST::Node(AST::Node::Type::ConstantValue, *it));
+        constNode->value = variable;
+        ++it;
+        return true;
+    }
+
     auto variable_node = currNode->add_child(new AST::Node(AST::Node::Type::Variable, *it));
     variable_node->value.type = variable.type;
     if(peek(tokens, it, Tokenizer::Token::Type::Operator, "[")) { // Array accessor
@@ -316,6 +324,7 @@ bool Parser::parse_function_declaration(const std::span<Tokenizer::Token>& token
 bool Parser::parse_boolean(const std::span<Tokenizer::Token>&, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode) {
     auto boolNode = currNode->add_child(new AST::Node(AST::Node::Type::ConstantValue, *it));
     boolNode->value.type = GenericValue::Type::Boolean;
+    boolNode->value.flags = GenericValue::Flags::ConstExpr;
     boolNode->value.value.as_bool = it->value == "true";
     ++it;
     return true;
@@ -324,6 +333,7 @@ bool Parser::parse_boolean(const std::span<Tokenizer::Token>&, std::span<Tokeniz
 bool Parser::parse_digits(const std::span<Tokenizer::Token>&, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode) {
     auto integer = currNode->add_child(new AST::Node(AST::Node::Type::ConstantValue, *it));
     integer->value.type = GenericValue::Type::Integer;
+    integer->value.flags = GenericValue::Flags::ConstExpr;
     auto result = std::from_chars(&*(it->value.begin()), &*(it->value.begin()) + it->value.length(), integer->value.value.as_int32_t);
     ++it;
     return true;
@@ -332,6 +342,7 @@ bool Parser::parse_digits(const std::span<Tokenizer::Token>&, std::span<Tokenize
 bool Parser::parse_float(const std::span<Tokenizer::Token>&, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode) {
     auto floatNode = currNode->add_child(new AST::Node(AST::Node::Type::ConstantValue, *it));
     floatNode->value.type = GenericValue::Type::Float;
+    floatNode->value.flags = GenericValue::Flags::ConstExpr;
     auto result = std::from_chars(&*(it->value.begin()), &*(it->value.begin()) + it->value.length(), floatNode->value.value.as_float);
     ++it;
     return true;
@@ -340,6 +351,7 @@ bool Parser::parse_float(const std::span<Tokenizer::Token>&, std::span<Tokenizer
 bool Parser::parse_char(const std::span<Tokenizer::Token>&, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode) {
     auto strNode = currNode->add_child(new AST::Node(AST::Node::Type::ConstantValue, *it));
     strNode->value.type = GenericValue::Type::Char;
+    strNode->value.flags = GenericValue::Flags::ConstExpr;
     strNode->value.value.as_char = it->value[0];
     ++it;
     return true;
@@ -348,6 +360,7 @@ bool Parser::parse_char(const std::span<Tokenizer::Token>&, std::span<Tokenizer:
 bool Parser::parse_string(const std::span<Tokenizer::Token>&, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode) {
     auto strNode = currNode->add_child(new AST::Node(AST::Node::Type::ConstantValue, *it));
     strNode->value.type = GenericValue::Type::String;
+    strNode->value.flags = GenericValue::Flags::ConstExpr;
     strNode->value.value.as_string = it->value;
     ++it;
     return true;
@@ -442,6 +455,17 @@ bool Parser::parse_operator(const std::span<Tokenizer::Token>& tokens, std::span
     }
     // TODO: Test if types are compatible (with the operator and between each other)
 
+    // Assignment: if variable is const and value is constexpr, mark the variable as constexpr.
+    if(binaryOperatorNode->token.value == "=") {
+        if(binaryOperatorNode->children[0]->type == AST::Node::Type::Variable && binaryOperatorNode->children[0]->subtype == AST::Node::SubType::Const &&
+           binaryOperatorNode->children[1]->type == AST::Node::Type::ConstantValue) {
+            auto maybe_variable = get(binaryOperatorNode->children[0]->token.value);
+            assert(maybe_variable);
+            *maybe_variable = binaryOperatorNode->children[1]->value;
+            maybe_variable->flags = maybe_variable->flags | GenericValue::Flags::ConstExpr;
+        }
+    }
+
     resolve_operator_type(binaryOperatorNode);
     return true;
 }
@@ -449,11 +473,13 @@ bool Parser::parse_operator(const std::span<Tokenizer::Token>& tokens, std::span
 /* it must point to an type identifier
  * TODO: Handle non-built-it types.
  */
-bool Parser::parse_variable_declaration(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode) {
+bool Parser::parse_variable_declaration(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode, bool is_const) {
     assert(it->type == Tokenizer::Token::Type::BuiltInType);
     auto varDecNode = currNode->add_child(new AST::Node(AST::Node::Type::VariableDeclaration, *it));
     auto cleanup_on_error = [&]() { delete currNode->pop_child(); };
     varDecNode->value.type = parse_type(it->value);
+    if(is_const)
+        varDecNode->subtype = AST::Node::SubType::Const;
     ++it;
     // Array declaration
     if(it != tokens.end() && it->value == "[") {
@@ -492,9 +518,17 @@ bool Parser::parse_variable_declaration(const std::span<Tokenizer::Token>& token
         }
         ++it;
         // Also push a variable identifier for initialisation
-        if(it != tokens.end() && it->value == "=") {
+        bool has_initializer = it != tokens.end() && it->value == "=";
+        if(is_const && !has_initializer) {
+            error("[Parser] Syntax error: Variable '{}' declared as const but not initialized on line {}.\n", next.value, next.line);
+            cleanup_on_error();
+            return false;
+        }
+        if(has_initializer) {
             auto varNode = currNode->add_child(new AST::Node(AST::Node::Type::Variable, next));
             varNode->value.type = varDecNode->value.type;
+            if(is_const)
+                varNode->subtype = AST::Node::SubType::Const;
         }
     } else {
         error("[Parser] Syntax error: Expected Identifier for variable declaration, got {}.\n", next);

@@ -26,6 +26,12 @@ struct GenericValue {
         Undefined
     };
 
+    enum Flags {
+        None = 0,
+        Const = 0x1,
+        CompileConst = 0x2, // constexpr
+    };
+
     static bool is_numeric(Type t) { return t == Type::Integer || t == Type::Float; }
     static Type common_type(Type t0, Type t1) {
         if(t0 == Type::Float || t1 == Type::Float)
@@ -261,26 +267,30 @@ struct GenericValue {
         return r;
     }
 
-    GenericValue operator++() {
+    GenericValue& operator++() {
+        assert(!is_const());
         assert(type == Type::Integer);
         ++value.as_int32_t;
         return *this;
     }
 
     GenericValue operator++(int) {
+        assert(!is_const());
         assert(type == Type::Integer);
         GenericValue r = *this;
         ++value.as_int32_t;
         return r;
     }
 
-    GenericValue operator--() {
+    GenericValue& operator--() {
+        assert(!is_const());
         assert(type == Type::Integer);
         --value.as_int32_t;
         return *this;
     }
 
     GenericValue operator--(int) {
+        assert(!is_const());
         assert(type == Type::Integer);
         GenericValue r = *this;
         --value.as_int32_t;
@@ -431,9 +441,17 @@ struct GenericValue {
         return value.as_int32_t;
     }
 
+    bool is_const() const { return flags & Flags::Const; }
+    bool is_constexpr() const { return flags & Flags::CompileConst; }
+
     Type       type;
+    Flags      flags;
     ValueUnion value;
 };
+
+inline GenericValue::Flags operator|(GenericValue::Flags a, GenericValue::Flags b) {
+    return static_cast<GenericValue::Flags>(static_cast<int>(a) | static_cast<int>(b));
+}
 
 inline static GenericValue::Type parse_type(const std::string_view& str) {
     using enum GenericValue::Type;

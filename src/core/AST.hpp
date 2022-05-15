@@ -38,6 +38,8 @@ class AST {
             Prefix,
             Postfix,
 
+            Const,
+
             Undefined,
         };
 

@@ -37,7 +37,9 @@ class Scope {
             case GenericValue::Type::Integer: [[fallthrough]];
             case GenericValue::Type::Float: [[fallthrough]];
             case GenericValue::Type::Char: [[fallthrough]];
-            case GenericValue::Type::String: _variables[std::string{name}] = Variable{decNode.value.type}; break;
+            case GenericValue::Type::String:
+                _variables[std::string{name}] = Variable{decNode.value.type, decNode.subtype == AST::Node::SubType::Const ? GenericValue::Flags::Const : GenericValue::Flags::None};
+                break;
             case GenericValue::Type::Array: {
 
                 Variable v{Variable::Type::Array};

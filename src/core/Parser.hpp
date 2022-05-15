@@ -87,6 +87,7 @@ class Parser : public Scoped {
     bool parse(const std::span<Tokenizer::Token>& tokens, AST::Node* currNode) {
         currNode = currNode->add_child(new AST::Node(AST::Node::Type::Statement));
         auto it = tokens.begin();
+        bool is_const = false;
         while(it != tokens.end()) {
             const auto& token = *it;
             switch(token.type) {
@@ -142,9 +143,15 @@ class Parser : public Scoped {
 
                     break;
                 }
+                case Tokenizer::Token::Type::Const:
+                    is_const = true;
+                    ++it;
+                    assert(it->type == Tokenizer::Token::Type::BuiltInType);
+                    [[fallthrough]];
                 case Tokenizer::Token::Type::BuiltInType: {
-                    if(!parse_variable_declaration(tokens, it, currNode))
+                    if(!parse_variable_declaration(tokens, it, currNode, is_const))
                         return false;
+                    is_const = false;
                     break;
                 }
                 case Tokenizer::Token::Type::Return: {
@@ -234,5 +241,5 @@ class Parser : public Scoped {
     bool parse_char(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode);
     bool parse_string(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode);
     bool parse_operator(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode);
-    bool parse_variable_declaration(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode);
+    bool parse_variable_declaration(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode, bool is_const = false);
 };
