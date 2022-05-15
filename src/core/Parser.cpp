@@ -324,7 +324,7 @@ bool Parser::parse_function_declaration(const std::span<Tokenizer::Token>& token
 bool Parser::parse_boolean(const std::span<Tokenizer::Token>&, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode) {
     auto boolNode = currNode->add_child(new AST::Node(AST::Node::Type::ConstantValue, *it));
     boolNode->value.type = GenericValue::Type::Boolean;
-    boolNode->value.flags = GenericValue::Flags::ConstExpr;
+    boolNode->value.flags = GenericValue::Flags::CompileConst;
     boolNode->value.value.as_bool = it->value == "true";
     ++it;
     return true;
@@ -333,7 +333,7 @@ bool Parser::parse_boolean(const std::span<Tokenizer::Token>&, std::span<Tokeniz
 bool Parser::parse_digits(const std::span<Tokenizer::Token>&, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode) {
     auto integer = currNode->add_child(new AST::Node(AST::Node::Type::ConstantValue, *it));
     integer->value.type = GenericValue::Type::Integer;
-    integer->value.flags = GenericValue::Flags::ConstExpr;
+    integer->value.flags = GenericValue::Flags::CompileConst;
     auto result = std::from_chars(&*(it->value.begin()), &*(it->value.begin()) + it->value.length(), integer->value.value.as_int32_t);
     ++it;
     return true;
@@ -342,7 +342,7 @@ bool Parser::parse_digits(const std::span<Tokenizer::Token>&, std::span<Tokenize
 bool Parser::parse_float(const std::span<Tokenizer::Token>&, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode) {
     auto floatNode = currNode->add_child(new AST::Node(AST::Node::Type::ConstantValue, *it));
     floatNode->value.type = GenericValue::Type::Float;
-    floatNode->value.flags = GenericValue::Flags::ConstExpr;
+    floatNode->value.flags = GenericValue::Flags::CompileConst;
     auto result = std::from_chars(&*(it->value.begin()), &*(it->value.begin()) + it->value.length(), floatNode->value.value.as_float);
     ++it;
     return true;
@@ -351,7 +351,7 @@ bool Parser::parse_float(const std::span<Tokenizer::Token>&, std::span<Tokenizer
 bool Parser::parse_char(const std::span<Tokenizer::Token>&, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode) {
     auto strNode = currNode->add_child(new AST::Node(AST::Node::Type::ConstantValue, *it));
     strNode->value.type = GenericValue::Type::Char;
-    strNode->value.flags = GenericValue::Flags::ConstExpr;
+    strNode->value.flags = GenericValue::Flags::CompileConst;
     strNode->value.value.as_char = it->value[0];
     ++it;
     return true;
@@ -360,7 +360,7 @@ bool Parser::parse_char(const std::span<Tokenizer::Token>&, std::span<Tokenizer:
 bool Parser::parse_string(const std::span<Tokenizer::Token>&, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode) {
     auto strNode = currNode->add_child(new AST::Node(AST::Node::Type::ConstantValue, *it));
     strNode->value.type = GenericValue::Type::String;
-    strNode->value.flags = GenericValue::Flags::ConstExpr;
+    strNode->value.flags = GenericValue::Flags::CompileConst;
     strNode->value.value.as_string = it->value;
     ++it;
     return true;
@@ -442,17 +442,29 @@ bool Parser::parse_operator(const std::span<Tokenizer::Token>& tokens, std::span
     binaryOperatorNode->add_child(prevExpr);
 
     auto precedence = operator_precedence.at(std::string(it->value));
-    if((it + 1) == tokens.end()) {
-        error("Syntax error: Reached end of document without a right-hand side operand for {} on line {}.\n", it->value, it->line);
-        delete currNode->pop_child();
-        return false;
-    }
     ++it;
-    // Lookahead for rhs
-    if(!parse_next_expression(tokens, it, binaryOperatorNode, precedence)) {
+    if(it == tokens.end()) {
+        error("[Parser::parse_operator] Syntax error: Reached end of document without a right-hand side operand for {} on line {}.\n", it->value, it->line);
         delete currNode->pop_child();
         return false;
     }
+
+    if(binaryOperatorNode->token.value == "[") {
+        if(!parse_next_expression(tokens, it, binaryOperatorNode, 0)) {
+            delete currNode->pop_child();
+            return false;
+        }
+        // Check for ']' and advance
+        assert(it->value == "]");
+        ++it;
+    } else {
+        // Lookahead for rhs
+        if(!parse_next_expression(tokens, it, binaryOperatorNode, precedence)) {
+            delete currNode->pop_child();
+            return false;
+        }
+    }
+
     // TODO: Test if types are compatible (with the operator and between each other)
 
     // Assignment: if variable is const and value is constexpr, mark the variable as constexpr.
@@ -462,7 +474,7 @@ bool Parser::parse_operator(const std::span<Tokenizer::Token>& tokens, std::span
             auto maybe_variable = get(binaryOperatorNode->children[0]->token.value);
             assert(maybe_variable);
             *maybe_variable = binaryOperatorNode->children[1]->value;
-            maybe_variable->flags = maybe_variable->flags | GenericValue::Flags::ConstExpr;
+            maybe_variable->flags = maybe_variable->flags | GenericValue::Flags::CompileConst;
         }
     }
 

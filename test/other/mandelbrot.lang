@@ -2,7 +2,7 @@ const int sx = 160;
 const int sy = 60;
 int[sx * sy] results;
 const int max_iteration = 70;
-string grey = "$@B%8&WM#*oahkbdpqwmZO0QLCJUYXzcvunxrjft/\|()1{}[]?-_+~<>i!lI;:,^`'. ";
+const string grey = "$@B%8&WM#*oahkbdpqwmZO0QLCJUYXzcvunxrjft/\|()1{}[]?-_+~<>i!lI;:,^`'. ";
 
 int py = 0;
 while(py < sy) {

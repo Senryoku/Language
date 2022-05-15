@@ -83,6 +83,10 @@ struct GenericValue {
             return GenericValue::Type::Float;
         else if(lhs == GenericValue::Type::String && rhs == GenericValue::Type::String)
             return GenericValue::Type::String;
+        else if(op == "[" && lhs == GenericValue::Type::String && rhs == GenericValue::Type::Integer)
+            return GenericValue::Type::Char;
+        else if(op == "[" && lhs == GenericValue::Type::String && rhs == GenericValue::Type::Float) // Auto cast float to integer for string indexing
+            return GenericValue::Type::Char;
         return GenericValue::Type::Undefined;
     }
 
