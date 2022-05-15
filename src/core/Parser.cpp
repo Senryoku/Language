@@ -455,7 +455,11 @@ bool Parser::parse_operator(const std::span<Tokenizer::Token>& tokens, std::span
             return false;
         }
         // Check for ']' and advance
-        assert(it->value == "]");
+        if(it->value != "]") {
+            error("[Parser::parse_operator] Syntax error: Expected ']', got '{}' (line {}).\n", it->value, it->line);
+            delete currNode->pop_child();
+            return false;
+        }
         ++it;
     } else {
         // Lookahead for rhs
