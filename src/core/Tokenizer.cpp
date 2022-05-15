@@ -62,17 +62,23 @@ Tokenizer::Token Tokenizer::search_next(size_t& pointer) const {
             else
                 type = Token::Type::Digits;
         } else {
-            type = Token::Type::Operator;
-            // Operators
-            // FIXME (Better solution than is_allowed_in_operators?)
-            while(pointer < _source.length() && !is_discardable(_source[pointer]) && is_allowed_in_operators(_source[pointer]))
-                ++pointer;
-            const auto end = pointer;
-            while(pointer != begin && !operators.contains(std::string_view{_source.begin() + begin, _source.begin() + pointer})) {
-                --pointer;
-            }
-            if(pointer == begin) {
-                error("[Tokenizer] Error: Not matching operator for '{}'.", std::string_view{_source.begin() + begin, _source.begin() + end});
+            if(first_char == '/' && pointer + 1 < _source.length() && _source[pointer + 1] == '/') {
+                type = Token::Type::Comment;
+                while(pointer < _source.length() && _source[pointer] != '\n')
+                    ++pointer;
+            } else {
+                type = Token::Type::Operator;
+                // Operators
+                // FIXME (Better solution than is_allowed_in_operators?)
+                while(pointer < _source.length() && !is_discardable(_source[pointer]) && is_allowed_in_operators(_source[pointer]))
+                    ++pointer;
+                const auto end = pointer;
+                while(pointer != begin && !operators.contains(std::string_view{_source.begin() + begin, _source.begin() + pointer}))
+                    --pointer;
+                if(pointer == begin) {
+                    error("[Tokenizer] Error: Not matching operator for '{}'.", std::string_view{_source.begin() + begin, _source.begin() + end});
+                    ++pointer;
+                }
             }
         }
     } else {

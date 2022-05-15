@@ -212,6 +212,7 @@ class Parser : public Scoped {
                         return false;
                     break;
                 }
+                case Tokenizer::Token::Type::Comment: ++it; break;
                 default:
                     warn("Unused token: {}.\n", *it);
                     ++it;

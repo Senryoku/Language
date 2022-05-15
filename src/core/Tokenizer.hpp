@@ -31,6 +31,8 @@ class Tokenizer {
             Else,
             While,
 
+            Comment,
+
             Unknown
         };
 
