@@ -8,8 +8,8 @@ int py = 0;
 while(py < sy) {
 	int px = 0;
 	while(px < sx) {
-		const float xz = (0 - 2.5) + 3.5 * ((0.0 + px) / sx);
-		const float yz = (0 - 1.0) + 2.0 * ((0.0 + py) / sy);
+		const float xz = -2.5 + 3.5 * ((0.0 + px) / sx);
+		const float yz = -1.0 + 2.0 * ((0.0 + py) / sy);
 		float x = 0;
 		float y = 0;
 		int iteration = 0;
