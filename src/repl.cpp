@@ -12,9 +12,16 @@
 #include <Tokenizer.hpp>
 #include <utils/CLIArg.hpp>
 
+#ifdef WIN32
+#include <windows.h>
+#endif
+
 int main(int argc, char* argv[]) {
+#ifdef WIN32
+    SetConsoleTitle("Lang REPL");
+#endif
     fmt::print(R"(
-# Welcome to {} prompt. Enter 'q' to quit, 'help' for more commands.
+# Welcome to {} REPL. Enter 'q' to quit, 'help' for more commands.
 )",
                link("http://lang.com", "<insert language name>"));
 

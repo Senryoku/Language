@@ -31,20 +31,20 @@ file(GLOB HEADERS src/**/*.hpp)
 add_library(langlib STATIC ${SOURCES} ${HEADERS})
 
 add_executable(compiler ${HEADERS} src/compiler.cpp)
-add_executable(prompt ${HEADERS} src/prompt.cpp)
+add_executable(repl ${HEADERS} src/repl.cpp)
 add_executable(tester ${TEST_FILES} ${HEADERS} test/main.cpp)
 add_executable(assembler_test ${HEADERS} src/assembler_test.cpp)
 
 target_include_directories(compiler PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/ext")
 
 target_link_libraries(compiler langlib)
-target_link_libraries(prompt langlib)
+target_link_libraries(repl langlib)
 target_link_libraries(tester langlib)
 target_link_libraries(assembler_test langlib)
 
 set_property(TARGET langlib PROPERTY CXX_STANDARD 20)
 set_property(TARGET compiler PROPERTY CXX_STANDARD 20)
-set_property(TARGET prompt PROPERTY CXX_STANDARD 20)
+set_property(TARGET repl PROPERTY CXX_STANDARD 20)
 set_property(TARGET tester PROPERTY CXX_STANDARD 20)
 set_property(TARGET assembler_test PROPERTY CXX_STANDARD 20)
 
@@ -54,7 +54,7 @@ set_property(TARGET tester PROPERTY VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURC
 add_subdirectory("./ext/fmt-8.1.1")
 include_directories("ext/fmt-8.1.1/include")
 target_link_libraries(compiler fmt::fmt)
-target_link_libraries(prompt fmt::fmt)
+target_link_libraries(repl fmt::fmt)
 target_link_libraries(tester fmt::fmt)
 target_link_libraries(assembler_test fmt::fmt)
 
