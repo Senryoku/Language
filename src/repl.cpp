@@ -13,12 +13,13 @@
 #include <utils/CLIArg.hpp>
 
 #ifdef WIN32
+#include <tchar.h>
 #include <windows.h>
 #endif
 
 int main(int argc, char* argv[]) {
 #ifdef WIN32
-    SetConsoleTitle("Lang REPL");
+    SetConsoleTitle(_T("Lang REPL"));
 #endif
     fmt::print(R"(
 # Welcome to {} REPL. Enter 'q' to quit, 'help' for more commands.

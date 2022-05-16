@@ -39,7 +39,7 @@ class Interpreter : public Scoped {
         var.value.as_array.items = arr;
     }
 
-    GenericValue execute(const AST::Node& node) {
+    Variable execute(const AST::Node& node) {
         switch(node.type) {
             using enum AST::Node::Type;
             case Root:
@@ -164,7 +164,7 @@ class Interpreter : public Scoped {
                 } else if(node.token.value == "++") {
                     assert(node.children.size() == 1);
                     assert(node.children[0]->type == Variable);
-                    GenericValue* v = get(node.children[0]->token.value);
+                    auto* v = get(node.children[0]->token.value);
                     if(node.subtype == AST::Node::SubType::Prefix)
                         _return_value = ++(*v);
                     else
@@ -172,7 +172,7 @@ class Interpreter : public Scoped {
                 } else if(node.token.value == "--") {
                     assert(node.children.size() == 1);
                     assert(node.children[0]->type == Variable);
-                    GenericValue* v = get(node.children[0]->token.value);
+                    auto* v = get(node.children[0]->token.value);
                     if(node.subtype == AST::Node::SubType::Prefix)
                         _return_value = --(*v);
                     else
@@ -191,7 +191,7 @@ class Interpreter : public Scoped {
                     // Search for an l-value (FIXME: should execute the whole left-hand side)
                     if(node.children[0]->type == Variable) { // Variable
                         if(is_assignable(node.children[0]->value, node.children[1]->value)) {
-                            GenericValue* v = get(node.children[0]->token.value);
+                            auto* v = get(node.children[0]->token.value);
                             assert(v);
                             v->assign(rhs);
                             _return_value.type = v->type;
@@ -289,8 +289,8 @@ class Interpreter : public Scoped {
     }
 
   private:
-    bool         _returning_value = false;
-    GenericValue _return_value{.type = GenericValue::Type::Integer, .value = 0}; // FIXME: Probably not the right move!
+    bool     _returning_value = false;
+    Variable _return_value{{.type = GenericValue::Type::Integer, .value = 0}}; // FIXME: Probably not the right move!
 
     std::vector<GenericValue*> _allocated_arrays;
 

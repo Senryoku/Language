@@ -1,0 +1,8 @@
+int i = 2 * 2 + 5;
+int j = 0; 
+while(i > 0) {
+	j = j + i;
+	i = i - 1;
+}
+return j;
+	

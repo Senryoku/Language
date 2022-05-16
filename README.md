@@ -9,10 +9,9 @@ Toy Language
  - Boolean operators (== != < > <= >=)
  - String interning for keyword and symbols
 
- ## Features
+## Features
 
- ### Syntax
-
+### Syntax
   - Primitive types
   - - Integer
   - - Float
@@ -37,15 +36,25 @@ Toy Language
   ```
 
 ## Future Features (Hopefully)
-
+ - Easy module import (TBD :])
  - String templating
  - Templates (by 'auto'?); Concepts?
 
 ## Dependencies
  - C++20
- - fmt
+ - fmt 8.1.1 (sources in ext/)
+ - LLVM 14.0.0 (for the compiler only)
+   - Get the source tarball
+   - cd llvm-14.0.0.src
+   - mkdir build
+   - cd build
+   - cmake .. -DLLVM_INCLUDE_BENCHMARKS=OFF
+   - cmake --build . --target install
+   - CMake should now find LLVM automatically, otherwise set the LLVM_DIR variable (-DLLVM_DIR=path/to/llvm-14.0.0.src/build)
 
-## WASM Resources
+## Notes
+
+### WASM Resources
  - Spec https://webassembly.github.io/spec/core/index.html
  - Text Format Basics https://developer.mozilla.org/en-US/docs/WebAssembly/Understanding_the_text_format
  - WebAssembly Reference Manual https://github.com/sunfishcode/wasm-reference-manual/blob/master/WebAssembly.md

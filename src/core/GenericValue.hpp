@@ -8,12 +8,6 @@
 
 #include <Logger.hpp>
 
-// Will be used by the Parser/AST
-struct ConstValue {
-    // TODOOOOOOO!
-};
-
-// Will be used by the interpreter
 struct GenericValue {
     enum class Type {
         Boolean,
@@ -108,7 +102,7 @@ struct GenericValue {
 
     // Boolean operators
 
-    GenericValue operator==(const GenericValue& rhs) {
+    GenericValue operator==(const GenericValue& rhs) const {
         GenericValue r{.type = Type::Boolean};
         r.value.as_bool = false;
         if(type != rhs.type) // TODO: Hanlde implicit conversion?
@@ -123,14 +117,14 @@ struct GenericValue {
         return r;
     }
 
-    GenericValue operator!=(const GenericValue& rhs) {
+    GenericValue operator!=(const GenericValue& rhs) const {
         // TODO: Handle types
         auto r = (*this == rhs);
         r.value.as_bool = !r.value.as_bool;
         return r;
     }
 
-    GenericValue operator<(const GenericValue& rhs) {
+    GenericValue operator<(const GenericValue& rhs) const {
         GenericValue r{.type = Type::Boolean};
         r.value.as_bool = false;
         if(type != rhs.type) { // TODO: Hanlde implicit conversion?
@@ -153,7 +147,7 @@ struct GenericValue {
         return r;
     }
 
-    GenericValue operator<=(const GenericValue& rhs) {
+    GenericValue operator<=(const GenericValue& rhs) const {
         GenericValue r{.type = Type::Boolean};
         r.value.as_bool = false;
         if(type != rhs.type) { // TODO: Hanlde implicit conversion?
@@ -177,7 +171,7 @@ struct GenericValue {
         return r;
     }
 
-    GenericValue operator>(const GenericValue& rhs) {
+    GenericValue operator>(const GenericValue& rhs) const {
         GenericValue r{.type = Type::Boolean};
         r.value.as_bool = false;
         if(type != rhs.type) { // TODO: Hanlde implicit conversion?
@@ -200,7 +194,7 @@ struct GenericValue {
         return r;
     }
 
-    GenericValue operator>=(const GenericValue& rhs) {
+    GenericValue operator>=(const GenericValue& rhs) const {
         GenericValue r{.type = Type::Boolean};
         r.value.as_bool = false;
         if(type != rhs.type) { // TODO: Hanlde implicit conversion?
@@ -224,7 +218,7 @@ struct GenericValue {
         return r;
     }
 
-    GenericValue operator&&(const GenericValue& rhs) {
+    GenericValue operator&&(const GenericValue& rhs) const {
         GenericValue r{.type = Type::Boolean};
         r.value.as_bool = false;
         if(type != rhs.type) // TODO: Hanlde implicit conversion?
@@ -239,7 +233,7 @@ struct GenericValue {
         return r;
     }
 
-    GenericValue operator||(const GenericValue& rhs) {
+    GenericValue operator||(const GenericValue& rhs) const {
         GenericValue r{.type = Type::Boolean};
         r.value.as_bool = false;
         if(type != rhs.type) // TODO: Hanlde implicit conversion?
@@ -271,36 +265,6 @@ struct GenericValue {
         return r;
     }
 
-    GenericValue& operator++() {
-        assert(!is_const());
-        assert(type == Type::Integer);
-        ++value.as_int32_t;
-        return *this;
-    }
-
-    GenericValue operator++(int) {
-        assert(!is_const());
-        assert(type == Type::Integer);
-        GenericValue r = *this;
-        ++value.as_int32_t;
-        return r;
-    }
-
-    GenericValue& operator--() {
-        assert(!is_const());
-        assert(type == Type::Integer);
-        --value.as_int32_t;
-        return *this;
-    }
-
-    GenericValue operator--(int) {
-        assert(!is_const());
-        assert(type == Type::Integer);
-        GenericValue r = *this;
-        --value.as_int32_t;
-        return r;
-    }
-
     GenericValue operator+(const GenericValue& rhs) const {
         GenericValue r{.type = resolve_operator_type("+", type, rhs.type)};
         if(type != rhs.type) { // TODO: Hanlde implicit conversion?
@@ -323,7 +287,7 @@ struct GenericValue {
         return r;
     }
 
-    GenericValue operator-(const GenericValue& rhs) {
+    GenericValue operator-(const GenericValue& rhs) const {
         GenericValue r{.type = resolve_operator_type("-", type, rhs.type)};
         if(type != rhs.type) { // TODO: Hanlde implicit conversion?
             if(is_numeric(type) && is_numeric(rhs.type)) {
@@ -345,7 +309,7 @@ struct GenericValue {
         return r;
     }
 
-    GenericValue operator*(const GenericValue& rhs) {
+    GenericValue operator*(const GenericValue& rhs) const {
         GenericValue r{.type = resolve_operator_type("*", type, rhs.type)};
         if(type != rhs.type) { // TODO: Hanlde implicit conversion?
             if(is_numeric(type) && is_numeric(rhs.type)) {
@@ -367,7 +331,7 @@ struct GenericValue {
         return r;
     }
 
-    GenericValue operator/(const GenericValue& rhs) {
+    GenericValue operator/(const GenericValue& rhs) const {
         GenericValue r{.type = resolve_operator_type("/", type, rhs.type)};
         if(type != rhs.type) { // TODO: Hanlde implicit conversion?
             if(is_numeric(type) && is_numeric(rhs.type)) {
@@ -389,7 +353,7 @@ struct GenericValue {
         return r;
     }
 
-    GenericValue operator%(const GenericValue& rhs) {
+    GenericValue operator%(const GenericValue& rhs) const {
         GenericValue r{.type = resolve_operator_type("%", type, rhs.type)};
         assert(type == rhs.type);
         switch(type) {
@@ -400,7 +364,7 @@ struct GenericValue {
         return r;
     }
 
-    GenericValue operator^(const GenericValue& rhs) {
+    GenericValue operator^(const GenericValue& rhs) const {
         GenericValue r{.type = resolve_operator_type("^", type, rhs.type)};
         if(type != rhs.type)
             return r;

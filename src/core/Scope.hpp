@@ -38,11 +38,12 @@ class Scope {
             case GenericValue::Type::Float: [[fallthrough]];
             case GenericValue::Type::Char: [[fallthrough]];
             case GenericValue::Type::String:
-                _variables[std::string{name}] = Variable{decNode.value.type, decNode.subtype == AST::Node::SubType::Const ? GenericValue::Flags::Const : GenericValue::Flags::None};
+                _variables[std::string{name}] =
+                    Variable{{decNode.value.type, decNode.subtype == AST::Node::SubType::Const ? GenericValue::Flags::Const : GenericValue::Flags::None}};
                 break;
             case GenericValue::Type::Array: {
 
-                Variable v{Variable::Type::Array};
+                Variable v{{Variable::Type::Array}};
                 v.value.as_array.type = decNode.value.value.as_array.type;
                 v.value.as_array.capacity = decNode.value.value.as_array.capacity;
                 v.value.as_array.items = nullptr;
