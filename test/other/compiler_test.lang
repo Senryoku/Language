@@ -1,11 +1,11 @@
-function double(int i) {
-	return i * 2;
+function double(int k) {
+	return k * 2;
 }
 
 int i = 2 * 2 + 5;
 int j = 0; 
 while(i > 0) {
-	j = j + i;
+	j = j + double(i);
 	i = i - 1;
 }
 return j;
