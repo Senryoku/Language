@@ -168,7 +168,7 @@ struct fmt::formatter<AST::Node> {
 
         auto token_str = t.token.type == Tokenizer::Token::Type::Unknown ? "None" : fmt::format("{}", t.token);
         // FIXME: This would be cool to use the actual token_str length here, but computing the printed length (stripping style/control characters) isn't trivial.
-        const auto length = 60;
+        // const auto length = 60;
         // Forward then backward
         // r = format_to(ctx.out(), "\033[999C\033[{}D{}\n", length, token_str);
         // Backward then forward

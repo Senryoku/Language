@@ -39,6 +39,7 @@ Toy Language
  - Easy module import (TBD :])
  - String templating
  - Templates (by 'auto'?); Concepts?
+ - Reflection
 
 ## Dependencies
  - C++20
