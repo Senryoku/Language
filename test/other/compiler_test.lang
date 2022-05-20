@@ -1,3 +1,7 @@
+function double(int i) {
+	return i * 2;
+}
+
 int i = 2 * 2 + 5;
 int j = 0; 
 while(i > 0) {
