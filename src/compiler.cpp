@@ -10,6 +10,7 @@
 #include <fmt/chrono.h>
 #include <fmt/os.h>
 
+#include <Module.hpp>
 #include <Parser.hpp>
 #include <Tokenizer.hpp>
 #include <asm/wasm.hpp>
@@ -24,250 +25,6 @@
 #include <jit/LLVMJIT.hpp>
 
 static std::unique_ptr<llvm::LLVMContext> llvm_context(new llvm::LLVMContext());
-static std::unique_ptr<llvm::Module>      llvm_module;
-static llvm::IRBuilder<>                  llvm_ir_builder(*llvm_context);
-
-class Module {
-  public:
-    using Scope = het_unordered_map<llvm::AllocaInst*>;
-
-    Scope& push_scope() {
-        _scopes.push_back(Scope{});
-        return get_scope();
-    }
-
-    void pop_scope() { _scopes.pop_back(); }
-
-    bool set(const std::string_view& name, llvm::AllocaInst* alloca) {
-        if(get_scope().find(name) != get_scope().end()) {
-            return false;
-        }
-        get_scope().emplace(name, alloca);
-        return true;
-    }
-
-    llvm::AllocaInst* get(const std::string_view& name) {
-        auto scope_it = _scopes.rbegin();
-        auto alloca_it = scope_it->find(name);
-        while(scope_it != _scopes.rend() && (alloca_it = scope_it->find(name)) == scope_it->end())
-            scope_it++;
-        return scope_it != _scopes.rend() && alloca_it != scope_it->end() ? alloca_it->second : nullptr;
-    }
-
-    const llvm::AllocaInst* get(const std::string_view& name) const {
-        auto scope_it = _scopes.rbegin();
-        auto alloca_it = scope_it->find(name);
-        while(scope_it != _scopes.rend() && (alloca_it = scope_it->find(name)) == scope_it->end())
-            scope_it++;
-        return scope_it != _scopes.rend() && alloca_it != scope_it->end() ? alloca_it->second : nullptr;
-    }
-
-    bool is_declared(const std::string_view& name) const { return get(name) != nullptr; }
-
-  private:
-    std::vector<Scope> _scopes{Scope{}};
-
-    Scope&       get_scope() { return _scopes.back(); }
-    const Scope& get_scope() const { return _scopes.back(); }
-};
-static Module tmp_llvm_names;
-
-static llvm::AllocaInst* CreateEntryBlockAlloca(llvm::Function* func, auto type, const std::string& name) {
-    if(func) {
-        llvm::IRBuilder<> tmp_builder(&func->getEntryBlock(), func->getEntryBlock().begin());
-        return tmp_builder.CreateAlloca(type, 0, name.c_str());
-    } else
-        return llvm_ir_builder.CreateAlloca(type, 0, name.c_str());
-}
-
-llvm::Value* codegen_constant(const GenericValue& val) {
-    switch(val.type) {
-        case GenericValue::Type::Float: return llvm::ConstantFP::get(*llvm_context, llvm::APFloat(val.value.as_float));
-        case GenericValue::Type::Integer: return llvm::ConstantInt::get(*llvm_context, llvm::APInt(32, val.value.as_int32_t));
-        default: warn("LLVM Codegen: Unsupported value type '{}'.\n", val.type);
-    }
-    return nullptr;
-}
-
-llvm::Value* codegen(const AST::Node* node) {
-    switch(node->type) {
-        case AST::Node::Type::Root: [[fallthrough]];
-        case AST::Node::Type::Statement: {
-            llvm::Value* ret = nullptr;
-            for(auto c : node->children) {
-                ret = codegen(c);
-            }
-            return ret;
-        }
-        case AST::Node::Type::Scope: {
-            tmp_llvm_names.push_scope();
-            llvm::Value* ret = nullptr;
-            for(auto c : node->children)
-                ret = codegen(c);
-            tmp_llvm_names.pop_scope();
-            return ret;
-        }
-        case AST::Node::Type::ConstantValue: return codegen_constant(node->value);
-        case AST::Node::Type::FunctionDeclaration: {
-            auto function_name = std::string{node->token.value};
-            auto prev_function = llvm_module->getFunction(function_name);
-            if(prev_function) {
-                error("Redefinition of function '{}' (line {}, already defined on line ??[TODO]).", function_name, node->token.line);
-                return nullptr;
-            }
-
-            auto                     current_block = llvm_ir_builder.GetInsertBlock();
-            std::vector<llvm::Type*> param_types(1, llvm::Type::getInt32Ty(*llvm_context));                                               // TODO
-            auto                     function_types = llvm::FunctionType::get(llvm::Type::getInt32Ty(*llvm_context), param_types, false); // TODO
-            auto                     function = llvm::Function::Create(function_types, llvm::Function::ExternalLinkage, function_name, llvm_module.get());
-            auto*                    block = llvm::BasicBlock::Create(*llvm_context, "entrypoint", function);
-            auto                     arg_idx = 0;
-            llvm_ir_builder.SetInsertPoint(block);
-            tmp_llvm_names.push_scope(); // Scope for variable declarations
-            for(auto& arg : function->args()) {
-                const auto& argName = node->children[arg_idx]->token.value;
-                arg.setName(std::string{argName});
-                auto alloca = codegen(node->children[arg_idx]); // Generate variable declarations
-                llvm_ir_builder.CreateStore(&arg, alloca);
-                ++arg_idx;
-            }
-            codegen(node->children.back()); // Generate function body
-            tmp_llvm_names.pop_scope();
-            // TODO: Correctly handle no return (llvm_ir_builder.CreateRet(RetVal);)
-            llvm_ir_builder.SetInsertPoint(current_block);
-            if(verifyFunction(*function)) {
-                function->eraseFromParent();
-                return nullptr;
-            }
-            return function;
-        }
-        case AST::Node::Type::FunctionCall: {
-            auto function_name = std::string{node->token.value};
-            auto function = llvm_module->getFunction(function_name);
-            if(!function) {
-                error("Call to undeclared function '{}' (line {}).", function_name, node->token.line);
-                return nullptr;
-            }
-            // TODO: Handle default values.
-            if(function->arg_size() != node->children.size() - 1) {
-                error("Unexpected number of parameters in function call '{}' (line {}): Expected {}, got {}.", function_name, node->token.line, function->arg_size(),
-                      node->children.size());
-                return nullptr;
-            }
-            std::vector<llvm::Value*> parameters;
-            // Skip the first one, it (will) holds the function name (FIXME: No used yet, we don't support function as result of expression yet)
-            for(auto i = 1u; i < node->children.size(); ++i) {
-                auto v = codegen(node->children[i]);
-                if(!v)
-                    return nullptr;
-                parameters.push_back(v);
-            }
-            return llvm_ir_builder.CreateCall(function, parameters, function_name);
-        }
-        case AST::Node::Type::VariableDeclaration: {
-            llvm::AllocaInst* ret = nullptr;
-            auto              parent_function = llvm_ir_builder.GetInsertBlock()->getParent();
-            switch(node->value.type) {
-                case GenericValue::Type::Float: ret = CreateEntryBlockAlloca(nullptr, llvm::Type::getFloatTy(*llvm_context), std::string{node->token.value}); break;
-                case GenericValue::Type::Integer: ret = CreateEntryBlockAlloca(nullptr, llvm::Type::getInt32Ty(*llvm_context), std::string{node->token.value}); break;
-                default: warn("LLVM Codegen: Unsupported variable type '{}'.\n", node->value.type); break;
-            }
-            if(!tmp_llvm_names.set(node->token.value, ret)) {
-                error("Variable '{}' already declared (line {}).\n", node->token.value, node->token.line);
-            }
-            return ret;
-        }
-        case AST::Node::Type::Variable: {
-            auto var = tmp_llvm_names.get(node->token.value);
-            if(!var) {
-                error("LLVM Codegen: Undeclared variable '{}'.\n", node->token.value);
-                return nullptr;
-            }
-            return llvm_ir_builder.CreateLoad(var->getAllocatedType(), var, std::string{node->token.value}.c_str());
-        }
-        case AST::Node::Type::BinaryOperator: {
-            auto lhs = codegen(node->children[0]);
-            auto rhs = codegen(node->children[1]);
-            if(!lhs || !rhs)
-                return nullptr;
-            if(node->token.value == "+") {
-                if(node->value.type == GenericValue::Type::Integer)
-                    return llvm_ir_builder.CreateAdd(lhs, rhs, "addtmp");
-                else
-                    return llvm_ir_builder.CreateFAdd(lhs, rhs, "addftmp");
-            } else if(node->token.value == "-") {
-                if(node->value.type == GenericValue::Type::Integer)
-                    return llvm_ir_builder.CreateSub(lhs, rhs, "subtmp");
-                else
-                    return llvm_ir_builder.CreateFSub(lhs, rhs, "subftmp");
-            } else if(node->token.value == "*") {
-                if(node->value.type == GenericValue::Type::Integer)
-                    return llvm_ir_builder.CreateMul(lhs, rhs, "multmp");
-                else
-                    return llvm_ir_builder.CreateFMul(lhs, rhs, "mulftmp");
-            } else if(node->token.value == "/") {
-                auto div = llvm_ir_builder.CreateFDiv(lhs, rhs, "divftmp");
-                if(node->value.type == GenericValue::Type::Integer)
-                    return llvm_ir_builder.CreateFPToUI(div, llvm::Type::getInt32Ty(*llvm_context), "intcasttmp");
-                else
-                    return div;
-                // Boolean Operators
-            } else if(node->token.value == "<") {
-                // TODO: More types
-                if(node->children[0]->value.type == GenericValue::Type::Integer && node->children[1]->value.type == GenericValue::Type::Integer)
-                    return llvm_ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_SLT, lhs, rhs, "ICMP_SLT");
-                else if(node->children[0]->value.type == GenericValue::Type::Float && node->children[1]->value.type == GenericValue::Type::Float)
-                    return llvm_ir_builder.CreateFCmp(llvm::CmpInst::Predicate::FCMP_OLT, lhs, rhs, "FCMP_OLT");
-            } else if(node->token.value == ">") {
-                // TODO: More types
-                if(node->children[0]->value.type == GenericValue::Type::Integer && node->children[1]->value.type == GenericValue::Type::Integer)
-                    return llvm_ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_SGT, lhs, rhs, "ICMP_SGT");
-                else if(node->children[0]->value.type == GenericValue::Type::Float && node->children[1]->value.type == GenericValue::Type::Float)
-                    return llvm_ir_builder.CreateFCmp(llvm::CmpInst::Predicate::FCMP_OGT, lhs, rhs, "FCMP_OGT");
-            } else if(node->token.value == "=") {
-                assert(node->children[0]->type == AST::Node::Type::Variable); // FIXME
-                auto variable = tmp_llvm_names.get(node->children[0]->token.value);
-                llvm_ir_builder.CreateStore(rhs, variable);
-                return rhs;
-            }
-            warn("LLVM Code: Unimplemented Binary Operator '{}'.\n", node->token.value);
-            break;
-        }
-        case AST::Node::Type::WhileStatement: {
-            llvm::Function* current_function = llvm_ir_builder.GetInsertBlock()->getParent();
-            auto            current_block = llvm_ir_builder.GetInsertBlock();
-
-            llvm::BasicBlock* condition_block = llvm::BasicBlock::Create(*llvm_context, "while_condition", current_function);
-            llvm::BasicBlock* loop_block = llvm::BasicBlock::Create(*llvm_context, "while_loop", current_function);
-            llvm::BasicBlock* after_block = llvm::BasicBlock::Create(*llvm_context, "while_end", current_function);
-
-            llvm_ir_builder.CreateBr(condition_block);
-
-            llvm_ir_builder.SetInsertPoint(condition_block);
-            auto condition_label = llvm_ir_builder.GetInsertBlock();
-            auto condition = codegen(node->children[0]);
-            if(!condition)
-                return nullptr;
-            llvm_ir_builder.CreateCondBr(condition, loop_block, after_block);
-
-            llvm_ir_builder.SetInsertPoint(loop_block);
-            auto loop_code = codegen(node->children[1]);
-            if(!loop_code)
-                return nullptr;
-            llvm_ir_builder.CreateBr(condition_label);
-
-            llvm_ir_builder.SetInsertPoint(after_block);
-            return llvm::Constant::getNullValue(llvm::Type::getInt32Ty(*llvm_context));
-        }
-        case AST::Node::Type::ReturnStatement: return llvm_ir_builder.CreateRet(codegen(node->children[0]));
-        default: warn("LLVM Codegen: Unsupported node type '{}'.\n", node->type);
-    }
-    return nullptr;
-}
-
-llvm::Value* codegen(const AST& ast) {
-    return codegen(&ast.getRoot());
-}
 
 int main(int argc, char* argv[]) {
     fmt::print("?{0:-^{2}}?\n"
@@ -333,21 +90,16 @@ int main(int argc, char* argv[]) {
                 auto filepath = std::filesystem::path(filename).stem().append(".ll");
                 if(args['o'].set)
                     filepath = args['o'].value;
-                llvm_module.reset(new llvm::Module{filename, *llvm_context});
-                std::vector<llvm::Type*> main_param_types; //(1, llvm::Type::getInt32Ty(*llvm_context));
-                auto                     main_return_type = llvm::FunctionType::get(llvm::Type::getInt32Ty(*llvm_context), main_param_types, false);
-                auto                     main_function = llvm::Function::Create(main_return_type, llvm::Function::ExternalLinkage, "main", llvm_module.get());
-                auto*                    mainblock = llvm::BasicBlock::Create(*llvm_context, "entrypoint", main_function);
-                llvm_ir_builder.SetInsertPoint(mainblock);
-                auto result = codegen(*ast);
+                Module new_module{filename, llvm_context.get()};
+                auto   result = new_module.codegen(*ast);
                 if(!result) {
                     error("LLVM Codegen returned nullptr.\n");
                     return 1;
                 }
 
                 // TODO: Remove
-                llvm_module->dump();
-                if(llvm::verifyModule(*llvm_module, &llvm::errs())) {
+                new_module.get_llvm_module().dump();
+                if(llvm::verifyModule(new_module.get_llvm_module(), &llvm::errs())) {
                     error("Errors in LLVM Module, exiting...\n");
                     return 1;
                 }
@@ -356,7 +108,7 @@ int main(int argc, char* argv[]) {
                 std::error_code err;
                 auto            file = llvm::raw_fd_ostream(filepath.string(), err);
                 if(!err)
-                    llvm_module->print(file, nullptr);
+                    new_module.get_llvm_module().print(file, nullptr);
                 else {
                     error("Error opening '{}': {}\n", filepath.string(), err);
                     return 1;
@@ -364,7 +116,7 @@ int main(int argc, char* argv[]) {
 
                 // Quick Test JIT (TODO: Remove)
                 lang::LLVMJIT jit;
-                auto          return_value = jit.run(std::move(llvm_module), std::move(llvm_context));
+                auto          return_value = jit.run(std::move(new_module.get_llvm_module_ptr()), std::move(llvm_context));
                 success("JIT main function returned '{}'\n", return_value);
             }
         }
