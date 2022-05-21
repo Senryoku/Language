@@ -49,12 +49,12 @@ int main(int argc, char* argv[]) {
 
     auto handle_file = [&]() {
         auto           filename = args.get_default_arg();
-        std ::ifstream file(filename);
-        if(!file) {
+        std ::ifstream input_file(filename);
+        if(!input_file) {
             error("Couldn't open file '{}' (Running from {}).\n", filename, std::filesystem::current_path().string());
             return 1;
         }
-        std::string source{(std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>()};
+        std::string source{(std::istreambuf_iterator<char>(input_file)), std::istreambuf_iterator<char>()};
 
         std::vector<Tokenizer::Token> tokens;
         Tokenizer                     tokenizer(source);
