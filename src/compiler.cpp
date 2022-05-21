@@ -10,17 +10,20 @@
 #include <fmt/chrono.h>
 #include <fmt/os.h>
 
-#include <Module.hpp>
 #include <Parser.hpp>
 #include <Tokenizer.hpp>
 #include <asm/wasm.hpp>
+#include <compiler/Module.hpp>
 #include <utils/CLIArg.hpp>
 
 #include <het_unordered_map.hpp>
 
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/LLVMContext.h>
+#include <llvm/IR/LegacyPassManager.h>
 #include <llvm/IR/Verifier.h>
+#include <llvm/MC/TargetRegistry.h>
+#include <llvm/Support/Host.h>
 
 #include <jit/LLVMJIT.hpp>
 
@@ -87,9 +90,9 @@ int main(int argc, char* argv[]) {
             if(args['s'].set)
                 generate_wasm_s_expression(*ast);
             if(args['i'].set) {
-                auto filepath = std::filesystem::path(filename).stem().append(".ll");
+                auto ir_filepath = std::filesystem::path(filename).stem().replace_extension(".ll");
                 if(args['o'].set)
-                    filepath = args['o'].value;
+                    ir_filepath = args['o'].value;
                 Module new_module{filename, llvm_context.get()};
                 auto   result = new_module.codegen(*ast);
                 if(!result) {
@@ -106,18 +109,63 @@ int main(int argc, char* argv[]) {
 
                 // Output text IR to output file
                 std::error_code err;
-                auto            file = llvm::raw_fd_ostream(filepath.string(), err);
+                auto            file = llvm::raw_fd_ostream(ir_filepath.string(), err);
                 if(!err)
                     new_module.get_llvm_module().print(file, nullptr);
                 else {
-                    error("Error opening '{}': {}\n", filepath.string(), err);
+                    error("Error opening '{}': {}\n", ir_filepath.string(), err);
                     return 1;
                 }
 
+#if 1
+                auto target_triple = llvm::sys::getDefaultTargetTriple();
+                llvm::InitializeNativeTarget();
+                llvm::InitializeNativeTargetAsmParser();
+                llvm::InitializeNativeTargetAsmPrinter();
+                std::string error_str;
+                auto        target = llvm::TargetRegistry::lookupTarget(target_triple, error_str);
+                if(!target) {
+                    error("Could not lookup target: {}.\n", error_str);
+                    return 1;
+                }
+                auto cpu = "generic";
+                auto features = "";
+
+                llvm::TargetOptions opt;
+                auto                reloc_model = llvm::Optional<llvm::Reloc::Model>();
+                auto                target_machine = target->createTargetMachine(target_triple, cpu, features, opt, reloc_model);
+
+                new_module.get_llvm_module().setDataLayout(target_machine->createDataLayout());
+                new_module.get_llvm_module().setTargetTriple(target_triple);
+
+                auto o_filepath = std::filesystem::path(filename).stem().replace_extension(".o");
+                // if(args['o'].set)
+                //     o_filepath = args['o'].value;
+                std::error_code      error_code;
+                llvm::raw_fd_ostream dest(o_filepath.string(), error_code, llvm::sys::fs::OF_None);
+
+                if(error_code) {
+                    error("Could not open file '{}': {}.\n", o_filepath.string(), error_code.message());
+                    return 1;
+                }
+
+                llvm::legacy::PassManager pass;
+                auto                      file_type = llvm::CGFT_ObjectFile;
+
+                if(target_machine->addPassesToEmitFile(pass, dest, nullptr, file_type)) {
+                    error("Target Machine can't emit a file of this type.\n");
+                    return 1;
+                }
+
+                pass.run(new_module.get_llvm_module());
+                dest.flush();
+                success("Wrote object file '{}'.\n", o_filepath.string());
+#else
                 // Quick Test JIT (TODO: Remove)
                 lang::LLVMJIT jit;
                 auto          return_value = jit.run(std::move(new_module.get_llvm_module_ptr()), std::move(llvm_context));
                 success("JIT main function returned '{}'\n", return_value);
+#endif
             }
         }
         return 0;

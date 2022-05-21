@@ -30,7 +30,7 @@ file(GLOB HEADERS src/**/*.hpp)
 
 add_library(langlib STATIC ${SOURCES} ${HEADERS})
 
-add_executable(compiler ${HEADERS} src/compiler.cpp)
+add_executable(compiler ${HEADERS} src/compiler.cpp src/compiler/Module.cpp)
 add_executable(repl ${HEADERS} src/repl.cpp)
 add_executable(tester ${TEST_FILES} ${HEADERS} test/main.cpp)
 
