@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.22)
+cmake_minimum_required(VERSION 3.23)
 project(Lang)
 
 enable_testing()
@@ -52,7 +52,7 @@ set_property(TARGET tester PROPERTY VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURC
 
 # Use included version of FMT
 add_subdirectory("./ext/fmt-8.1.1")
-include_directories("ext/fmt-8.1.1/include")
+include_directories(SYSTEM "ext/fmt-8.1.1/include")
 target_link_libraries(compiler fmt::fmt)
 target_link_libraries(repl fmt::fmt)
 target_link_libraries(tester fmt::fmt)
@@ -61,7 +61,6 @@ target_link_libraries(assembler_test fmt::fmt)
 find_package(LLVM REQUIRED CONFIG)
 message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
 message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
-include_directories(${LLVM_INCLUDE_DIRS})
 separate_arguments(LLVM_DEFINITIONS_LIST NATIVE_COMMAND ${LLVM_DEFINITIONS})
 add_definitions(${LLVM_DEFINITIONS_LIST})
 llvm_map_components_to_libnames(llvm_libs support core irreader orcjit support native)
@@ -69,6 +68,7 @@ foreach(target ${LLVM_TARGETS_TO_BUILD})
   list(APPEND targets "LLVM${target}CodeGen")
 endforeach()
 
+target_include_directories(compiler SYSTEM PRIVATE ${LLVM_INCLUDE_DIRS})
 target_link_libraries(compiler ${llvm_libs} ${targets})
 
 # Get GTest online
