@@ -28,12 +28,21 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
+    
+    - name: Cache LLVM
+      id: cache-llvm
+      uses: actions/cache@v3
+      with:
+        path: llvm-14.0.0.src
+        key: ${{ runner.os }}-llvm
 
     - name: Download LLVM
+      if: steps.cache-llvm.outputs.cache-hit != 'true'
       id: download-llvm
       run: Invoke-WebRequest -Uri https://github.com/llvm/llvm-project/releases/download/llvmorg-14.0.0/llvm-14.0.0.src.tar.xz -OutFile llvm-14.0.0.src.tar.xz
 
     - name: Build & Install LLVM
+      if: steps.cache-llvm.outputs.cache-hit != 'true'
       id: build-install-llvm
       run: |
         tar -xvzf .\llvm-14.0.0.src.tar.xz
