@@ -3,10 +3,10 @@ function double(int k) {
 }
 
 int i = 2 * 2 + 5;
-int j = 0; 
+float j = 0.0; 
 while(i > 0) {
-	j = j + double(i);
+	j = 0.5 * j + double(i);
 	i = i - 1;
 }
-return j;
-	
+
+return double(i);

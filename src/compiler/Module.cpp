@@ -114,20 +114,42 @@ llvm::Value* Module::codegen(const AST::Node* node) {
             if(!lhs || !rhs)
                 return nullptr;
             if(node->token.value == "+") {
-                if(node->value.type == GenericValue::Type::Integer)
-                    return _llvm_ir_builder.CreateAdd(lhs, rhs, "addtmp");
-                else
-                    return _llvm_ir_builder.CreateFAdd(lhs, rhs, "addftmp");
+                switch(node->value.type) {
+                    case GenericValue::Type::Integer: return _llvm_ir_builder.CreateAdd(lhs, rhs, "addtmp");
+                    case GenericValue::Type::Float: {
+                        // TODO: Temp, tidy up.
+                        if(lhs->getType() == llvm::Type::getInt32Ty(*_llvm_context)) {
+                            assert(rhs->getType() != llvm::Type::getInt32Ty(*_llvm_context));
+                            lhs = _llvm_ir_builder.CreateSIToFP(lhs, llvm::Type::getFloatTy(*_llvm_context), "conv");
+                        } else if(rhs->getType() == llvm::Type::getInt32Ty(*_llvm_context)) {
+                            assert(lhs->getType() != llvm::Type::getInt32Ty(*_llvm_context));
+                            rhs = _llvm_ir_builder.CreateSIToFP(rhs, llvm::Type::getFloatTy(*_llvm_context), "conv");
+                        }
+                        return _llvm_ir_builder.CreateFAdd(lhs, rhs, "addftmp");
+                    }
+                    default: error("LLVM::Codegen: Binary operator '{}' does not support type '{}'.", node->token.value, node->value.type); return nullptr;
+                }
             } else if(node->token.value == "-") {
                 if(node->value.type == GenericValue::Type::Integer)
                     return _llvm_ir_builder.CreateSub(lhs, rhs, "subtmp");
                 else
                     return _llvm_ir_builder.CreateFSub(lhs, rhs, "subftmp");
             } else if(node->token.value == "*") {
-                if(node->value.type == GenericValue::Type::Integer)
-                    return _llvm_ir_builder.CreateMul(lhs, rhs, "multmp");
-                else
-                    return _llvm_ir_builder.CreateFMul(lhs, rhs, "mulftmp");
+                switch(node->value.type) {
+                    case GenericValue::Type::Integer: return _llvm_ir_builder.CreateMul(lhs, rhs, "multmp");
+                    case GenericValue::Type::Float: {
+                        // TODO: Temp, tidy up.
+                        if(lhs->getType() == llvm::Type::getInt32Ty(*_llvm_context)) {
+                            assert(rhs->getType() != llvm::Type::getInt32Ty(*_llvm_context));
+                            lhs = _llvm_ir_builder.CreateSIToFP(lhs, llvm::Type::getFloatTy(*_llvm_context), "conv");
+                        } else if(rhs->getType() == llvm::Type::getInt32Ty(*_llvm_context)) {
+                            assert(lhs->getType() != llvm::Type::getInt32Ty(*_llvm_context));
+                            rhs = _llvm_ir_builder.CreateSIToFP(rhs, llvm::Type::getFloatTy(*_llvm_context), "conv");
+                        }
+                        return _llvm_ir_builder.CreateFMul(lhs, rhs, "mulftmp");
+                    }
+                    default: error("LLVM::Codegen: Binary operator '{}' does not support type '{}'.", node->token.value, node->value.type); return nullptr;
+                }
             } else if(node->token.value == "/") {
                 auto div = _llvm_ir_builder.CreateFDiv(lhs, rhs, "divftmp");
                 if(node->value.type == GenericValue::Type::Integer)
@@ -150,6 +172,14 @@ llvm::Value* Module::codegen(const AST::Node* node) {
             } else if(node->token.value == "=") {
                 assert(node->children[0]->type == AST::Node::Type::Variable); // FIXME
                 auto variable = get(node->children[0]->token.value);
+                // FIXME
+                if(variable->getAllocatedType() != rhs->getType()) {
+                    if(variable->getAllocatedType() == llvm::Type::getInt32Ty(*_llvm_context) && rhs->getType() == llvm::Type::getFloatTy(*_llvm_context)) {
+                        rhs = _llvm_ir_builder.CreateFPToSI(rhs, llvm::Type::getFloatTy(*_llvm_context), "conv");
+                    } else {
+                        error("LLVM::Codegen: No automatic conversion from ... to ... .\n");
+                    }
+                }
                 _llvm_ir_builder.CreateStore(rhs, variable);
                 return rhs;
             }

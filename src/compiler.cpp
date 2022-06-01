@@ -117,7 +117,7 @@ int main(int argc, char* argv[]) {
                     return 1;
                 }
 
-#if 1
+#if 0
                 auto target_triple = llvm::sys::getDefaultTargetTriple();
                 llvm::InitializeNativeTarget();
                 llvm::InitializeNativeTargetAsmParser();
