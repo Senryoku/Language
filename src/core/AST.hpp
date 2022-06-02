@@ -26,6 +26,7 @@ class AST {
             FunctionDeclaration,
             FunctionCall,
             BuiltInFunctionDeclaration,
+            Cast,
             // BuiltInFunctionCall,
             ConstantValue,
             UnaryOperator,
@@ -205,6 +206,7 @@ struct fmt::formatter<AST::Node::Type> {
             case AST::Node::Type::FunctionDeclaration: return fmt::format_to(ctx.out(), fg(fmt::color::light_yellow), "{}", "FunctionDeclaration");
             case AST::Node::Type::FunctionCall: return fmt::format_to(ctx.out(), fg(fmt::color::light_yellow), "{}", "FunctionCall");
             case AST::Node::Type::Variable: return fmt::format_to(ctx.out(), fg(fmt::color::light_blue), "{}", "Variable");
+            case AST::Node::Type::Cast: return fmt::format_to(ctx.out(), "{}", "Cast");
             case AST::Node::Type::ConstantValue: return fmt::format_to(ctx.out(), "{}", "ConstantValue");
             case AST::Node::Type::UnaryOperator: return fmt::format_to(ctx.out(), "{}", "UnaryOperator");
             case AST::Node::Type::BinaryOperator: return fmt::format_to(ctx.out(), "{}", "BinaryOperator");

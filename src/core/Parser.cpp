@@ -485,6 +485,26 @@ bool Parser::parse_operator(const std::span<Tokenizer::Token>& tokens, std::span
     }
 
     resolve_operator_type(binaryOperatorNode);
+    if(binaryOperatorNode->value.type == GenericValue::Type::Float) {
+        if(binaryOperatorNode->children[0]->value.type == GenericValue::Type::Integer) {
+            auto castNode = new AST::Node(AST::Node::Type::Cast);
+            castNode->value.type = GenericValue::Type::Float;
+            castNode->parent = binaryOperatorNode;
+            auto lhs = binaryOperatorNode->children[0];
+            lhs->parent = nullptr;
+            castNode->add_child(lhs);
+            binaryOperatorNode->children[0] = castNode;
+        }
+        if(binaryOperatorNode->children[1]->value.type == GenericValue::Type::Integer) {
+            auto castNode = new AST::Node(AST::Node::Type::Cast);
+            castNode->value.type = GenericValue::Type::Float;
+            castNode->parent = binaryOperatorNode;
+            auto rhs = binaryOperatorNode->children[1];
+            rhs->parent = nullptr;
+            castNode->add_child(rhs);
+            binaryOperatorNode->children[1] = castNode;
+        }
+    }
     return true;
 }
 

@@ -28,6 +28,16 @@ llvm::Value* Module::codegen(const AST::Node* node) {
             return ret;
         }
         case AST::Node::Type::ConstantValue: return codegen(node->value);
+        case AST::Node::Type::Cast: {
+            assert(node->children.size() == 1);
+            auto&& child = codegen(node->children[0]);
+            if(child)
+                return nullptr;
+            switch(node->value.type) {
+                case GenericValue::Type::Float: return _llvm_ir_builder.CreateSIToFP(child, llvm::Type::getFloatTy(*_llvm_context), "conv");
+                default: error("LLVM::Codegen: Cast to {} not supported.", node->value.type); return nullptr;
+            }
+        }
         case AST::Node::Type::FunctionDeclaration: {
             auto function_name = std::string{node->token.value};
             auto prev_function = _llvm_module->getFunction(function_name);
