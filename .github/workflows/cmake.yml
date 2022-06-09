@@ -29,28 +29,19 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     
-    - name: Cache LLVM
+    - name: Cache LLVM and Clang
       id: cache-llvm
-      uses: actions/cache@v3
+      uses: actions/cache@v2
       with:
-        path: llvm-14.0.0.src
-        key: ${{ runner.os }}-llvm
-
-    - name: Download LLVM
-      if: steps.cache-llvm.outputs.cache-hit != 'true'
-      id: download-llvm
-      run: Invoke-WebRequest -Uri https://github.com/llvm/llvm-project/releases/download/llvmorg-14.0.0/llvm-14.0.0.src.tar.xz -OutFile llvm-14.0.0.src.tar.xz
-
-    - name: Build & Install LLVM
-      if: steps.cache-llvm.outputs.cache-hit != 'true'
-      id: build-install-llvm
-      run: |
-        tar -xvzf .\llvm-14.0.0.src.tar.xz
-        cd llvm-14.0.0.src
-        mkdir build
-        cd build
-        cmake .. -DLLVM_INCLUDE_BENCHMARKS=OFF
-        cmake --build . --target install
+        path: |
+          C:/Program Files/LLVM
+          ./llvm
+        key: llvm-14.0.0
+    - name: Install LLVM and Clang
+      uses: KyleMayes/install-llvm-action@v1.5.3
+      with:
+        version: "14.0.0"
+        cached: ${{ steps.cache-llvm.outputs.cache-hit }}
 
     - name: Select GCC
       if: matrix.gcc
@@ -68,7 +59,7 @@ jobs:
     - name: Configure CMake
       # Configure CMake in a 'build' subdirectory. `CMAKE_BUILD_TYPE` is only required if you are using a single-configuration generator such as make.
       # See https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html?highlight=cmake_build_type
-      run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DLLVM_DIR="${{ env.LLVM_PATH }}/lib/cmake/llvm"
+      run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
 
     - name: Build
       # Build your program with the given configuration
