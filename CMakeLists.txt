@@ -15,7 +15,6 @@ set(Lang_VERSION_MAJOR 0)
 include_directories("${CMAKE_SOURCE_DIR}/src")
 include_directories("${CMAKE_SOURCE_DIR}/src/core")
 include_directories("${CMAKE_SOURCE_DIR}/src/utils")
-include_directories("${CMAKE_SOURCE_DIR}/ext")
 
 if (MSVC)
     add_compile_options(/W4 /utf-8)
@@ -44,7 +43,9 @@ set_property(TARGET tester PROPERTY VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURC
 
 # Use included version of FMT
 add_subdirectory("./ext/fmt-8.1.1")
-include_directories(SYSTEM "ext/fmt-8.1.1/include")
+target_include_directories(langlib SYSTEM PRIVATE "ext/fmt-8.1.1/include")
+target_include_directories(repl SYSTEM PRIVATE "ext/fmt-8.1.1/include")
+target_include_directories(tester SYSTEM PRIVATE "ext/fmt-8.1.1/include")
 target_link_libraries(repl fmt::fmt)
 target_link_libraries(tester fmt::fmt)
 
@@ -60,10 +61,12 @@ if(DEFINED LLVM_PACKAGE_VERSION)
     endforeach()
     
     add_executable(compiler ${HEADERS} src/compiler.cpp src/compiler/Module.cpp)
-    target_link_libraries(compiler langlib)
     set_property(TARGET compiler PROPERTY CXX_STANDARD 20)
-    target_link_libraries(compiler fmt::fmt)
+    target_include_directories(compiler SYSTEM PRIVATE "${CMAKE_SOURCE_DIR}/ext")
+    target_include_directories(compiler SYSTEM PRIVATE "ext/fmt-8.1.1/include")
     target_include_directories(compiler SYSTEM PRIVATE ${LLVM_INCLUDE_DIRS})
+    target_link_libraries(compiler langlib)
+    target_link_libraries(compiler fmt::fmt)
     target_link_libraries(compiler ${llvm_libs} ${targets})
 else()
     message(STATUS "Could not find LLVM, skipping compiler.")
