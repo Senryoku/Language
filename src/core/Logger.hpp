@@ -23,6 +23,11 @@ inline void error(Args&&... args) {
 }
 
 template<typename... Args>
+inline void info(Args&&... args) {
+    fmt::print(fg(fmt::color::light_blue), std::forward<Args>(args)...);
+}
+
+template<typename... Args>
 inline void warn(Args&&... args) {
     fmt::print(fg(fmt::color::yellow), std::forward<Args>(args)...);
 }

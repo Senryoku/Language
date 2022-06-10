@@ -17,6 +17,8 @@
 #include <windows.h>
 #endif
 
+#include "Prompt.hpp"
+
 int main(int argc, char* argv[]) {
 #ifdef WIN32
     SetConsoleTitle(_T("Lang REPL"));
@@ -37,6 +39,8 @@ int main(int argc, char* argv[]) {
     Parser                        parser;
     Interpreter                   interpreter;
     std::string                   input;
+
+    Prompt prompt;
 
     auto load = [&](const auto& path) {
         std::ifstream file(path);
@@ -72,14 +76,9 @@ int main(int argc, char* argv[]) {
         load(args.get_default_arg());
     }
 
-    lines.reserve(64 * 1024); // FIXME: Tokens are referencing these strings, this a workaround to avoid reallocation of the vector, which would be fatal :)
+    lines.reserve(64 * 1024); // FIXME: Tokens are referencing these strings, this is a workaround to avoid reallocation of the vector, which would be fatal :)
     do {
-        std::cout << " > ";
-        getline(std::cin, input);
-        if(std::cin.fail() || std::cin.eof()) {
-            std::cin.clear();
-            return 0;
-        }
+        input = prompt.get_line();
 
         if(input == "q") {
             break;
@@ -122,21 +121,23 @@ int main(int argc, char* argv[]) {
 
             Tokenizer tokenizer(line);
             auto      first = tokens.size();
-            while(tokenizer.has_more())
-                tokens.push_back(tokenizer.consume());
+            try {
+                while(tokenizer.has_more())
+                    tokens.push_back(tokenizer.consume());
 
-            auto newNode = parser.parse(std::span<Tokenizer::Token>{tokens.begin() + first, tokens.end()}, ast);
-            if(newNode) {
-                log.group();
-                log.print("Executing ({}) using Interpreter...\n", newNode->type);
-                auto clock = std::chrono::steady_clock();
-                auto start = clock.now();
-                interpreter.execute(*newNode);
-                auto end = clock.now();
-                log.print("Done in {}ms, returned: '{}'.\n", std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count(), interpreter.get_return_value());
+                auto newNode = parser.parse(std::span<Tokenizer::Token>{tokens.begin() + first, tokens.end()}, ast);
+                if(newNode) {
+                    log.group();
+                    log.print("Executing ({}) using Interpreter...\n", newNode->type);
+                    auto clock = std::chrono::steady_clock();
+                    auto start = clock.now();
+                    interpreter.execute(*newNode);
+                    auto end = clock.now();
+                    log.print("Done in {}ms, returned: '{}'.\n", std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count(), interpreter.get_return_value());
+                    log.end();
+                }
                 log.end();
-            }
-            log.end();
+            } catch(const Exception& e) { e.display(); }
         }
     } while(true);
 }
