@@ -25,104 +25,110 @@ Tokenizer::Token Tokenizer::search_next() {
 
     // FIXME: Should be more specific
     if(!is_allowed_in_identifiers(first_char)) {
-        if(first_char == ',') {
-            advance();
-            type = Token::Type::Control;
-        } else if(first_char == '\'') {
-            advance();
-            type = Token::Type::CharLiteral;
-            if(peek() == '\\') { // Escaped character
+        switch(first_char) {
+            case '\'': {
                 advance();
-                size_t c = 0;
-                switch(peek()) {
-                    case '\'': c = 1; break;
-                    case '"': c = 2; break;
-                    case '?': c = 3; break;
-                    case '\\': c = 4; break;
-                    case 'a': c = 4; break;
-                    case 'b': c = 5; break;
-                    case 'f': c = 6; break;
-                    case 'n': c = 7; break;
-                    case 'r': c = 8; break;
-                    case 't': c = 9; break;
-                    case 'v': c = 10; break;
-                    default: throw Exception(fmt::format("[Tokenizer] Unknown escape sequence \\'{}'.", peek()), point_error(_current_pos, _current_line, begin));
-                }
-                advance();
-                advance();
-                return Token{type, std::string_view{escaped_char + c, escaped_char + c + 1}, _current_line};
-            } else {
-                advance();
-                advance();
-                if(eof()) {
-                    throw Exception(fmt::format("[Tokenizer] Reached end of file without matching ' on line {}.", _current_line),
-                                    point_error(begin, _current_line, begin, _source.length() - 1));
-                }
-                return Token{type, std::string_view{_source.begin() + begin + 1, _source.begin() + (_current_pos - 1)}, _current_line};
-            }
-        } else if(first_char == '"') {
-            advance(); // Skip '"'
-            while(!eof() && peek() != '"')
-                advance();
-            if(eof()) {
-                throw Exception(fmt::format("[Tokenizer] Reached end of file without matching \" on line {}.", _current_line),
-                                point_error(begin, _current_line, begin, _source.length() - 1));
-            }
-            advance(); // Skip '"'
-            type = Token::Type::StringLiteral;
-            return Token{type, std::string_view{_source.begin() + begin + 1, _source.begin() + (_current_pos - 1)}, _current_line};
-        } else if(is(first_char, control_characters)) {
-            advance();
-            type = Token::Type::Control;
-        } else if(is_digit(first_char)) {
-            bool found_decimal_separator = false;
-            while(!eof() && (is_digit(peek()) || peek() == '.')) {
-                if(peek() == '.') {
-                    if(found_decimal_separator) {
-                        throw Exception(fmt::format("Usupernumerary '.' in float constant on line {}.", _current_line), point_error(_current_pos, _current_line, begin));
+                type = Token::Type::CharLiteral;
+                if(peek() == '\\') { // Escaped character
+                    advance();
+                    size_t c = 0;
+                    switch(peek()) {
+                        case '\'': c = 1; break;
+                        case '"': c = 2; break;
+                        case '?': c = 3; break;
+                        case '\\': c = 4; break;
+                        case 'a': c = 4; break;
+                        case 'b': c = 5; break;
+                        case 'f': c = 6; break;
+                        case 'n': c = 7; break;
+                        case 'r': c = 8; break;
+                        case 't': c = 9; break;
+                        case 'v': c = 10; break;
+                        default: throw Exception(fmt::format("[Tokenizer] Unknown escape sequence \\'{}'.", peek()), point_error(_current_pos, _current_line, begin));
                     }
-                    found_decimal_separator = true;
+                    advance();
+                    advance();
+                    return Token{type, std::string_view{escaped_char + c, escaped_char + c + 1}, _current_line, _current_column};
+                } else {
+                    advance();
+                    advance();
+                    if(eof()) {
+                        throw Exception(fmt::format("[Tokenizer] Reached end of file without matching ' on line {}.", _current_line),
+                                        point_error(begin, _current_line, begin, _source.length() - 1));
+                    }
+                    return Token{type, std::string_view{_source.begin() + begin + 1, _source.begin() + (_current_pos - 1)}, _current_line, _current_column};
                 }
-                advance();
+                break;
             }
-            if(found_decimal_separator)
-                type = Token::Type::Float;
-            else
-                type = Token::Type::Digits;
-        } else {
-            if(first_char == '/' && _current_pos + 1 < _source.length() && _source[_current_pos + 1] == '/') {
-                type = Token::Type::Comment;
-                while(!eof() && peek() != '\n')
+            case '"': {
+                advance();                     // Skip '"'
+                while(!eof() && peek() != '"') // TODO: Handle escaped "
                     advance();
-            } else {
-                type = Token::Type::Operator;
-                auto temp_cursor = _current_pos;
-                // Operators
-                // FIXME (Better solution than is_allowed_in_operators?)
-                while(!eof() && !is_discardable(peek()) && is_allowed_in_operators(peek()))
-                    ++temp_cursor;
-                const auto end = temp_cursor;
-                while(temp_cursor != begin && !operators.contains(std::string_view{_source.begin() + begin, _source.begin() + temp_cursor}))
-                    --temp_cursor;
-                if(temp_cursor == begin)
-                    throw Exception(fmt::format("Error: No matching operator for '{}'.", std::string_view{_source.begin() + begin, _source.begin() + end}),
-                                    point_error(temp_cursor, _current_line, begin, end));
-                // Sync our cursor with the temp one.
-                while(_current_pos != temp_cursor)
-                    advance();
+                if(eof())
+                    throw Exception(fmt::format("[Tokenizer] Reached end of file without matching \" on line {}.", _current_line),
+                                    point_error(begin, _current_line, begin, _source.length() - 1));
+                advance(); // Skip '"'
+                type = Token::Type::StringLiteral;
+                return Token{type, std::string_view{_source.begin() + begin + 1, _source.begin() + (_current_pos - 1)}, _current_line, _current_column};
+            }
+            case ',': [[fallthrough]];
+            case '{': [[fallthrough]];
+            case '}': {
+                advance();
+                type = Token::Type::Control;
+                break;
+            }
+            case '/':
+                // Comments, check for a second /, fallthrough to the general case if not found.
+                if(_current_pos + 1 < _source.length() && _source[_current_pos + 1] == '/') {
+                    type = Token::Type::Comment;
+                    while(!eof() && peek() != '\n')
+                        advance();
+                    break;
+                }
+                [[fallthrough]];
+            default: {
+                if(is_digit(first_char)) {
+                    bool found_decimal_separator = false;
+                    while(!eof() && (is_digit(peek()) || peek() == '.')) {
+                        if(peek() == '.') {
+                            if(found_decimal_separator)
+                                throw Exception(fmt::format("Usupernumerary '.' in float constant on line {}.", _current_line), point_error(_current_pos, _current_line, begin));
+                            found_decimal_separator = true;
+                        }
+                        advance();
+                    }
+                    type = found_decimal_separator ? Token::Type::Float : Token::Type::Digits;
+                } else {
+                    type = Token::Type::Operator;
+                    auto temp_cursor = _current_pos;
+                    // Operators
+                    // FIXME (Better solution than is_allowed_in_operators?)
+                    while(!eof() && !is_discardable(peek()) && is_allowed_in_operators(peek()))
+                        ++temp_cursor;
+                    const auto end = temp_cursor;
+                    while(temp_cursor != begin && !operators.contains(std::string_view{_source.begin() + begin, _source.begin() + temp_cursor}))
+                        --temp_cursor;
+                    if(temp_cursor == begin)
+                        throw Exception(fmt::format("Error: No matching operator for '{}'.", std::string_view{_source.begin() + begin, _source.begin() + end}),
+                                        point_error(temp_cursor, _current_line, begin, end));
+                    // Sync our cursor with the temp one.
+                    while(_current_pos != temp_cursor)
+                        advance();
+                }
             }
         }
     } else {
-        while(is_allowed_in_identifiers(peek()) && !eof())
+        while((is_allowed_in_identifiers(peek()) || is_digit(peek())) && !eof())
             advance();
 
         const std::string_view str{_source.begin() + begin, _source.begin() + _current_pos};
-        if(keywords.contains(str))
-            type = keywords.find(str)->second;
+        if(auto it = keywords.find(str); it != keywords.end())
+            type = it->second;
         else
             type = Token::Type::Identifier;
     }
-    return Token{type, std::string_view{_source.begin() + begin, _source.begin() + _current_pos}, _current_line};
+    return Token{type, std::string_view{_source.begin() + begin, _source.begin() + _current_pos}, _current_line, _current_column};
 }
 
 std::string Tokenizer::point_error(size_t at, size_t line, int from, int to) const noexcept {

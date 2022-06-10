@@ -56,7 +56,7 @@ class Tokenizer {
 
         Token() = default;
 
-        Token(Type type, const std::string_view val, size_t line) : type(type), value(val), line(line) {}
+        Token(Type type, const std::string_view val, size_t line, size_t column) : type(type), value(val), line(line), column(column) {}
 
         Type             type = Type::Unknown;
         std::string_view value;
@@ -90,13 +90,15 @@ class Tokenizer {
     void newline() noexcept;
     void skip_whitespace() noexcept;
 
-    template<size_t N>
-    static bool is(char c, std::array<char, N> arr) {
-        for(const auto& s : arr)
-            if(s == c)
-                return true;
-        return false;
-    }
+    Token search_next();
+
+    // Display a hint to the origin of an error.
+    std::string point_error(size_t at, size_t line, int from = -1, int to = -1) const noexcept;
+
+    static constexpr std::string_view control_chars = ";{}";
+    static constexpr std::string_view operators_chars = "=*/+-^!<>&|%()[]";
+
+    static inline bool                   is_allowed_in_operators(char c) { return operators_chars.find(c) != operators_chars.npos; }
     static constexpr std::array<char, 3> control_characters{';', '{', '}'};
     static constexpr char                escaped_char[] = {'?', '\'', '\"', '\?', '\a', '\b', '\f', '\n', '\r', '\t', '\v'};
 
@@ -108,22 +110,12 @@ class Tokenizer {
         {"]", Token::Type::Operator},
     };
 
-    // FIXME: This is a workaround, not a proper way to recognize operators :)
-    static inline bool is_allowed_in_operators(char c) {
-        return (c >= '*' && c <= '/') || (c >= '<' && c <= '>') || (c == '&' || c == '|' || c == '%' || c == '[' || c == ']' || c == '(' || c == ')');
-    }
-
     const het_unordered_map<Token::Type> keywords{
         {"function", Token::Type::Function}, {"return", Token::Type::Return},      {"if", Token::Type::If},           {"else", Token::Type::Else},
         {"while", Token::Type::While},       {"bool", Token::Type::BuiltInType},   {"int", Token::Type::BuiltInType}, {"float", Token::Type::BuiltInType},
         {"char", Token::Type::BuiltInType},  {"string", Token::Type::BuiltInType}, {"true", Token::Type::Boolean},    {"false", Token::Type::Boolean},
         {"const", Token::Type::Const},       {"import", Token::Type::Import},
     };
-
-    Token search_next();
-
-    // Display a hint to the origin of an error.
-    std::string point_error(size_t at, size_t line, int from = -1, int to = -1) const noexcept;
 
     const std::string& _source;
     size_t             _current_pos = 0;
