@@ -29,7 +29,8 @@ class Prompt {
     std::string syntax_highlight(const std::string& str);
 
   private:
-    void add_history(const std::string& str);
+    void                     add_history(const std::string& str);
+    std::vector<std::string> autocomplete(const std::string& str) const;
 
     std::deque<std::string> _history;
 

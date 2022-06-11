@@ -1,5 +1,6 @@
 #include "Prompt.hpp"
 
+#include <filesystem>
 #include <win_error.hpp>
 
 Prompt::Prompt() {
@@ -96,14 +97,40 @@ std::string Prompt::get_line() {
                                         --cursor;
                                     }
                                     break;
-                                case 0x09: // Tab
+                                case 0x09: { // Tab
+                                    // TODO: Autocomplete on the cursor and not exclusively at the end of the string.
+                                    auto candidates = autocomplete(current_line);
+                                    if(candidates.size() == 1) {
+                                        auto last_blank = current_line.find_last_of(" \""); // FIXME
+                                        if(last_blank != current_line.npos)
+                                            current_line = current_line.substr(0, last_blank + 1) + candidates[0];
+                                        else
+                                            current_line = candidates[0];
+                                        cursor = current_line.size();
+                                    } else {
+                                        CONSOLE_SCREEN_BUFFER_INFO console_info;
+                                        if(!GetConsoleScreenBufferInfo(_stdout_handle, &console_info))
+                                            win_error_exit("GetConsoleScreenBufferInfo");
+                                        if(candidates.empty()) {
+                                            fmt::print(fg(fmt::color::dark_gray), "\n\033[0JNo match found.");
+                                            // Try WriteConsoleOutput to avoid cursor movement here.
+                                        } else {
+                                            print("\n\033[0J");
+                                            for(auto&& candidate : candidates) {
+                                                fmt::print(fg(fmt::color::gray), "{}\t", candidate);
+                                            }
+                                        }
+                                        if(SetConsoleCursorPosition(_stdout_handle, console_info.dwCursorPosition) == 0)
+                                            win_error_exit("SetConsoleCursorPosition");
+                                    }
                                     break;
+                                }
                                 default:
                                     // FIXME: This is not a proper way to filter printable caracters (Modifier keys send a keypressed event for example)
                                     if(input_buffer[i].Event.KeyEvent.uChar.AsciiChar >= 0x20 && input_buffer[i].Event.KeyEvent.uChar.AsciiChar < 0x80) {
                                         current_line.insert(cursor, 1, input_buffer[i].Event.KeyEvent.uChar.AsciiChar);
                                         ++cursor;
-                                    } else {
+                                    } else if(input_buffer[i].Event.KeyEvent.uChar.AsciiChar >= 0x80) {
                                         std::cout << std::endl
                                                   << "Unhandled key event with virtual key code 0x" << std::hex << input_buffer[i].Event.KeyEvent.wVirtualKeyCode << std::endl;
                                     }
@@ -120,7 +147,9 @@ std::string Prompt::get_line() {
 
                 // \r           Back to the start of the line
                 // \033[0J      Clear to the end of the screen
-                print("\r\033[0J{}{}", prompt_str, syntax_highlight(current_line));
+                // \033[K      Clear to the end of the screen
+                // print("\r\033[0J{}{}", prompt_str, syntax_highlight(current_line));
+                print("\r\033[K{}{}", prompt_str, syntax_highlight(current_line));
                 CONSOLE_SCREEN_BUFFER_INFO console_info;
                 if(!GetConsoleScreenBufferInfo(_stdout_handle, &console_info))
                     win_error_exit("GetConsoleScreenBufferInfo");
@@ -165,4 +194,35 @@ void Prompt::add_history(const std::string& str) {
     _history.push_back(str);
     if(_history.size() > 100)
         _history.pop_front();
+}
+
+std::vector<std::string> Prompt::autocomplete(const std::string& str) const {
+    std::vector<std::string> ret;
+    try {
+        std::filesystem::path path = "./";
+
+        auto last_blank = str.find_last_of(" \"");
+        if(last_blank != str.npos)
+            path.append(str.substr(last_blank + 1, str.size()));
+        else
+            path.append(str);
+        /*
+        // Using the Tokenizer directly could be better, but it's not stable enough yet.
+        Tokenizer tokenizer(str);
+        if(tokenizer.has_more()) {
+            auto last_token = tokenizer.consume();
+            while(tokenizer.has_more())
+                last_token = tokenizer.consume();
+            path = last_token.value;
+        }
+        */
+        auto folder = path.parent_path();
+        auto name = path.filename().string();
+
+        for(const auto& entry : std::filesystem::directory_iterator(folder))
+            if(entry.path().filename().string().starts_with(name))
+                ret.push_back(entry.path().lexically_normal().string());
+
+    } catch(...) {}
+    return ret;
 }
