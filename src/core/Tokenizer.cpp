@@ -22,15 +22,21 @@ Tokenizer::Token Tokenizer::search_next() {
     auto type = Token::Type::Unknown;
     auto begin = _current_pos;
     auto first_char = peek();
+    advance();
 
     // FIXME: Should be more specific
     if(!is_allowed_in_identifiers(first_char)) {
         switch(first_char) {
             case '\'': {
-                advance();
                 type = Token::Type::CharLiteral;
+                if(eof())
+                    throw Exception(fmt::format("[Tokenizer] Reached end of file without matching ' on line {}.", _current_line),
+                                    point_error(begin, _current_line, begin, _source.length() - 1));
                 if(peek() == '\\') { // Escaped character
                     advance();
+                    if(eof())
+                        throw Exception(fmt::format("[Tokenizer] Expected escape sequence, got EOF on line {}.", _current_line),
+                                        point_error(begin, _current_line, begin, _source.length() - 1));
                     size_t c = 0;
                     switch(peek()) {
                         case '\'': c = 1; break;
@@ -47,21 +53,22 @@ Tokenizer::Token Tokenizer::search_next() {
                         default: throw Exception(fmt::format("[Tokenizer] Unknown escape sequence \\'{}'.", peek()), point_error(_current_pos, _current_line, begin));
                     }
                     advance();
-                    advance();
+                    if(eof() || peek() != '\'')
+                        throw Exception(fmt::format("[Tokenizer] Reached end of file without matching ' on line {}.", _current_line),
+                                        point_error(begin, _current_line, begin, _source.length() - 1));
+                    advance(); // Skip '
                     return Token{type, std::string_view{escaped_char + c, escaped_char + c + 1}, _current_line, _current_column};
                 } else {
                     advance();
-                    advance();
-                    if(eof()) {
+                    if(eof() || peek() != '\'')
                         throw Exception(fmt::format("[Tokenizer] Reached end of file without matching ' on line {}.", _current_line),
                                         point_error(begin, _current_line, begin, _source.length() - 1));
-                    }
+                    advance(); // Skip '
                     return Token{type, std::string_view{_source.begin() + begin + 1, _source.begin() + (_current_pos - 1)}, _current_line, _current_column};
                 }
                 break;
             }
             case '"': {
-                advance();                     // Skip '"'
                 while(!eof() && peek() != '"') // TODO: Handle escaped "
                     advance();
                 if(eof())
@@ -72,15 +79,15 @@ Tokenizer::Token Tokenizer::search_next() {
                 return Token{type, std::string_view{_source.begin() + begin + 1, _source.begin() + (_current_pos - 1)}, _current_line, _current_column};
             }
             case ',': [[fallthrough]];
+            case ';': [[fallthrough]];
             case '{': [[fallthrough]];
             case '}': {
-                advance();
                 type = Token::Type::Control;
                 break;
             }
             case '/':
-                // Comments, check for a second /, fallthrough to the general case if not found.
-                if(_current_pos + 1 < _source.length() && _source[_current_pos + 1] == '/') {
+                // Comments, checks for a second /, fallthrough to the general case if not found.
+                if(!eof() && peek() == '/') {
                     type = Token::Type::Comment;
                     while(!eof() && peek() != '\n')
                         advance();
@@ -104,7 +111,7 @@ Tokenizer::Token Tokenizer::search_next() {
                     auto temp_cursor = _current_pos;
                     // Operators
                     // FIXME (Better solution than is_allowed_in_operators?)
-                    while(!eof() && !is_discardable(peek()) && is_allowed_in_operators(peek()))
+                    while(!eof() && !is_discardable(_source[temp_cursor]) && is_allowed_in_operators(_source[temp_cursor]))
                         ++temp_cursor;
                     const auto end = temp_cursor;
                     while(temp_cursor != begin && !operators.contains(std::string_view{_source.begin() + begin, _source.begin() + temp_cursor}))
@@ -119,7 +126,7 @@ Tokenizer::Token Tokenizer::search_next() {
             }
         }
     } else {
-        while((is_allowed_in_identifiers(peek()) || is_digit(peek())) && !eof())
+        while(!eof() && (is_allowed_in_identifiers(peek()) || is_digit(peek())))
             advance();
 
         const std::string_view str{_source.begin() + begin, _source.begin() + _current_pos};

@@ -6,8 +6,6 @@
 #include <Logger.hpp>
 #include <Tokenizer.hpp>
 
-namespace TokenizerTests {
-
 #define TOKENIZE(code)                               \
     std::string                   source{code};      \
     std::vector<Tokenizer::Token> tokens;            \
@@ -34,5 +32,3 @@ TEST(Tokenizer, Assignment) {
     EXPECT_EQ(tokens[3].type, Tokenizer::Token::Type::Digits);
     EXPECT_EQ(tokens[4].type, Tokenizer::Token::Type::Control);
 }
-
-} // namespace TokenizerTests

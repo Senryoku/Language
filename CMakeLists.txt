@@ -29,7 +29,7 @@ file(GLOB HEADERS src/**/*.hpp)
 
 add_library(langlib STATIC ${SOURCES} ${HEADERS})
 
-add_executable(repl ${HEADERS} src/repl.cpp)
+add_executable(repl ${HEADERS} src/repl.cpp src/repl/Prompt.cpp)
 add_executable(tester ${TEST_FILES} ${HEADERS} test/main.cpp)
 
 target_link_libraries(repl langlib)
@@ -40,6 +40,8 @@ set_property(TARGET repl PROPERTY CXX_STANDARD 20)
 set_property(TARGET tester PROPERTY CXX_STANDARD 20)
 
 set_property(TARGET tester PROPERTY VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/test")
+
+target_include_directories(repl PRIVATE "${CMAKE_SOURCE_DIR}/src/repl")
 
 # Use included version of FMT
 add_subdirectory("./ext/fmt-8.1.1")

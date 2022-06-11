@@ -83,7 +83,7 @@ class Tokenizer {
     inline bool is_digit(char c) const noexcept { return c >= '0' && c <= '9'; }
     bool        is_newline(char c) const noexcept { return c == '\n'; }
 
-    bool        eof() const noexcept { return _current_pos < _source.length(); }
+    bool        eof() const noexcept { return _current_pos >= _source.length(); }
     inline char peek() const noexcept { return _source[_current_pos]; }
 
     void advance() noexcept;
@@ -98,9 +98,8 @@ class Tokenizer {
     static constexpr std::string_view control_chars = ";{}";
     static constexpr std::string_view operators_chars = "=*/+-^!<>&|%()[]";
 
-    static inline bool                   is_allowed_in_operators(char c) { return operators_chars.find(c) != operators_chars.npos; }
-    static constexpr std::array<char, 3> control_characters{';', '{', '}'};
-    static constexpr char                escaped_char[] = {'?', '\'', '\"', '\?', '\a', '\b', '\f', '\n', '\r', '\t', '\v'};
+    static inline bool    is_allowed_in_operators(char c) { return operators_chars.find(c) != operators_chars.npos; }
+    static constexpr char escaped_char[] = {'?', '\'', '\"', '\?', '\a', '\b', '\f', '\n', '\r', '\t', '\v'};
 
     const het_unordered_map<Token::Type> operators{
         {"=", Token::Type::Operator},  {"*", Token::Type::Operator},  {"+", Token::Type::Operator},  {"-", Token::Type::Operator},  {"/", Token::Type::Operator},

@@ -122,8 +122,11 @@ int main(int argc, char* argv[]) {
             Tokenizer tokenizer(line);
             auto      first = tokens.size();
             try {
-                while(tokenizer.has_more())
-                    tokens.push_back(tokenizer.consume());
+                while(tokenizer.has_more()) {
+                    auto t = tokenizer.consume();
+                    // print("{}\n", t);
+                    tokens.push_back(t);
+                }
 
                 auto newNode = parser.parse(std::span<Tokenizer::Token>{tokens.begin() + first, tokens.end()}, ast);
                 if(newNode) {

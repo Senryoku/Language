@@ -25,8 +25,6 @@ void tokenize(const char* filepath, std::vector<Tokenizer::Token>& tokens, std::
     EXPECT_GT(tokens.size(), 0);
 }
 
-namespace InterpreterTests {
-
 #define PARSE_INTERP(code)                           \
     std::string                   source{code};      \
     std::vector<Tokenizer::Token> tokens;            \
@@ -256,5 +254,3 @@ TEST(Function, ArrayFibonacci) {
         EXPECT_EQ(interpreter.get_return_value().value.as_int32_t, fib(i));
     }
 }
-
-} // namespace InterpreterTests
