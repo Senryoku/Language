@@ -269,6 +269,23 @@ class Interpreter : public Scoped {
                 _return_value = node.value;
                 break;
             }
+            case Cast: {
+                auto child = execute(*node.children[0]);
+                switch(node.value.type) {
+                    case GenericValue::Type::Integer: {
+                        _return_value.type = GenericValue::Type::Integer;
+                        _return_value.value.as_int32_t = child.to_int32_t();
+                        break;
+                    }
+                    case GenericValue::Type::Float: {
+                        _return_value.type = GenericValue::Type::Float;
+                        _return_value.value.as_float = child.to_float();
+                        break;
+                    }
+                    default: error("[Interpreter] Unimplemented cast {}.\n", node.value.type);
+                }
+                break;
+            }
             case ReturnStatement: {
                 assert(node.children.size() == 1);
                 const auto result = execute(*node.children[0]);

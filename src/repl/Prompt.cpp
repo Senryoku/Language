@@ -34,7 +34,7 @@ Prompt ::~Prompt() {
 }
 
 std::string Prompt::get_line() {
-    static std::string_view prompt_str = " > ";
+    static const std::string_view prompt_str = " > ";
 
     if(complex_prompt) {
 #ifdef WIN32
@@ -207,7 +207,7 @@ std::vector<std::string> Prompt::autocomplete(const std::string& str) const {
         else
             path.append(str);
         /*
-        // Using the Tokenizer directly could be better, but it's not stable enough yet.
+        // Using the Tokenizer directly could be better (autocomplete on keyword/identifier instead of files depending on the context), but it's not stable enough yet.
         Tokenizer tokenizer(str);
         if(tokenizer.has_more()) {
             auto last_token = tokenizer.consume();
