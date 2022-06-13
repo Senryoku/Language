@@ -125,12 +125,19 @@ std::string Prompt::get_line() {
                                     }
                                     break;
                                 }
+                                case 0x2e: // Suppr
+                                    if(cursor < current_line.size()) {
+                                        current_line.erase(cursor, 1);
+                                    }
+                                    break;
                                 default:
                                     // FIXME: This is not a proper way to filter printable caracters (Modifier keys send a keypressed event for example)
                                     if(input_buffer[i].Event.KeyEvent.uChar.AsciiChar >= 0x20 && input_buffer[i].Event.KeyEvent.uChar.AsciiChar < 0x80) {
                                         current_line.insert(cursor, 1, input_buffer[i].Event.KeyEvent.uChar.AsciiChar);
                                         ++cursor;
-                                    } else if(input_buffer[i].Event.KeyEvent.uChar.AsciiChar >= 0x80) {
+                                    } else /*
+                                        if(input_buffer[i].Event.KeyEvent.uChar.AsciiChar >= 0x80) */
+                                    {
                                         std::cout << std::endl
                                                   << "Unhandled key event with virtual key code 0x" << std::hex << input_buffer[i].Event.KeyEvent.wVirtualKeyCode << std::endl;
                                     }
