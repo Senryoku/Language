@@ -20,6 +20,7 @@ class AST {
             IfStatement,
             ElseStatement,
             WhileStatement,
+            ForStatement,
             ReturnStatement,
             VariableDeclaration,
             Variable,
@@ -161,6 +162,7 @@ struct fmt::formatter<AST::Node> {
             case AST::Node::Type::FunctionDeclaration: r = fmt::format_to(ctx.out(), "{}:{}", t.type, t.token.value); break;
             case AST::Node::Type::FunctionCall: r = fmt::format_to(ctx.out(), "{}:{}()", t.type, t.token.value); break;
             case AST::Node::Type::VariableDeclaration: r = fmt::format_to(ctx.out(), "{}:{} {}", t.type, t.value.type, t.token.value); break;
+            case AST::Node::Type::Cast: r = fmt::format_to(ctx.out(), "{}:{}", t.type, t.value.type); break;
             case AST::Node::Type::BinaryOperator:
                 r = fmt::format_to(ctx.out(), "{} {}:{}", fmt::format(fmt::emphasis::bold | fg(fmt::color::black) | bg(fmt::color::dim_gray), t.token.value), t.type, t.value.type);
                 break;
@@ -173,7 +175,7 @@ struct fmt::formatter<AST::Node> {
         // Forward then backward
         // r = format_to(ctx.out(), "\033[999C\033[{}D{}\n", length, token_str);
         // Backward then forward
-        r = fmt::format_to(ctx.out(), "\033[999D\033[{}C{}\n", 50, token_str);
+        r = fmt::format_to(ctx.out(), "\033[999D\033[{}C{}\n", 80, token_str);
 
         for(size_t i = 0; i < t.children.size(); ++i)
             r = fmt::format_to(r, fmt::runtime("{:" + indent + (i == t.children.size() - 1 ? "e" : "i") + "}"), *t.children[i]);

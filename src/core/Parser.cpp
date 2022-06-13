@@ -19,7 +19,7 @@ bool Parser::parse(const std::span<Tokenizer::Token>& tokens, AST::Node* currNod
                         while(currNode->type != AST::Node::Type::Scope && currNode->parent != nullptr)
                             currNode = currNode->parent;
                         if(currNode->type != AST::Node::Type::Scope) {
-                            error("Syntax error: Unmatched '}' one line {}.\n", it->line);
+                            error("[Parser] Syntax error: Unmatched '}' one line {}.\n", it->line);
                             return false;
                         }
                         currNode = currNode->parent;
@@ -33,7 +33,7 @@ bool Parser::parse(const std::span<Tokenizer::Token>& tokens, AST::Node* currNod
                         ++it;
                         break;
                     default:
-                        warn("Unused token: {}.\n", *it);
+                        warn("[Parser] Unused token: {}.\n", *it);
                         ++it;
                         break;
                 }
@@ -41,7 +41,7 @@ bool Parser::parse(const std::span<Tokenizer::Token>& tokens, AST::Node* currNod
             }
             case Tokenizer::Token::Type::If: {
                 if(!peek(tokens, it, Tokenizer::Token::Type::Operator, "(")) {
-                    error("Syntax error: expected '(' after 'if'.\n");
+                    error("[Parser] Syntax error: expected '(' after 'if'.\n");
                     return false;
                 }
                 auto ifNode = currNode->add_child(new AST::Node(AST::Node::Type::IfStatement, *it));
@@ -51,7 +51,7 @@ bool Parser::parse(const std::span<Tokenizer::Token>& tokens, AST::Node* currNod
                     return false;
                 }
                 if(!parse_scope_or_single_statement(tokens, it, ifNode)) {
-                    error("Syntax error: expected 'new scope' after 'if'.\n");
+                    error("[Parser] Syntax error: expected 'new scope' after 'if'.\n");
                     delete currNode->pop_child();
                     return false;
                 }
@@ -123,6 +123,11 @@ bool Parser::parse(const std::span<Tokenizer::Token>& tokens, AST::Node* currNod
                     return false;
                 break;
             }
+            case Tokenizer::Token::Type::For: {
+                if(!parse_for(tokens, it, currNode))
+                    return false;
+                break;
+            }
             case Tokenizer::Token::Type::Function: {
                 if(!parse_function_declaration(tokens, it, currNode))
                     return false;
@@ -130,7 +135,7 @@ bool Parser::parse(const std::span<Tokenizer::Token>& tokens, AST::Node* currNod
             }
             case Tokenizer::Token::Type::Comment: ++it; break;
             default:
-                warn("Unused token: {}.\n", *it);
+                warn("[Parser] Unused token: {}.\n", *it);
                 ++it;
                 break;
         }
@@ -148,9 +153,9 @@ bool Parser::parse(const std::span<Tokenizer::Token>& tokens, AST::Node* currNod
 bool Parser::parse_next_scope(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode) {
     if(it == tokens.end() || it->value != "{") {
         if(it == tokens.end())
-            error("Syntax error: Expected scope opening, got end-of-document.\n");
+            error("[Parser] Syntax error: Expected scope opening, got end-of-document.\n");
         else
-            error("Syntax error: Expected scope opening on line {}, got {}.\n", it->line, it->value);
+            error("[Parser] Syntax error: Expected scope opening on line {}, got {}.\n", it->line, it->value);
         return false;
     }
     auto   begin = it + 1;
@@ -167,7 +172,7 @@ bool Parser::parse_next_scope(const std::span<Tokenizer::Token>& tokens, std::sp
         ++end;
     }
     if(opened_scopes > 0) {
-        error("Syntax error: no matching 'closing bracket', got end-of-document.\n");
+        error("[Parser] Syntax error: no matching 'closing bracket', got end-of-document.\n");
         return false;
     }
 
@@ -183,7 +188,7 @@ bool Parser::parse_next_scope(const std::span<Tokenizer::Token>& tokens, std::sp
 bool Parser::parse_next_expression(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode, uint32_t precedence,
                                    bool search_for_matching_bracket) {
     if(it == tokens.end()) {
-        error("Expected expression, got end-of-file.\n");
+        error("[Parser] Expected expression, got end-of-file.\n");
         return false;
     }
 
@@ -279,9 +284,9 @@ bool Parser::parse_next_expression(const std::span<Tokenizer::Token>& tokens, st
 
     if(search_for_matching_bracket && (it == tokens.end() || it->value != ")")) {
         if(it == tokens.end())
-            error("Unmatched '(' after reaching end-of-document.\n");
+            error("[Parser] Unmatched '(' after reaching end-of-document.\n");
         else
-            error("Unmatched '(' on line {}.\n", it->line);
+            error("[Parser] Unmatched '(' on line {}.\n", it->line);
         delete currNode->pop_child();
         return false;
     }
@@ -362,18 +367,26 @@ bool Parser::parse_identifier(const std::span<Tokenizer::Token>& tokens, std::sp
     //}
 }
 
+bool Parser::parse_statement(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode) {
+    // FIXME: Probably
+    auto end = it;
+    while(end != tokens.end() && end->value != ";")
+        ++end;
+    if(!parse({it, end}, currNode))
+        return false;
+    it = end;
+    if(it != tokens.end()) // Skip ';'
+        ++it;
+    return true;
+}
+
 bool Parser::parse_scope_or_single_statement(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode) {
     if(it->value == "{") {
         if(!parse_next_scope(tokens, it, currNode))
             return false;
     } else {
-        // FIXME: Probably
-        auto end = it;
-        while(end != tokens.end() && end->value != ";")
-            ++end;
-        if(!parse({it, end}, currNode))
+        if(!parse_statement(tokens, it, currNode))
             return false;
-        it = end;
     }
     return true;
 }
@@ -400,6 +413,44 @@ bool Parser::parse_while(const std::span<Tokenizer::Token>& tokens, std::span<To
     }
 
     if(!parse_scope_or_single_statement(tokens, it, whileNode)) {
+        delete currNode->pop_child();
+        return false;
+    }
+    return true;
+}
+
+bool Parser::parse_for(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode) {
+    auto forNode = currNode->add_child(new AST::Node(AST::Node::Type::ForStatement, *it));
+    ++it;
+    if(it->value != "(") {
+        error("Expected '(' after for on line {}, got {}.\n", it->line, it->value);
+        delete currNode->pop_child();
+        return false;
+    }
+    ++it; // Skip '('
+    // Initialisation
+    if(!parse_statement(tokens, it, forNode)) {
+        delete currNode->pop_child();
+        return false;
+    }
+    // Condition
+    if(!parse_statement(tokens, it, forNode)) {
+        delete currNode->pop_child();
+        return false;
+    }
+    // Increment (until bracket)
+    if(!parse_next_expression(tokens, it, forNode, 0, true)) {
+        delete currNode->pop_child();
+        return false;
+    }
+
+    if(it == tokens.end()) {
+        error("Expected while body on line {}, got end-of-file.\n", it->line);
+        delete currNode->pop_child();
+        return false;
+    }
+
+    if(!parse_scope_or_single_statement(tokens, it, forNode)) {
         delete currNode->pop_child();
         return false;
     }

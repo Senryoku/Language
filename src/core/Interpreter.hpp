@@ -74,6 +74,21 @@ class Interpreter : public Scoped {
                 }
                 break;
             }
+            case ForStatement: {
+                assert(node.children.size() == 4);
+                auto initialisation = node.children[0];
+                auto condition = node.children[1];
+                auto increment = node.children[2];
+                auto body = node.children[3];
+                execute(*initialisation);
+                while(execute(*condition).value.as_bool) {
+                    execute(*body);
+                    execute(*increment);
+                    if(_returning_value)
+                        break;
+                }
+                break;
+            }
             case IfStatement: {
                 auto condition = execute(*node.children[0]);
                 if(condition.value.as_bool) {
@@ -239,7 +254,7 @@ class Interpreter : public Scoped {
                         // Automatically convert float indices to integer, because we don't have in-language easy conversion (yet?)
                         // FIXME: I don't think this should be handled here.
                         if(index.type == GenericValue::Type::Float) {
-                            index.value.as_int32_t = static_cast<int32_t>(index.value.as_float);
+                            index.value.as_int32_t = index.to_int32_t();
                             index.type = GenericValue::Type::Integer;
                         }
                         assert(index.type == GenericValue::Type::Integer);

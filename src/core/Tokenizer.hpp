@@ -48,6 +48,7 @@ class Tokenizer {
             If,
             Else,
             While,
+            For,
             Class,
 
             Comment,
@@ -111,10 +112,12 @@ class Tokenizer {
     };
 
     const het_unordered_map<Token::Type> keywords{
-        {"function", Token::Type::Function}, {"return", Token::Type::Return},      {"if", Token::Type::If},           {"else", Token::Type::Else},
-        {"while", Token::Type::While},       {"bool", Token::Type::BuiltInType},   {"int", Token::Type::BuiltInType}, {"float", Token::Type::BuiltInType},
-        {"char", Token::Type::BuiltInType},  {"string", Token::Type::BuiltInType}, {"true", Token::Type::Boolean},    {"false", Token::Type::Boolean},
-        {"const", Token::Type::Const},       {"import", Token::Type::Import},      {"class", Token::Type::Class},
+        {"function", Token::Type::Function}, {"return", Token::Type::Return},      {"if", Token::Type::If},
+        {"else", Token::Type::Else},         {"while", Token::Type::While},        {"for", Token::Type::For},
+        {"bool", Token::Type::BuiltInType},  {"int", Token::Type::BuiltInType},    {"float", Token::Type::BuiltInType},
+        {"char", Token::Type::BuiltInType},  {"string", Token::Type::BuiltInType}, {"true", Token::Type::Boolean},
+        {"false", Token::Type::Boolean},     {"const", Token::Type::Const},        {"import", Token::Type::Import},
+        {"class", Token::Type::Class},
     };
 
     const std::string& _source;
