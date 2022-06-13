@@ -20,12 +20,14 @@ class AST {
             IfStatement,
             ElseStatement,
             WhileStatement,
+            ForStatement,
             ReturnStatement,
             VariableDeclaration,
             Variable,
             FunctionDeclaration,
             FunctionCall,
             BuiltInFunctionDeclaration,
+            Cast,
             // BuiltInFunctionCall,
             ConstantValue,
             UnaryOperator,
@@ -160,6 +162,7 @@ struct fmt::formatter<AST::Node> {
             case AST::Node::Type::FunctionDeclaration: r = fmt::format_to(ctx.out(), "{}:{}", t.type, t.token.value); break;
             case AST::Node::Type::FunctionCall: r = fmt::format_to(ctx.out(), "{}:{}()", t.type, t.token.value); break;
             case AST::Node::Type::VariableDeclaration: r = fmt::format_to(ctx.out(), "{}:{} {}", t.type, t.value.type, t.token.value); break;
+            case AST::Node::Type::Cast: r = fmt::format_to(ctx.out(), "{}:{}", t.type, t.value.type); break;
             case AST::Node::Type::BinaryOperator:
                 r = fmt::format_to(ctx.out(), "{} {}:{}", fmt::format(fmt::emphasis::bold | fg(fmt::color::black) | bg(fmt::color::dim_gray), t.token.value), t.type, t.value.type);
                 break;
@@ -168,11 +171,11 @@ struct fmt::formatter<AST::Node> {
 
         auto token_str = t.token.type == Tokenizer::Token::Type::Unknown ? "None" : fmt::format("{}", t.token);
         // FIXME: This would be cool to use the actual token_str length here, but computing the printed length (stripping style/control characters) isn't trivial.
-        const auto length = 60;
+        // const auto length = 60;
         // Forward then backward
         // r = format_to(ctx.out(), "\033[999C\033[{}D{}\n", length, token_str);
         // Backward then forward
-        r = fmt::format_to(ctx.out(), "\033[999D\033[{}C{}\n", 50, token_str);
+        r = fmt::format_to(ctx.out(), "\033[999D\033[{}C{}\n", 80, token_str);
 
         for(size_t i = 0; i < t.children.size(); ++i)
             r = fmt::format_to(r, fmt::runtime("{:" + indent + (i == t.children.size() - 1 ? "e" : "i") + "}"), *t.children[i]);
@@ -205,6 +208,7 @@ struct fmt::formatter<AST::Node::Type> {
             case AST::Node::Type::FunctionDeclaration: return fmt::format_to(ctx.out(), fg(fmt::color::light_yellow), "{}", "FunctionDeclaration");
             case AST::Node::Type::FunctionCall: return fmt::format_to(ctx.out(), fg(fmt::color::light_yellow), "{}", "FunctionCall");
             case AST::Node::Type::Variable: return fmt::format_to(ctx.out(), fg(fmt::color::light_blue), "{}", "Variable");
+            case AST::Node::Type::Cast: return fmt::format_to(ctx.out(), "{}", "Cast");
             case AST::Node::Type::ConstantValue: return fmt::format_to(ctx.out(), "{}", "ConstantValue");
             case AST::Node::Type::UnaryOperator: return fmt::format_to(ctx.out(), "{}", "UnaryOperator");
             case AST::Node::Type::BinaryOperator: return fmt::format_to(ctx.out(), "{}", "BinaryOperator");

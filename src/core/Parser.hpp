@@ -84,157 +84,16 @@ class Parser : public Scoped {
     }
 
   private:
-    bool parse(const std::span<Tokenizer::Token>& tokens, AST::Node* currNode) {
-        currNode = currNode->add_child(new AST::Node(AST::Node::Type::Statement));
-        auto it = tokens.begin();
-        bool is_const = false;
-        while(it != tokens.end()) {
-            const auto& token = *it;
-            switch(token.type) {
-                case Tokenizer::Token::Type::Control: {
-                    switch(token.value[0]) {
-                        case '{': { // Open a new scope
-                            currNode = currNode->add_child(new AST::Node(AST::Node::Type::Scope, *it));
-                            push_scope();
-                            ++it;
-                            break;
-                        }
-                        case '}': { // Close nearest scope
-                            while(currNode->type != AST::Node::Type::Scope && currNode->parent != nullptr)
-                                currNode = currNode->parent;
-                            if(currNode->type != AST::Node::Type::Scope) {
-                                error("Syntax error: Unmatched '}' one line {}.\n", it->line);
-                                return false;
-                            }
-                            currNode = currNode->parent;
-                            pop_scope();
-                            ++it;
-                            break;
-                        }
-                        case ';':
-                            currNode = currNode->parent;
-                            currNode = currNode->add_child(new AST::Node(AST::Node::Type::Statement, *it));
-                            ++it;
-                            break;
-                        default:
-                            warn("Unused token: {}.\n", *it);
-                            ++it;
-                            break;
-                    }
-                    break;
-                }
-                case Tokenizer::Token::Type::If: {
-                    if(!peek(tokens, it, Tokenizer::Token::Type::Operator, "(")) {
-                        error("Syntax error: expected '(' after 'if'.\n");
-                        return false;
-                    }
-                    auto ifNode = currNode->add_child(new AST::Node(AST::Node::Type::IfStatement, *it));
-                    it += 2;
-                    if(!parse_next_expression(tokens, it, ifNode, 0, true)) {
-                        delete currNode->pop_child();
-                        return false;
-                    }
-                    if(!parse_scope_or_single_statement(tokens, it, ifNode)) {
-                        error("Syntax error: expected 'new scope' after 'if'.\n");
-                        delete currNode->pop_child();
-                        return false;
-                    }
-                    // TODO: Handle Else here?
-
-                    break;
-                }
-                case Tokenizer::Token::Type::Const:
-                    is_const = true;
-                    ++it;
-                    assert(it->type == Tokenizer::Token::Type::BuiltInType);
-                    [[fallthrough]];
-                case Tokenizer::Token::Type::BuiltInType: {
-                    if(!parse_variable_declaration(tokens, it, currNode, is_const))
-                        return false;
-                    is_const = false;
-                    break;
-                }
-                case Tokenizer::Token::Type::Return: {
-                    auto returnNode = currNode->add_child(new AST::Node(AST::Node::Type::ReturnStatement, *it));
-                    ++it;
-                    if(!parse_next_expression(tokens, it, returnNode, 0)) {
-                        delete currNode->pop_child();
-                        return false;
-                    }
-                    returnNode->value.type = returnNode->children[0]->value.type;
-                    break;
-                }
-
-                // Constants
-                case Tokenizer::Token::Type::Boolean: {
-                    if(!parse_boolean(tokens, it, currNode))
-                        return false;
-                    break;
-                }
-                case Tokenizer::Token::Type::Digits: {
-                    if(!parse_digits(tokens, it, currNode))
-                        return false;
-                    break;
-                }
-                case Tokenizer::Token::Type::Float: {
-                    if(!parse_float(tokens, it, currNode))
-                        return false;
-                    break;
-                }
-                case Tokenizer::Token::Type::CharLiteral: {
-                    if(!parse_char(tokens, it, currNode))
-                        return false;
-                    break;
-                }
-                case Tokenizer::Token::Type::StringLiteral: {
-                    if(!parse_string(tokens, it, currNode))
-                        return false;
-                    break;
-                }
-
-                case Tokenizer::Token::Type::Operator: {
-                    if(!parse_operator(tokens, it, currNode))
-                        return false;
-                    break;
-                }
-                case Tokenizer::Token::Type::Identifier: {
-                    if(!parse_identifier(tokens, it, currNode))
-                        return false;
-                    break;
-                }
-                case Tokenizer::Token::Type::While: {
-                    if(!parse_while(tokens, it, currNode))
-                        return false;
-                    break;
-                }
-                case Tokenizer::Token::Type::Function: {
-                    if(!parse_function_declaration(tokens, it, currNode))
-                        return false;
-                    break;
-                }
-                case Tokenizer::Token::Type::Comment: ++it; break;
-                default:
-                    warn("Unused token: {}.\n", *it);
-                    ++it;
-                    break;
-            }
-        }
-        // Remove empty statements (at end of file)
-        if(currNode->type == AST::Node::Type::Statement && currNode->children.empty()) {
-            auto tmp = currNode;
-            currNode = currNode->parent;
-            currNode->children.erase(std::find(currNode->children.begin(), currNode->children.end(), tmp));
-            delete tmp;
-        }
-        return true;
-    }
+    bool parse(const std::span<Tokenizer::Token>& tokens, AST::Node* currNode);
 
     bool parse_next_scope(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode);
     bool parse_next_expression(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode, uint32_t precedence,
                                bool search_for_matching_bracket = false);
     bool parse_identifier(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode);
+    bool parse_statement(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode);
     bool parse_scope_or_single_statement(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode);
     bool parse_while(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode);
+    bool parse_for(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode);
     bool parse_function_declaration(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode);
     bool parse_boolean(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode);
     bool parse_digits(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode);

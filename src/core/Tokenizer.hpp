@@ -8,6 +8,23 @@
 
 #include <Logger.hpp>
 
+// FIXME: Move, specialize
+class Exception : public std::exception {
+  public:
+    Exception(const std::string& what, const std::string& hint) : std::exception(what.c_str()), _hint(hint) {}
+
+    const std::string& hint() const { return _hint; }
+
+    void display() const {
+        error(what());
+        print("\n");
+        info(hint());
+    }
+
+  private:
+    std::string _hint;
+};
+
 class Tokenizer {
   public:
     struct Token {
@@ -27,9 +44,12 @@ class Tokenizer {
             Operator,
             Identifier,
 
+            Import,
             If,
             Else,
             While,
+            For,
+            Class,
 
             Comment,
 
@@ -38,59 +58,49 @@ class Tokenizer {
 
         Token() = default;
 
-        Token(Type type, const std::string_view val, size_t line) : type(type), value(val), line(line) {}
+        Token(Type type, const std::string_view val, size_t line, size_t column) : type(type), value(val), line(line), column(column) {}
 
         Type             type = Type::Unknown;
         std::string_view value;
 
         // Debug Info
         size_t line = 0;
+        size_t column = 0; // FIXME: TODO
     };
 
-    Tokenizer(const std::string& source) : _source(source) { advance_ptr(_current_pos); }
-
-    Token next() const {
-        auto curr = _current_pos;
-        return search_next(curr);
-    }
+    Tokenizer(const std::string& source) : _source(source) { skip_whitespace(); }
 
     Token consume() {
-        auto t = search_next(_current_pos);
+        auto t = search_next();
         // Skip discardable characters immediatly (avoid ending empty token)
-        advance_ptr(_current_pos);
+        skip_whitespace();
         return t;
     }
 
-    bool has_more() const { return _current_pos < _source.length(); }
+    bool has_more() const noexcept { return _current_pos < _source.length(); }
 
   private:
-    inline bool is_discardable(char c) const { return c == ' ' || c == '\n' || c == '\r' || c == '\t'; }
-    inline bool is_allowed_in_identifiers(char c) const { return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || c == '_'; }
-    inline bool is_digit(char c) const { return c >= '0' && c <= '9'; }
+    inline bool is_discardable(char c) const noexcept { return c == ' ' || c == '\n' || c == '\r' || c == '\t'; }
+    inline bool is_allowed_in_identifiers(char c) const noexcept { return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || c == '_'; }
+    inline bool is_digit(char c) const noexcept { return c >= '0' && c <= '9'; }
+    bool        is_newline(char c) const noexcept { return c == '\n'; }
 
-    void advance_ptr(size_t& pointer) {
-        // Skip discardable characters
-        while(is_discardable(_source[pointer]) && pointer < _source.length()) {
-            if(_source[pointer] == '\n')
-                ++_current_line;
-            ++pointer;
-        }
-    }
+    bool        eof() const noexcept { return _current_pos >= _source.length(); }
+    inline char peek() const noexcept { return _source[_current_pos]; }
 
-    constexpr static std::array<char, 7> control_characters{
-        ';',
-        '{',
-        '}',
-    };
+    void advance() noexcept;
+    void newline() noexcept;
+    void skip_whitespace() noexcept;
 
-    template<size_t N>
-    static bool is(char c, std::array<char, N> arr) {
-        for(const auto& s : arr)
-            if(s == c)
-                return true;
-        return false;
-    }
+    Token search_next();
 
+    // Display a hint to the origin of an error.
+    std::string point_error(size_t at, size_t line, int from = -1, int to = -1) const noexcept;
+
+    static constexpr std::string_view control_chars = ";{}";
+    static constexpr std::string_view operators_chars = "=*/+-^!<>&|%()[]";
+
+    static inline bool    is_allowed_in_operators(char c) { return operators_chars.find(c) != operators_chars.npos; }
     static constexpr char escaped_char[] = {'?', '\'', '\"', '\?', '\a', '\b', '\f', '\n', '\r', '\t', '\v'};
 
     const het_unordered_map<Token::Type> operators{
@@ -101,23 +111,19 @@ class Tokenizer {
         {"]", Token::Type::Operator},
     };
 
-    // FIXME: This is a workaround, not a proper way to recognize operators :)
-    static inline bool is_allowed_in_operators(char c) {
-        return (c >= '*' && c <= '/') || (c >= '<' && c <= '>') || (c == '&' || c == '|' || c == '%' || c == '[' || c == ']' || c == '(' || c == ')');
-    }
-
     const het_unordered_map<Token::Type> keywords{
-        {"function", Token::Type::Function}, {"return", Token::Type::Return},      {"if", Token::Type::If},           {"else", Token::Type::Else},
-        {"while", Token::Type::While},       {"bool", Token::Type::BuiltInType},   {"int", Token::Type::BuiltInType}, {"float", Token::Type::BuiltInType},
-        {"char", Token::Type::BuiltInType},  {"string", Token::Type::BuiltInType}, {"true", Token::Type::Boolean},    {"false", Token::Type::Boolean},
-        {"const", Token::Type::Const},
+        {"function", Token::Type::Function}, {"return", Token::Type::Return},      {"if", Token::Type::If},
+        {"else", Token::Type::Else},         {"while", Token::Type::While},        {"for", Token::Type::For},
+        {"bool", Token::Type::BuiltInType},  {"int", Token::Type::BuiltInType},    {"float", Token::Type::BuiltInType},
+        {"char", Token::Type::BuiltInType},  {"string", Token::Type::BuiltInType}, {"true", Token::Type::Boolean},
+        {"false", Token::Type::Boolean},     {"const", Token::Type::Const},        {"import", Token::Type::Import},
+        {"class", Token::Type::Class},
     };
-
-    Token search_next(size_t& pointer) const;
 
     const std::string& _source;
     size_t             _current_pos = 0;
     size_t             _current_line = 0;
+    size_t             _current_column = 0;
 };
 
 // fmt Formaters for Token and Token::Type

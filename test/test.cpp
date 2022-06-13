@@ -254,3 +254,15 @@ TEST(Function, ArrayFibonacci) {
         EXPECT_EQ(interpreter.get_return_value().value.as_int32_t, fib(i));
     }
 }
+
+TEST(Other, Mandelbrot) {
+    LOAD_PARSE_INTERP("other/mandelbrot.lang");
+    EXPECT_EQ(interpreter.get_return_value().type, GenericValue::Type::Boolean);
+    EXPECT_EQ(interpreter.get_return_value().value.as_bool, true);
+}
+
+TEST(Other, MandelbrotFor) {
+    LOAD_PARSE_INTERP("other/mandelbrot_for.lang");
+    EXPECT_EQ(interpreter.get_return_value().type, GenericValue::Type::Boolean);
+    EXPECT_EQ(interpreter.get_return_value().value.as_bool, true);
+}

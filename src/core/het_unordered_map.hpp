@@ -5,8 +5,9 @@
 #include <unordered_map>
 
 // Hash & Comparison to let unordered_map::find work with string_views (Heterogeneous Lookup)
-struct TransparentEqual : public std::equal_to<> {
+struct string_equal : public std::equal_to<> {
     using is_transparent = void;
+    bool operator()(std::string_view l, std::string_view r) const noexcept { return l == r; }
 };
 struct string_hash {
     using is_transparent = void;
@@ -17,5 +18,5 @@ struct string_hash {
     size_t operator()(const char* txt) const { return hash_type{}(txt); }
 };
 
-template <typename T>
-using het_unordered_map = std::unordered_map<std::string, T, string_hash, TransparentEqual>;
+template<typename T>
+using het_unordered_map = std::unordered_map<std::string, T, string_hash, string_equal>;

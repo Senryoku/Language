@@ -39,7 +39,7 @@ class Interpreter : public Scoped {
         var.value.as_array.items = arr;
     }
 
-    GenericValue execute(const AST::Node& node) {
+    Variable execute(const AST::Node& node) {
         switch(node.type) {
             using enum AST::Node::Type;
             case Root:
@@ -71,6 +71,21 @@ class Interpreter : public Scoped {
                     if(_returning_value)
                         break;
                     condition = execute(*node.children[0]);
+                }
+                break;
+            }
+            case ForStatement: {
+                assert(node.children.size() == 4);
+                auto initialisation = node.children[0];
+                auto condition = node.children[1];
+                auto increment = node.children[2];
+                auto body = node.children[3];
+                execute(*initialisation);
+                while(execute(*condition).value.as_bool) {
+                    execute(*body);
+                    execute(*increment);
+                    if(_returning_value)
+                        break;
                 }
                 break;
             }
@@ -164,7 +179,7 @@ class Interpreter : public Scoped {
                 } else if(node.token.value == "++") {
                     assert(node.children.size() == 1);
                     assert(node.children[0]->type == Variable);
-                    GenericValue* v = get(node.children[0]->token.value);
+                    auto* v = get(node.children[0]->token.value);
                     if(node.subtype == AST::Node::SubType::Prefix)
                         _return_value = ++(*v);
                     else
@@ -172,7 +187,7 @@ class Interpreter : public Scoped {
                 } else if(node.token.value == "--") {
                     assert(node.children.size() == 1);
                     assert(node.children[0]->type == Variable);
-                    GenericValue* v = get(node.children[0]->token.value);
+                    auto* v = get(node.children[0]->token.value);
                     if(node.subtype == AST::Node::SubType::Prefix)
                         _return_value = --(*v);
                     else
@@ -191,7 +206,7 @@ class Interpreter : public Scoped {
                     // Search for an l-value (FIXME: should execute the whole left-hand side)
                     if(node.children[0]->type == Variable) { // Variable
                         if(is_assignable(node.children[0]->value, node.children[1]->value)) {
-                            GenericValue* v = get(node.children[0]->token.value);
+                            auto* v = get(node.children[0]->token.value);
                             assert(v);
                             v->assign(rhs);
                             _return_value.type = v->type;
@@ -239,7 +254,7 @@ class Interpreter : public Scoped {
                         // Automatically convert float indices to integer, because we don't have in-language easy conversion (yet?)
                         // FIXME: I don't think this should be handled here.
                         if(index.type == GenericValue::Type::Float) {
-                            index.value.as_int32_t = static_cast<int32_t>(index.value.as_float);
+                            index.value.as_int32_t = index.to_int32_t();
                             index.type = GenericValue::Type::Integer;
                         }
                         assert(index.type == GenericValue::Type::Integer);
@@ -269,6 +284,23 @@ class Interpreter : public Scoped {
                 _return_value = node.value;
                 break;
             }
+            case Cast: {
+                auto child = execute(*node.children[0]);
+                switch(node.value.type) {
+                    case GenericValue::Type::Integer: {
+                        _return_value.type = GenericValue::Type::Integer;
+                        _return_value.value.as_int32_t = child.to_int32_t();
+                        break;
+                    }
+                    case GenericValue::Type::Float: {
+                        _return_value.type = GenericValue::Type::Float;
+                        _return_value.value.as_float = child.to_float();
+                        break;
+                    }
+                    default: error("[Interpreter] Unimplemented cast {}.\n", node.value.type);
+                }
+                break;
+            }
             case ReturnStatement: {
                 assert(node.children.size() == 1);
                 const auto result = execute(*node.children[0]);
@@ -289,8 +321,8 @@ class Interpreter : public Scoped {
     }
 
   private:
-    bool         _returning_value = false;
-    GenericValue _return_value{.type = GenericValue::Type::Integer, .value = 0}; // FIXME: Probably not the right move!
+    bool     _returning_value = false;
+    Variable _return_value{{.type = GenericValue::Type::Integer, .value = 0}}; // FIXME: Probably not the right move!
 
     std::vector<GenericValue*> _allocated_arrays;
 
