@@ -82,9 +82,8 @@ class Scope {
             };
             case GenericValue::Type::Composite: {
                 Variable v{{Variable::Type::Composite}};
-                v.value.as_array.type = Variable::Type::Composite;
-                v.value.as_array.capacity = static_cast<uint32_t>(decNode.children.size());
-                v.value.as_array.items = nullptr;
+                v.value.as_composite.type_id = decNode.value.value.as_composite.type_id;
+                v.value.as_composite.members = nullptr;
                 _variables[std::string{name}] = v;
                 break;
             }

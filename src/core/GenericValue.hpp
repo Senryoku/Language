@@ -59,7 +59,6 @@ struct GenericValue {
 
     struct Composite {
         TypeID        type_id;
-        uint32_t      capacity;
         GenericValue* members; // FIXME?
     };
 
@@ -480,7 +479,7 @@ struct fmt::formatter<GenericValue::Type> {
             case Array: return fmt::format_to(ctx.out(), "{}", "Array");
             case Composite: return fmt::format_to(ctx.out(), fg(fmt::color::light_green), "{}", "Composite");
             case Undefined: return fmt::format_to(ctx.out(), fg(fmt::color::gray), "{}", "Undefined");
-            default: return fmt::format_to(ctx.out(), fg(fmt::color::red), "{}", "Unknown [by the formatter]");
+            default: return fmt::format_to(ctx.out(), fg(fmt::color::red), "{}", "Unknown Generic Value Type [by the formatter]");
         }
     }
 };
@@ -514,7 +513,7 @@ struct fmt::formatter<GenericValue> {
             }
             case Composite: return fmt::format_to(ctx.out(), "{}", v.type); // TODO
             case Undefined: return fmt::format_to(ctx.out(), fg(fmt::color::gray), "{}", "Undefined");
-            default: return fmt::format_to(ctx.out(), fg(fmt::color::red), "{}", "Unknown [by the formatter]");
+            default: return fmt::format_to(ctx.out(), fg(fmt::color::red), "{}", "Generic Value of Unknown type [by the formatter]");
         }
     }
 };
