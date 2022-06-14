@@ -378,11 +378,12 @@ bool Parser::parse_statement(const std::span<Tokenizer::Token>& tokens, std::spa
     auto end = it;
     while(end != tokens.end() && end->value != ";")
         ++end;
+    // Include ',' in the sub-parsing
+    if(end != tokens.end())
+        ++end;
     if(!parse({it, end}, curr_node))
         return false;
     it = end;
-    if(it != tokens.end()) // Skip ';'
-        ++it;
     return true;
 }
 
@@ -867,9 +868,6 @@ bool Parser::parse_variable_declaration(const std::span<Tokenizer::Token>& token
             return false;
         }
     }
-
-    if(it->type == Tokenizer::Token::Type::Control && it->value == ";")
-        ++it;
 
     return true;
 }
