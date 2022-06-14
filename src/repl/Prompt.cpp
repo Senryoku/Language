@@ -3,6 +3,30 @@
 #include <filesystem>
 #include <win_error.hpp>
 
+#ifdef WIN32
+std::string get_clipboard_text() {
+    if(!OpenClipboard(nullptr))
+        win_error_exit("OpenClipboard");
+    HANDLE hData = GetClipboardData(CF_TEXT);
+    if(hData == nullptr)
+        win_error_exit("GetClipboardData");
+
+    // Lock the handle to get the actual text pointer
+    char* pszText = static_cast<char*>(GlobalLock(hData));
+    if(pszText == nullptr)
+        win_error_exit("GlobalLock");
+
+    std::string text(pszText);
+
+    // Release the lock
+    GlobalUnlock(hData);
+
+    CloseClipboard();
+
+    return text;
+}
+#endif
+
 Prompt::Prompt() {
 #ifdef WIN32
     if(complex_prompt) {
@@ -134,6 +158,14 @@ std::string Prompt::get_line() {
                                 case 0x11: // Ctrl
                                 case 0x12: // Alt
                                     break;
+                                case 0x56: { // Ctrl+V
+                                    auto clipboard_text = get_clipboard_text();
+                                    if(auto it = clipboard_text.find_first_of('\n'); it != clipboard_text.npos)
+                                        clipboard_text = clipboard_text.substr(0, it - 1);
+                                    current_line += clipboard_text;
+                                    cursor = current_line.size();
+                                    break;
+                                }
                                 default:
                                     // FIXME: This is not a proper way to filter printable caracters (Modifier keys send a keypressed event for example)
                                     if(input_buffer[i].Event.KeyEvent.uChar.AsciiChar >= 0x20 && input_buffer[i].Event.KeyEvent.uChar.AsciiChar < 0x80) {
