@@ -63,7 +63,7 @@ bool Parser::parse(const std::span<Tokenizer::Token>& tokens, AST::Node* curr_no
                 assert(it->type == Tokenizer::Token::Type::Identifier);
                 if(!parse_variable_declaration(tokens, it, curr_node, true))
                     return false;
-                [[fallthrough]];
+                break;
             case Tokenizer::Token::Type::Return: {
                 auto returnNode = curr_node->add_child(new AST::Node(AST::Node::Type::ReturnStatement, *it));
                 ++it;
