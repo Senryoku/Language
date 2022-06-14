@@ -2,11 +2,13 @@ function double(int k) {
 	return k * 2;
 }
 
-int i = 2 * 2 + 5;
+int i = 2 * 2 + 6;
 float j = 0.0; 
 while(i > 0) {
 	j = 0.5 * j + double(i);
 	i = i - 1;
 }
 
-return double(i);
+int r = j; // Poor man's cast
+
+return double(r);

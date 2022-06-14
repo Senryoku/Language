@@ -198,7 +198,7 @@ llvm::Value* Module::codegen(const AST::Node* node) {
         }
         case AST::Node::Type::WhileStatement: {
             llvm::Function* current_function = _llvm_ir_builder.GetInsertBlock()->getParent();
-            auto            current_block = _llvm_ir_builder.GetInsertBlock();
+            // auto            current_block = _llvm_ir_builder.GetInsertBlock();
 
             llvm::BasicBlock* condition_block = llvm::BasicBlock::Create(*_llvm_context, "while_condition", current_function);
             llvm::BasicBlock* loop_block = llvm::BasicBlock::Create(*_llvm_context, "while_loop", current_function);

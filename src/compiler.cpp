@@ -27,8 +27,6 @@
 
 #include <jit/LLVMJIT.hpp>
 
-static std::unique_ptr<llvm::LLVMContext> llvm_context(new llvm::LLVMContext());
-
 int main(int argc, char* argv[]) {
     fmt::print("?{0:-^{2}}?\n"
                "¦{1: ^{2}}¦\n"
@@ -60,9 +58,14 @@ int main(int argc, char* argv[]) {
         std::string source{(std::istreambuf_iterator<char>(input_file)), std::istreambuf_iterator<char>()};
 
         std::vector<Tokenizer::Token> tokens;
-        Tokenizer                     tokenizer(source);
-        while(tokenizer.has_more())
-            tokens.push_back(tokenizer.consume());
+        try {
+            Tokenizer tokenizer(source);
+            while(tokenizer.has_more())
+                tokens.push_back(tokenizer.consume());
+        } catch(const Exception& e) {
+            e.display();
+            return 1;
+        }
 
         // Print tokens
         if(args['t'].set) {
@@ -93,29 +96,32 @@ int main(int argc, char* argv[]) {
                 auto ir_filepath = std::filesystem::path(filename).stem().replace_extension(".ll");
                 if(args['o'].set)
                     ir_filepath = args['o'].value;
-                Module new_module{filename, llvm_context.get()};
-                auto   result = new_module.codegen(*ast);
-                if(!result) {
-                    error("LLVM Codegen returned nullptr.\n");
-                    return 1;
-                }
 
-                // TODO: Remove
-                new_module.get_llvm_module().dump();
-                if(llvm::verifyModule(new_module.get_llvm_module(), &llvm::errs())) {
-                    error("Errors in LLVM Module, exiting...\n");
-                    return 1;
-                }
+                try {
+                    std::unique_ptr<llvm::LLVMContext> llvm_context(new llvm::LLVMContext());
+                    Module                             new_module{filename, llvm_context.get()};
+                    auto                               result = new_module.codegen(*ast);
+                    if(!result) {
+                        error("LLVM Codegen returned nullptr.\n");
+                        return 1;
+                    }
 
-                // Output text IR to output file
-                std::error_code err;
-                auto            file = llvm::raw_fd_ostream(ir_filepath.string(), err);
-                if(!err)
-                    new_module.get_llvm_module().print(file, nullptr);
-                else {
-                    error("Error opening '{}': {}\n", ir_filepath.string(), err);
-                    return 1;
-                }
+                    // TODO: Remove
+                    new_module.get_llvm_module().dump();
+                    if(llvm::verifyModule(new_module.get_llvm_module(), &llvm::errs())) {
+                        error("Errors in LLVM Module, exiting...\n");
+                        return 1;
+                    }
+
+                    // Output text IR to output file
+                    std::error_code err;
+                    auto            file = llvm::raw_fd_ostream(ir_filepath.string(), err);
+                    if(!err)
+                        new_module.get_llvm_module().print(file, nullptr);
+                    else {
+                        error("Error opening '{}': {}\n", ir_filepath.string(), err);
+                        return 1;
+                    }
 
 #if 0
                 auto target_triple = llvm::sys::getDefaultTargetTriple();
@@ -161,11 +167,15 @@ int main(int argc, char* argv[]) {
                 dest.flush();
                 success("Wrote object file '{}'.\n", o_filepath.string());
 #else
-                // Quick Test JIT (TODO: Remove)
-                lang::LLVMJIT jit;
-                auto          return_value = jit.run(std::move(new_module.get_llvm_module_ptr()), std::move(llvm_context));
-                success("JIT main function returned '{}'\n", return_value);
+                    // Quick Test JIT (TODO: Remove)
+                    lang::LLVMJIT jit;
+                    auto          return_value = jit.run(std::move(new_module.get_llvm_module_ptr()), std::move(llvm_context));
+                    success("JIT main function returned '{}'\n", return_value);
 #endif
+                } catch(const std::exception& e) {
+                    error("Exception: {}", e.what());
+                    return 1;
+                }
             }
         }
         return 0;

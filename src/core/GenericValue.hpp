@@ -8,6 +8,8 @@
 
 #include <Logger.hpp>
 
+using TypeID = uint64_t;
+
 struct GenericValue {
     enum class Type {
         Boolean,
@@ -55,6 +57,12 @@ struct GenericValue {
                                   // responsability to manage this memory.
     };
 
+    struct Composite {
+        TypeID        type_id;
+        uint32_t      capacity;
+        GenericValue* members; // FIXME?
+    };
+
     union ValueUnion {
         bool       as_bool;
         int32_t    as_int32_t;
@@ -62,6 +70,7 @@ struct GenericValue {
         char       as_char;
         StringView as_string; // Not sure if this is the right choice?
         Array      as_array;
+        Composite  as_composite;
     };
 
     static GenericValue::Type resolve_operator_type(const std::string_view& op, GenericValue::Type lhs, GenericValue::Type rhs) {
@@ -412,6 +421,21 @@ struct GenericValue {
     bool is_const() const { return flags & Flags::Const; }
     bool is_constexpr() const { return flags & Flags::CompileConst; }
 
+    inline static Type parse_type(const std::string_view& str) {
+        using enum Type;
+        if(str == "int")
+            return Integer;
+        else if(str == "float")
+            return Float;
+        else if(str == "bool")
+            return Boolean;
+        else if(str == "char")
+            return Char;
+        else if(str == "string")
+            return String;
+        return Undefined;
+    }
+
     Type       type;
     Flags      flags;
     ValueUnion value;
@@ -419,21 +443,6 @@ struct GenericValue {
 
 inline GenericValue::Flags operator|(GenericValue::Flags a, GenericValue::Flags b) {
     return static_cast<GenericValue::Flags>(static_cast<int>(a) | static_cast<int>(b));
-}
-
-inline static GenericValue::Type parse_type(const std::string_view& str) {
-    using enum GenericValue::Type;
-    if(str == "int")
-        return Integer;
-    else if(str == "float")
-        return Float;
-    else if(str == "bool")
-        return Boolean;
-    else if(str == "char")
-        return Char;
-    else if(str == "string")
-        return String;
-    return Undefined;
 }
 
 template<>
@@ -469,8 +478,9 @@ struct fmt::formatter<GenericValue::Type> {
             case String: return fmt::format_to(ctx.out(), fg(fmt::color::burly_wood), "{}", "String");
             case Boolean: return fmt::format_to(ctx.out(), fg(fmt::color::royal_blue), "{}", "Boolean");
             case Array: return fmt::format_to(ctx.out(), "{}", "Array");
+            case Composite: return fmt::format_to(ctx.out(), fg(fmt::color::light_green), "{}", "Composite");
             case Undefined: return fmt::format_to(ctx.out(), fg(fmt::color::gray), "{}", "Undefined");
-            default: return fmt::format_to(ctx.out(), fg(fmt::color::red), "{}", "Unknown");
+            default: return fmt::format_to(ctx.out(), fg(fmt::color::red), "{}", "Unknown [by the formatter]");
         }
     }
 };
@@ -502,8 +512,9 @@ struct fmt::formatter<GenericValue> {
                 }
                 return r;
             }
+            case Composite: return fmt::format_to(ctx.out(), "{}", v.type); // TODO
             case Undefined: return fmt::format_to(ctx.out(), fg(fmt::color::gray), "{}", "Undefined");
-            default: return fmt::format_to(ctx.out(), fg(fmt::color::red), "{}", "Unknown");
+            default: return fmt::format_to(ctx.out(), fg(fmt::color::red), "{}", "Unknown [by the formatter]");
         }
     }
 };

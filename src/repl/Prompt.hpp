@@ -38,7 +38,6 @@ class Prompt {
     inline static std::unordered_map<Tokenizer::Token::Type, fmt::color> s_token_colors = {
         {Tokenizer::Token::Type::Unknown, fmt::color::red},
         {Tokenizer::Token::Type::Boolean, fmt::color::royal_blue},
-        {Tokenizer::Token::Type::BuiltInType, fmt::color::royal_blue},
         {Tokenizer::Token::Type::CharLiteral, fmt::color::burly_wood},
         {Tokenizer::Token::Type::Comment, fmt::color::dark_green},
         {Tokenizer::Token::Type::Const, fmt::color::royal_blue},

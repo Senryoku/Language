@@ -40,7 +40,6 @@ class Tokenizer {
             StringLiteral,
             Boolean,
 
-            BuiltInType,
             Operator,
             Identifier,
 
@@ -49,7 +48,7 @@ class Tokenizer {
             Else,
             While,
             For,
-            Class,
+            Type,
 
             Comment,
 
@@ -98,7 +97,7 @@ class Tokenizer {
     std::string point_error(size_t at, size_t line, int from = -1, int to = -1) const noexcept;
 
     static constexpr std::string_view control_chars = ";{}";
-    static constexpr std::string_view operators_chars = "=*/+-^!<>&|%()[]";
+    static constexpr std::string_view operators_chars = ".=*/+-^!<>&|%()[]";
 
     static inline bool    is_allowed_in_operators(char c) { return operators_chars.find(c) != operators_chars.npos; }
     static constexpr char escaped_char[] = {'?', '\'', '\"', '\?', '\a', '\b', '\f', '\n', '\r', '\t', '\v'};
@@ -108,16 +107,16 @@ class Tokenizer {
         {"^", Token::Type::Operator},  {"==", Token::Type::Operator}, {"!=", Token::Type::Operator}, {">", Token::Type::Operator},  {"<", Token::Type::Operator},
         {">=", Token::Type::Operator}, {"<=", Token::Type::Operator}, {"&&", Token::Type::Operator}, {"||", Token::Type::Operator}, {"%", Token::Type::Operator},
         {"++", Token::Type::Operator}, {"--", Token::Type::Operator}, {"(", Token::Type::Operator},  {")", Token::Type::Operator},  {"[", Token::Type::Operator},
-        {"]", Token::Type::Operator},
+        {"]", Token::Type::Operator},  {".", Token::Type::Operator},
     };
 
     const het_unordered_map<Token::Type> keywords{
-        {"function", Token::Type::Function}, {"return", Token::Type::Return},      {"if", Token::Type::If},
-        {"else", Token::Type::Else},         {"while", Token::Type::While},        {"for", Token::Type::For},
-        {"bool", Token::Type::BuiltInType},  {"int", Token::Type::BuiltInType},    {"float", Token::Type::BuiltInType},
-        {"char", Token::Type::BuiltInType},  {"string", Token::Type::BuiltInType}, {"true", Token::Type::Boolean},
-        {"false", Token::Type::Boolean},     {"const", Token::Type::Const},        {"import", Token::Type::Import},
-        {"class", Token::Type::Class},
+        {"function", Token::Type::Function}, {"return", Token::Type::Return},     {"if", Token::Type::If},
+        {"else", Token::Type::Else},         {"while", Token::Type::While},       {"for", Token::Type::For},
+        {"bool", Token::Type::Identifier},   {"int", Token::Type::Identifier},    {"float", Token::Type::Identifier},
+        {"char", Token::Type::Identifier},   {"string", Token::Type::Identifier}, {"true", Token::Type::Boolean},
+        {"false", Token::Type::Boolean},     {"const", Token::Type::Const},       {"import", Token::Type::Import},
+        {"type", Token::Type::Type},
     };
 
     const std::string& _source;
@@ -164,7 +163,6 @@ struct fmt::formatter<Tokenizer::Token::Type> {
             case Tokenizer::Token::Type::Else: return fmt::format_to(ctx.out(), fg(fmt::color::orchid), "{:12}", "Else");
             case Tokenizer::Token::Type::Digits: return fmt::format_to(ctx.out(), "{:12}", "Digits");
             case Tokenizer::Token::Type::Boolean: return fmt::format_to(ctx.out(), "{:12}", "Boolean");
-            case Tokenizer::Token::Type::BuiltInType: return fmt::format_to(ctx.out(), "{:12}", "BuiltInType");
             case Tokenizer::Token::Type::Operator: return fmt::format_to(ctx.out(), "{:12}", "Operator");
             case Tokenizer::Token::Type::Identifier: return fmt::format_to(ctx.out(), fg(fmt::color::light_blue), "{:12}", "Identifier");
             default:

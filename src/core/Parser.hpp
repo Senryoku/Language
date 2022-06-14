@@ -23,8 +23,8 @@ class Parser : public Scoped {
     // FIXME: For many reasons (string creations...) Just correctly type the node from the start (i.e. token stage) I guess?
     // FIXME: Pre and postfix versions of --/++ should have different precedences
     inline static const std::unordered_map<std::string, uint32_t> operator_precedence{
-        {"=", 0u}, {"||", 1u}, {"&&", 2u}, {"==", 3u}, {"!=", 3u}, {">", 3u},  {"<", 3u},  {">=", 3u}, {"<=", 3u}, {"<=", 3u}, {"-", 4u},
-        {"+", 4u}, {"*", 5u},  {"/", 5u},  {"%", 5u},  {"^", 5u},  {"++", 6u}, {"--", 6u}, {"(", 7u},  {"[", 7u},  {")", 7u},  {"]", 7u},
+        {"=", 0u}, {"||", 1u}, {"&&", 2u}, {"==", 3u}, {"!=", 3u}, {">", 3u},  {"<", 3u}, {">=", 3u}, {"<=", 3u}, {"<=", 3u}, {"-", 4u}, {"+", 4u},
+        {"*", 5u}, {"/", 5u},  {"%", 5u},  {"^", 5u},  {"++", 6u}, {"--", 6u}, {"(", 7u}, {"[", 7u},  {".", 7u},  {")", 7u},  {"]", 7u},
     };
 
     static void resolve_operator_type(AST::Node* opNode) {
@@ -95,6 +95,7 @@ class Parser : public Scoped {
     bool parse_while(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode);
     bool parse_for(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode);
     bool parse_function_declaration(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode);
+    bool parse_type_declaration(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode);
     bool parse_boolean(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode);
     bool parse_digits(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode);
     bool parse_float(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* currNode);

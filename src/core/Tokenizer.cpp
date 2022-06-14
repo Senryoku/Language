@@ -110,7 +110,6 @@ Tokenizer::Token Tokenizer::search_next() {
                     type = Token::Type::Operator;
                     auto temp_cursor = _current_pos;
                     // Operators
-                    // FIXME (Better solution than is_allowed_in_operators?)
                     while(!eof() && !is_discardable(_source[temp_cursor]) && is_allowed_in_operators(_source[temp_cursor]))
                         ++temp_cursor;
                     const auto end = temp_cursor;

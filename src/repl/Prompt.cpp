@@ -36,8 +36,8 @@ Prompt ::~Prompt() {
 std::string Prompt::get_line() {
     static const std::string_view prompt_str = " > ";
 
-    if(complex_prompt) {
 #ifdef WIN32
+    if(complex_prompt) {
         // Handle keyboard events rather than simply reading from stdin for a more interactive experience :)
         DWORD                         num_read = 0;
         std::array<INPUT_RECORD, 128> input_buffer;
@@ -113,7 +113,7 @@ std::string Prompt::get_line() {
                                             win_error_exit("GetConsoleScreenBufferInfo");
                                         if(candidates.empty()) {
                                             fmt::print(fg(fmt::color::dark_gray), "\n\033[0JNo match found.");
-                                            // Try WriteConsoleOutput to avoid cursor movement here.
+                                            // TODO: Try WriteConsoleOutput to avoid cursor movement here.
                                         } else {
                                             print("\n\033[0J");
                                             for(auto&& candidate : candidates) {
@@ -130,14 +130,16 @@ std::string Prompt::get_line() {
                                         current_line.erase(cursor, 1);
                                     }
                                     break;
+                                case 0x10: // Shift
+                                case 0x11: // Ctrl
+                                case 0x12: // Alt
+                                    break;
                                 default:
                                     // FIXME: This is not a proper way to filter printable caracters (Modifier keys send a keypressed event for example)
                                     if(input_buffer[i].Event.KeyEvent.uChar.AsciiChar >= 0x20 && input_buffer[i].Event.KeyEvent.uChar.AsciiChar < 0x80) {
                                         current_line.insert(cursor, 1, input_buffer[i].Event.KeyEvent.uChar.AsciiChar);
                                         ++cursor;
-                                    } else /*
-                                        if(input_buffer[i].Event.KeyEvent.uChar.AsciiChar >= 0x80) */
-                                    {
+                                    } else {
                                         std::cout << std::endl
                                                   << "Unhandled key event with virtual key code 0x" << std::hex << input_buffer[i].Event.KeyEvent.wVirtualKeyCode << std::endl;
                                     }
@@ -148,7 +150,8 @@ std::string Prompt::get_line() {
                     case MOUSE_EVENT: // Ignore these events
                     case WINDOW_BUFFER_SIZE_EVENT:
                     case FOCUS_EVENT:
-                    case MENU_EVENT: break;
+                    case MENU_EVENT: // Right click
+                        break;
                     default: error("Unknown event type"); break;
                 }
 
@@ -165,14 +168,15 @@ std::string Prompt::get_line() {
                     win_error_exit("SetConsoleCursorPosition");
             }
         }
-#endif
-    } else {
-        // Simple version, using only standard C++
-        std::string line;
-        print(prompt_str);
-        std::getline(std::cin, line);
-        return line;
+        // Should not be reached
+        return "";
     }
+#endif
+    // Simple version, using only standard C++
+    std::string line;
+    print(prompt_str);
+    std::getline(std::cin, line);
+    return line;
 }
 
 // FIXME: Doesn't handle tokenizing errors very well :)
@@ -193,6 +197,8 @@ std::string Prompt::syntax_highlight(const std::string& str) {
             // Advance cursor_on_input to the end of the token in the input string.
             cursor_on_input = token.value.data() + token.value.size();
         }
+        // Concat the end of the input string that might be ignored by the tokenizer (ending quote, whitespaces...)
+        r += std::string_view{cursor_on_input, str.data() + str.size()};
         return r;
     } catch(...) { return str; }
 }

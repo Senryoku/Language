@@ -26,7 +26,7 @@ TEST(Tokenizer, Add) {
 TEST(Tokenizer, Assignment) {
     TOKENIZE("int i = 0;");
     EXPECT_EQ(tokens.size(), 5);
-    EXPECT_EQ(tokens[0].type, Tokenizer::Token::Type::BuiltInType);
+    EXPECT_EQ(tokens[0].type, Tokenizer::Token::Type::Identifier);
     EXPECT_EQ(tokens[1].type, Tokenizer::Token::Type::Identifier);
     EXPECT_EQ(tokens[2].type, Tokenizer::Token::Type::Operator);
     EXPECT_EQ(tokens[3].type, Tokenizer::Token::Type::Digits);
