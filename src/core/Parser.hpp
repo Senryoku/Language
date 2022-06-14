@@ -27,7 +27,7 @@ class Parser : public Scoped {
         {"*", 5u}, {"/", 5u},  {"%", 5u},  {"^", 5u},  {"++", 6u}, {"--", 6u}, {"(", 7u}, {"[", 7u},  {".", 7u},  {")", 7u},  {"]", 7u},
     };
 
-    static void resolve_operator_type(AST::Node* opNode) {
+    void resolve_operator_type(AST::Node* opNode) {
         assert(opNode->type == AST::Node::Type::BinaryOperator || opNode->type == AST::Node::Type::UnaryOperator);
         if(opNode->type == AST::Node::Type::UnaryOperator) {
             auto rhs = opNode->children[0]->value.type;
@@ -35,6 +35,17 @@ class Parser : public Scoped {
                 rhs = opNode->children[0]->value.value.as_array.type;
             opNode->value.type = rhs;
         } else {
+            if(opNode->token.value == ".") {
+                assert(opNode->children[0]->value.type == GenericValue::Type::Composite);
+                auto type_node = get_type(opNode->children[0]->value.value.as_composite.type_id);
+                for(const auto& c : type_node->children)
+                    if(c->token.value == opNode->children[1]->token.value) {
+                        opNode->value.type = c->value.type;
+                        return;
+                    }
+                assert(false);
+            }
+
             auto lhs = opNode->children[0]->value.type;
             auto rhs = opNode->children[1]->value.type;
             // FIXME: Here we're getting the item type if we're accessing array items. This should be done automatically elsewhere I think (wrap the indexed access in an
