@@ -372,7 +372,7 @@ class Interpreter : public Scoped {
 
   private:
     bool     _returning_value = false;
-    Variable _return_value{{.type = GenericValue::Type::Integer, .value = 0}}; // FIXME: Probably not the right move!
+    Variable _return_value{GenericValue::Type::Integer, 0}; // FIXME: Probably not the right move!
 
     std::vector<GenericValue*> _allocated_arrays;
 

@@ -16,6 +16,8 @@ include_directories("${CMAKE_SOURCE_DIR}/src")
 include_directories("${CMAKE_SOURCE_DIR}/src/core")
 include_directories("${CMAKE_SOURCE_DIR}/src/utils")
 
+set(CMAKE_CXX_STANDARD 20)
+
 if (MSVC)
     add_compile_options(/W4 /utf-8)
 else()

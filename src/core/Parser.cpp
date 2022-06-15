@@ -1,5 +1,7 @@
 #include <Parser.hpp>
 
+#include <algorithm>
+
 bool Parser::parse(const std::span<Tokenizer::Token>& tokens, AST::Node* curr_node) {
     curr_node = curr_node->add_child(new AST::Node(AST::Node::Type::Statement));
     auto it = tokens.begin();

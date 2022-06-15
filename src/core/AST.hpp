@@ -94,7 +94,7 @@ class AST {
 
     // Will perform some really basic optimisations
     void                       optimize();
-    static [[nodiscard]] Node* optimize(Node*);
+    [[nodiscard]] static Node* optimize(Node*);
 
   private:
     Node _root{Node::Type::Root};

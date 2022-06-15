@@ -8,6 +8,9 @@ struct Variable : public GenericValue {
   public:
     Variable() : GenericValue() {}
     Variable(const GenericValue& v) : GenericValue(v) {}
+	Variable(GenericValue::Type type, int32_t _value) : GenericValue(type) {
+		value.as_int32_t = _value;
+	} 
 
     Variable& operator++() {
         assert(!is_const());

@@ -5,6 +5,7 @@
 #include <iostream>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #ifdef WIN32
 #include <stdio.h>

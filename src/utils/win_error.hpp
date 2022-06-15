@@ -25,4 +25,4 @@ void win_error_exit(const char* lpszFunction) {
     LocalFree(lpDisplayBuf);
     ExitProcess(dw);
 }
-#endif;
+#endif
