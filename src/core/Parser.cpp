@@ -557,6 +557,9 @@ bool Parser::parse_type_declaration(const std::span<Tokenizer::Token>& tokens, s
             pop_scope();
             return false;
         }
+        // Skip ';'
+        if(it != tokens.end() && it->type == Tokenizer::Token::Type::Control && it->value == ";")
+            ++it;
         // parse_variable_declaration may add an initialisation node, we'll make this a special case and add the default value as a child.
         if(type_node->children.back()->type == AST::Node::Type::BinaryOperator) {
             auto assignment_node = type_node->pop_child();
