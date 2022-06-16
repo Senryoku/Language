@@ -159,15 +159,17 @@ std::string Prompt::get_line() {
                                 case 0x11: // Ctrl
                                 case 0x12: // Alt
                                     break;
-                                case 0x56: { // Ctrl+V
-                                    auto clipboard_text = get_clipboard_text();
-                                    if(auto it = clipboard_text.find_first_of('\n'); it != clipboard_text.npos)
-                                        clipboard_text = clipboard_text.substr(0, it - 1);
-                                    current_line += clipboard_text;
-                                    cursor = current_line.size();
-                                    break;
-                                }
                                 default:
+                                    if(input_buffer[i].Event.KeyEvent.dwControlKeyState & (LEFT_CTRL_PRESSED | RIGHT_CTRL_PRESSED)) {
+                                        if(input_buffer[i].Event.KeyEvent.wVirtualKeyCode == 0x56) { // Ctrl+V
+                                            auto clipboard_text = get_clipboard_text();
+                                            if(auto it = clipboard_text.find_first_of('\n'); it != clipboard_text.npos)
+                                                clipboard_text = clipboard_text.substr(0, it - 1);
+                                            current_line += clipboard_text;
+                                            cursor = current_line.size();
+                                            break;
+                                        }
+                                    }
                                     // FIXME: This is not a proper way to filter printable caracters (Modifier keys send a keypressed event for example)
                                     if(input_buffer[i].Event.KeyEvent.uChar.AsciiChar >= 0x20 && input_buffer[i].Event.KeyEvent.uChar.AsciiChar < 0x80) {
                                         current_line.insert(cursor, 1, input_buffer[i].Event.KeyEvent.uChar.AsciiChar);
