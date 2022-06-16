@@ -78,13 +78,10 @@ Tokenizer::Token Tokenizer::search_next() {
                 type = Token::Type::StringLiteral;
                 return Token{type, std::string_view{_source.begin() + begin + 1, _source.begin() + (_current_pos - 1)}, _current_line, _current_column};
             }
-            case ',': [[fallthrough]];
-            case ';': [[fallthrough]];
-            case '{': [[fallthrough]];
-            case '}': {
-                type = Token::Type::Control;
-                break;
-            }
+            case ',': type = Token::Type::Comma; break;
+            case ';': type = Token::Type::EndStatement; break;
+            case '{': type = Token::Type::OpenScope; break;
+            case '}': type = Token::Type::CloseScope; break;
             case '/':
                 // Comments, checks for a second /, fallthrough to the general case if not found.
                 if(!eof() && peek() == '/') {

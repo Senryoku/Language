@@ -42,6 +42,8 @@ int main(int argc, char* argv[]) {
 
     Prompt prompt;
 
+    bool debug = false;
+
     auto load = [&](const auto& path) {
         std::ifstream file(path);
         if(!file) {
@@ -112,6 +114,8 @@ int main(int argc, char* argv[]) {
             interpreter.execute(ast.getRoot());
             auto end = clock.now();
             log.print("Done in {}ms, returned: '{}'.\n", std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count(), interpreter.get_return_value());
+        } else if(input == "debug") {
+            debug = !debug;
         } else {
             lines.push_back(input);
             auto& line = lines.back();
@@ -124,7 +128,8 @@ int main(int argc, char* argv[]) {
             try {
                 while(tokenizer.has_more()) {
                     auto t = tokenizer.consume();
-                    // print("{}\n", t);
+                    if(debug)
+                        print("{}\n", t);
                     tokens.push_back(t);
                 }
 

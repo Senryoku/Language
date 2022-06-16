@@ -20,7 +20,7 @@ TEST(Tokenizer, Add) {
     EXPECT_EQ(tokens[0].type, Tokenizer::Token::Type::Digits);
     EXPECT_EQ(tokens[1].type, Tokenizer::Token::Type::Addition);
     EXPECT_EQ(tokens[2].type, Tokenizer::Token::Type::Digits);
-    EXPECT_EQ(tokens[3].type, Tokenizer::Token::Type::Control);
+    EXPECT_EQ(tokens[3].type, Tokenizer::Token::Type::EndStatement);
 }
 
 TEST(Tokenizer, Assignment) {
@@ -30,5 +30,5 @@ TEST(Tokenizer, Assignment) {
     EXPECT_EQ(tokens[1].type, Tokenizer::Token::Type::Identifier);
     EXPECT_EQ(tokens[2].type, Tokenizer::Token::Type::Assignment);
     EXPECT_EQ(tokens[3].type, Tokenizer::Token::Type::Digits);
-    EXPECT_EQ(tokens[4].type, Tokenizer::Token::Type::Control);
+    EXPECT_EQ(tokens[4].type, Tokenizer::Token::Type::EndStatement);
 }

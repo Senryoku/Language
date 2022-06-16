@@ -42,7 +42,7 @@ class Prompt {
         {Tokenizer::Token::Type::CharLiteral, fmt::color::burly_wood},
         {Tokenizer::Token::Type::Comment, fmt::color::dark_green},
         {Tokenizer::Token::Type::Const, fmt::color::royal_blue},
-        {Tokenizer::Token::Type::Control, fmt::color::light_gray},
+        {Tokenizer::Token::Type::EndStatement, fmt::color::light_gray},
         {Tokenizer::Token::Type::Digits, fmt::color::golden_rod},
         {Tokenizer::Token::Type::If, fmt::color::royal_blue},
         {Tokenizer::Token::Type::Else, fmt::color::royal_blue},

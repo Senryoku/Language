@@ -30,7 +30,10 @@ class Tokenizer {
   public:
     struct Token {
         enum class Type {
-            Control,
+            EndStatement,
+            Comma,
+            OpenScope,
+            CloseScope,
 
             // Constants
             Digits,
@@ -199,7 +202,10 @@ struct fmt::formatter<Tokenizer::Token::Type> {
         switch(t) {
 #define OP(name) \
     case Tokenizer::Token::Type::name: return fmt::format_to(ctx.out(), "{:12}", #name);
-            OP(Control);
+            OP(Comma);
+            OP(EndStatement);
+            OP(OpenScope);
+            OP(CloseScope);
             OP(Digits);
             OP(Boolean);
             OP(Assignment);

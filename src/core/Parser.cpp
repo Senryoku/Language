@@ -8,36 +8,28 @@ bool Parser::parse(const std::span<Tokenizer::Token>& tokens, AST::Node* curr_no
     while(it != tokens.end()) {
         const auto& token = *it;
         switch(token.type) {
-            case Tokenizer::Token::Type::Control: {
-                switch(token.value[0]) {
-                    case '{': { // Open a new scope
-                        curr_node = curr_node->add_child(new AST::Node(AST::Node::Type::Scope, *it));
-                        push_scope();
-                        ++it;
-                        break;
-                    }
-                    case '}': { // Close nearest scope
-                        while(curr_node->type != AST::Node::Type::Scope && curr_node->parent != nullptr)
-                            curr_node = curr_node->parent;
-                        if(curr_node->type != AST::Node::Type::Scope) {
-                            error("[Parser] Syntax error: Unmatched '}' one line {}.\n", it->line);
-                            return false;
-                        }
-                        curr_node = curr_node->parent;
-                        pop_scope();
-                        ++it;
-                        break;
-                    }
-                    case ';':
-                        curr_node = curr_node->parent;
-                        curr_node = curr_node->add_child(new AST::Node(AST::Node::Type::Statement, *it));
-                        ++it;
-                        break;
-                    default:
-                        warn("[Parser] Unused token: {}.\n", *it);
-                        ++it;
-                        break;
+            case Tokenizer::Token::Type::OpenScope: {
+                curr_node = curr_node->add_child(new AST::Node(AST::Node::Type::Scope, *it));
+                push_scope();
+                ++it;
+                break;
+            }
+            case Tokenizer::Token::Type::CloseScope: {
+                while(curr_node->type != AST::Node::Type::Scope && curr_node->parent != nullptr)
+                    curr_node = curr_node->parent;
+                if(curr_node->type != AST::Node::Type::Scope) {
+                    error("[Parser] Syntax error: Unmatched '}' one line {}.\n", it->line);
+                    return false;
                 }
+                curr_node = curr_node->parent;
+                pop_scope();
+                ++it;
+                break;
+            }
+            case Tokenizer::Token::Type::EndStatement: {
+                curr_node = curr_node->parent;
+                curr_node = curr_node->add_child(new AST::Node(AST::Node::Type::Statement, *it));
+                ++it;
                 break;
             }
             case Tokenizer::Token::Type::If: {
@@ -47,7 +39,7 @@ bool Parser::parse(const std::span<Tokenizer::Token>& tokens, AST::Node* curr_no
                 }
                 auto ifNode = curr_node->add_child(new AST::Node(AST::Node::Type::IfStatement, *it));
                 it += 2;
-                if(!parse_next_expression(tokens, it, ifNode, 0, true)) {
+                if(!parse_next_expression(tokens, it, ifNode, -1, true)) {
                     delete curr_node->pop_child();
                     return false;
                 }
@@ -69,7 +61,7 @@ bool Parser::parse(const std::span<Tokenizer::Token>& tokens, AST::Node* curr_no
             case Tokenizer::Token::Type::Return: {
                 auto returnNode = curr_node->add_child(new AST::Node(AST::Node::Type::ReturnStatement, *it));
                 ++it;
-                if(!parse_next_expression(tokens, it, returnNode, 0)) {
+                if(!parse_next_expression(tokens, it, returnNode)) {
                     delete curr_node->pop_child();
                     return false;
                 }
@@ -218,7 +210,7 @@ bool Parser::parse_next_expression(const std::span<Tokenizer::Token>& tokens, st
 
     if(it->type == Tokenizer::Token::Type::OpenParenthesis) {
         ++it;
-        if(!parse_next_expression(tokens, it, exprNode, 0, true)) {
+        if(!parse_next_expression(tokens, it, exprNode, -1, true)) {
             delete curr_node->pop_child();
             return false;
         }
@@ -226,7 +218,7 @@ bool Parser::parse_next_expression(const std::span<Tokenizer::Token>& tokens, st
 
     bool stop = false;
 
-    while(it != tokens.end() && !(it->type == Tokenizer::Token::Type::Control && (it->value == ";" || it->value == ",")) && !stop) {
+    while(it != tokens.end() && !(it->type == Tokenizer::Token::Type::EndStatement || it->type == Tokenizer::Token::Type::Comma) && !stop) {
         // TODO: Check other types!
         switch(it->type) {
             using enum Tokenizer::Token::Type;
@@ -303,9 +295,6 @@ bool Parser::parse_next_expression(const std::span<Tokenizer::Token>& tokens, st
                 } else {
                     stop = true;
                 }
-                break;
-            }
-            case Control: {
                 break;
             }
             default: {
@@ -395,7 +384,7 @@ bool Parser::parse_identifier(const std::span<Tokenizer::Token>& tokens, std::sp
         it += 2;
         // Get the index and add it as a child.
         // FIXME: Search the matching ']' here?
-        if(!parse_next_expression(tokens, it, access_operator_node, 0, false)) {
+        if(!parse_next_expression(tokens, it, access_operator_node, -1, false)) {
             delete curr_node->pop_child();
             return false;
         }
@@ -444,7 +433,7 @@ bool Parser::parse_while(const std::span<Tokenizer::Token>& tokens, std::span<To
     }
     // Parse condition and add it as first child
     ++it; // Point to the beginning of the expression until ')' ('search_for_matching_bracket': true)
-    if(!parse_next_expression(tokens, it, whileNode, 0, true)) {
+    if(!parse_next_expression(tokens, it, whileNode, -1, true)) {
         delete curr_node->pop_child();
         return false;
     }
@@ -482,7 +471,7 @@ bool Parser::parse_for(const std::span<Tokenizer::Token>& tokens, std::span<Toke
         return false;
     }
     // Increment (until bracket)
-    if(!parse_next_expression(tokens, it, forNode, 0, true)) {
+    if(!parse_next_expression(tokens, it, forNode, -1, true)) {
         delete curr_node->pop_child();
         return false;
     }
@@ -576,7 +565,7 @@ bool Parser::parse_type_declaration(const std::span<Tokenizer::Token>& tokens, s
     }
 
     ++it;
-    if(!(it->type == Tokenizer::Token::Type::Control && it->value == "{")) {
+    if(!(it->type == Tokenizer::Token::Type::OpenScope)) {
         error("Expected '{{' after type declaration on line {}, got {}.\n", it->line, it->value);
         delete curr_node->pop_child();
         return false;
@@ -585,14 +574,14 @@ bool Parser::parse_type_declaration(const std::span<Tokenizer::Token>& tokens, s
     push_scope();
     ++it;
 
-    while(it != tokens.end() && !(it->type == Tokenizer::Token::Type::Control && it->value == "}")) {
+    while(it != tokens.end() && !(it->type == Tokenizer::Token::Type::CloseScope)) {
         if(!parse_variable_declaration(tokens, it, type_node)) {
             delete curr_node->pop_child();
             pop_scope();
             return false;
         }
         // Skip ';'
-        if(it != tokens.end() && it->type == Tokenizer::Token::Type::Control && it->value == ";")
+        if(it != tokens.end() && it->type == Tokenizer::Token::Type::EndStatement)
             ++it;
         // parse_variable_declaration may add an initialisation node, we'll make this a special case and add the default value as a child.
         if(type_node->children.back()->type == AST::Node::Type::BinaryOperator) {
@@ -689,7 +678,7 @@ bool Parser::parse_operator(const std::span<Tokenizer::Token>& tokens, std::span
 
     // '(', but not a function declaration or call operator.
     if(operator_type == Tokenizer::Token::Type::OpenParenthesis && curr_node->children.empty())
-        return parse_next_expression(tokens, it, curr_node, 0);
+        return parse_next_expression(tokens, it, curr_node);
 
     if(operator_type == Tokenizer::Token::Type::CloseParenthesis) {
         // Should have been handled by others parsing functions.
@@ -712,7 +701,7 @@ bool Parser::parse_operator(const std::span<Tokenizer::Token>& tokens, std::span
         ++it;
         // Parse arguments
         while(it != tokens.end() && it->value != ")") {
-            if(!parse_next_expression(tokens, it, call_node, 0)) {
+            if(!parse_next_expression(tokens, it, call_node)) {
                 delete curr_node->pop_child();
                 return false;
             }
@@ -748,7 +737,7 @@ bool Parser::parse_operator(const std::span<Tokenizer::Token>& tokens, std::span
     }
 
     if(operator_type == Tokenizer::Token::Type::OpenSubscript) {
-        if(!parse_next_expression(tokens, it, binaryOperatorNode, 0)) {
+        if(!parse_next_expression(tokens, it, binaryOperatorNode)) {
             delete curr_node->pop_child();
             return false;
         }
@@ -856,7 +845,7 @@ bool Parser::parse_variable_declaration(const std::span<Tokenizer::Token>& token
         varDecNode->value.value.as_array.type = varDecNode->value.type;
         varDecNode->value.type = GenericValue::Type::Array;
         ++it;
-        if(!parse_next_expression(tokens, it, varDecNode, 0)) {
+        if(!parse_next_expression(tokens, it, varDecNode)) {
             cleanup_on_error();
             return false;
         }
