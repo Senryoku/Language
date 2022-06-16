@@ -3,9 +3,9 @@
 #include <array>
 #include <cassert>
 #include <het_unordered_map.hpp>
+#include <stdexcept>
 #include <string>
 #include <string_view>
-#include <stdexcept>
 
 #include <Logger.hpp>
 
@@ -31,25 +31,48 @@ class Tokenizer {
     struct Token {
         enum class Type {
             Control,
-            Function,
-            Return,
-            Const,
+
             // Constants
             Digits,
             Float,
             CharLiteral,
             StringLiteral,
             Boolean,
+            // Operators
+            Assignment,
+            Xor,
+            Or,
+            And,
+            Equal,
+            Different,
+            Lesser,
+            LesserOrEqual,
+            Greater,
+            GreaterOrEqual,
+            Addition,
+            Substraction,
+            Multiplication,
+            Division,
+            Modulus,
+            Increment,
+            Decrement,
+            OpenParenthesis,
+            CloseParenthesis,
+            OpenSubscript,
+            CloseSubscript,
+            MemberAccess,
 
-            Operator,
             Identifier,
-
+            // Keywords
             Import,
             If,
             Else,
             While,
             For,
             Type,
+            Function,
+            Return,
+            Const,
 
             Comment,
 
@@ -104,11 +127,28 @@ class Tokenizer {
     static constexpr char escaped_char[] = {'?', '\'', '\"', '\?', '\a', '\b', '\f', '\n', '\r', '\t', '\v'};
 
     const het_unordered_map<Token::Type> operators{
-        {"=", Token::Type::Operator},  {"*", Token::Type::Operator},  {"+", Token::Type::Operator},  {"-", Token::Type::Operator},  {"/", Token::Type::Operator},
-        {"^", Token::Type::Operator},  {"==", Token::Type::Operator}, {"!=", Token::Type::Operator}, {">", Token::Type::Operator},  {"<", Token::Type::Operator},
-        {">=", Token::Type::Operator}, {"<=", Token::Type::Operator}, {"&&", Token::Type::Operator}, {"||", Token::Type::Operator}, {"%", Token::Type::Operator},
-        {"++", Token::Type::Operator}, {"--", Token::Type::Operator}, {"(", Token::Type::Operator},  {")", Token::Type::Operator},  {"[", Token::Type::Operator},
-        {"]", Token::Type::Operator},  {".", Token::Type::Operator},
+        {"=", Token::Type::Assignment},
+        {"*", Token::Type::Multiplication},
+        {"+", Token::Type::Addition},
+        {"-", Token::Type::Substraction},
+        {"/", Token::Type::Division},
+        {"^", Token::Type::Xor},
+        {"==", Token::Type::Equal},
+        {"!=", Token::Type::Different},
+        {">", Token::Type::Greater},
+        {"<", Token::Type::Lesser},
+        {">=", Token::Type::GreaterOrEqual},
+        {"<=", Token::Type::LesserOrEqual},
+        {"&&", Token::Type::And},
+        {"||", Token::Type::Or},
+        {"%", Token::Type::Modulus},
+        {"++", Token::Type::Increment},
+        {"--", Token::Type::Decrement},
+        {"(", Token::Type::OpenParenthesis},
+        {")", Token::Type::CloseParenthesis},
+        {"[", Token::Type::OpenSubscript},
+        {"]", Token::Type::CloseSubscript},
+        {".", Token::Type::MemberAccess},
     };
 
     const het_unordered_map<Token::Type> keywords{
@@ -117,7 +157,7 @@ class Tokenizer {
         {"bool", Token::Type::Identifier},   {"int", Token::Type::Identifier},    {"float", Token::Type::Identifier},
         {"char", Token::Type::Identifier},   {"string", Token::Type::Identifier}, {"true", Token::Type::Boolean},
         {"false", Token::Type::Boolean},     {"const", Token::Type::Const},       {"import", Token::Type::Import},
-        {"type", Token::Type::Type},
+        {"type", Token::Type::Type},         {"and", Token::Type::And},           {"or", Token::Type::Or},
     };
 
     const std::string& _source;
@@ -157,15 +197,39 @@ struct fmt::formatter<Tokenizer::Token::Type> {
     template<typename FormatContext>
     auto format(const Tokenizer::Token::Type& t, FormatContext& ctx) const -> decltype(ctx.out()) {
         switch(t) {
-            case Tokenizer::Token::Type::Control: return fmt::format_to(ctx.out(), "{:12}", "Control");
+#define OP(name) \
+    case Tokenizer::Token::Type::name: return fmt::format_to(ctx.out(), "{:12}", #name);
+            OP(Control);
+            OP(Digits);
+            OP(Boolean);
+            OP(Assignment);
+            OP(Xor);
+            OP(Or);
+            OP(And);
+            OP(Equal);
+            OP(Different);
+            OP(Lesser);
+            OP(LesserOrEqual);
+            OP(Greater);
+            OP(GreaterOrEqual);
+            OP(Addition);
+            OP(Substraction);
+            OP(Multiplication);
+            OP(Division);
+            OP(Modulus);
+            OP(Increment);
+            OP(Decrement);
+            OP(OpenParenthesis);
+            OP(CloseParenthesis);
+            OP(OpenSubscript);
+            OP(CloseSubscript);
+            OP(MemberAccess);
             case Tokenizer::Token::Type::Function: return fmt::format_to(ctx.out(), fg(fmt::color::orchid), "{:12}", "Function");
             case Tokenizer::Token::Type::While: return fmt::format_to(ctx.out(), fg(fmt::color::orchid), "{:12}", "While");
             case Tokenizer::Token::Type::If: return fmt::format_to(ctx.out(), fg(fmt::color::orchid), "{:12}", "If");
             case Tokenizer::Token::Type::Else: return fmt::format_to(ctx.out(), fg(fmt::color::orchid), "{:12}", "Else");
-            case Tokenizer::Token::Type::Digits: return fmt::format_to(ctx.out(), "{:12}", "Digits");
-            case Tokenizer::Token::Type::Boolean: return fmt::format_to(ctx.out(), "{:12}", "Boolean");
-            case Tokenizer::Token::Type::Operator: return fmt::format_to(ctx.out(), "{:12}", "Operator");
             case Tokenizer::Token::Type::Identifier: return fmt::format_to(ctx.out(), fg(fmt::color::light_blue), "{:12}", "Identifier");
+#undef OP
             default:
             case Tokenizer::Token::Type::Unknown: return fmt::format_to(ctx.out(), "{:12}", "Unknown");
         }

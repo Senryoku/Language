@@ -108,7 +108,6 @@ Tokenizer::Token Tokenizer::search_next() {
                     }
                     type = found_decimal_separator ? Token::Type::Float : Token::Type::Digits;
                 } else {
-                    type = Token::Type::Operator;
                     auto temp_cursor = _current_pos;
                     // Operators
                     while(!eof() && !is_discardable(_source[temp_cursor]) && is_allowed_in_operators(_source[temp_cursor]))
@@ -119,6 +118,7 @@ Tokenizer::Token Tokenizer::search_next() {
                     if(temp_cursor == begin)
                         throw Exception(fmt::format("[Tokenizer] Error: No matching operator for '{}'.", std::string_view{_source.begin() + begin, _source.begin() + end}),
                                         point_error(temp_cursor, _current_line, begin, end));
+                    type = operators.find(std::string_view{_source.begin() + begin, _source.begin() + temp_cursor})->second;
                     // Sync our cursor with the temp one.
                     while(_current_pos != temp_cursor)
                         advance();

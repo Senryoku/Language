@@ -20,12 +20,22 @@ class Parser : public Scoped {
         push_scope();
     }
 
-    // FIXME: For many reasons (string creations...) Just correctly type the node from the start (i.e. token stage) I guess?
     // FIXME: Pre and postfix versions of --/++ should have different precedences
-    inline static const std::unordered_map<std::string, uint32_t> operator_precedence{
-        {"=", 0u}, {"||", 1u}, {"&&", 2u}, {"==", 3u}, {"!=", 3u}, {">", 3u},  {"<", 3u}, {">=", 3u}, {"<=", 3u}, {"<=", 3u}, {"-", 4u}, {"+", 4u},
-        {"*", 5u}, {"/", 5u},  {"%", 5u},  {"^", 5u},  {"++", 6u}, {"--", 6u}, {"(", 7u}, {"[", 7u},  {".", 7u},  {")", 7u},  {"]", 7u},
+    inline static const std::unordered_map<Tokenizer::Token::Type, uint32_t> operator_precedence{
+        {Tokenizer::Token::Type::Assignment, 16u},    {Tokenizer::Token::Type::Or, 15u},          {Tokenizer::Token::Type::And, 14u},
+        {Tokenizer::Token::Type::Xor, 12u},           {Tokenizer::Token::Type::Equal, 10u},       {Tokenizer::Token::Type::Different, 10u},
+        {Tokenizer::Token::Type::Greater, 9u},        {Tokenizer::Token::Type::Lesser, 9u},       {Tokenizer::Token::Type::GreaterOrEqual, 9u},
+        {Tokenizer::Token::Type::LesserOrEqual, 9u},  {Tokenizer::Token::Type::Substraction, 6u}, {Tokenizer::Token::Type::Addition, 6u},
+        {Tokenizer::Token::Type::Multiplication, 5u}, {Tokenizer::Token::Type::Division, 5u},     {Tokenizer::Token::Type::Modulus, 5u},
+        {Tokenizer::Token::Type::Increment, 3u},      {Tokenizer::Token::Type::Decrement, 3u},    {Tokenizer::Token::Type::OpenParenthesis, 2u},
+        {Tokenizer::Token::Type::OpenSubscript, 2u},  {Tokenizer::Token::Type::MemberAccess, 2u}, {Tokenizer::Token::Type::CloseParenthesis, 2u},
+        {Tokenizer::Token::Type::CloseSubscript, 2u},
     };
+
+    bool is_unary_operator(Tokenizer::Token::Type type) {
+        return type == Tokenizer::Token::Type::Addition || type == Tokenizer::Token::Type::Substraction || type == Tokenizer::Token::Type::Increment ||
+               type == Tokenizer::Token::Type::Decrement;
+    }
 
     void resolve_operator_type(AST::Node* opNode) {
         assert(opNode->type == AST::Node::Type::BinaryOperator || opNode->type == AST::Node::Type::UnaryOperator);
@@ -92,6 +102,9 @@ class Parser : public Scoped {
     // Doesn't advance the iterator.
     bool peek(const std::span<Tokenizer::Token>& tokens, const std::span<Tokenizer::Token>::iterator& it, const Tokenizer::Token::Type& type, const std::string& value) {
         return it + 1 != tokens.end() && (it + 1)->type == type && (it + 1)->value == value;
+    }
+    bool peek(const std::span<Tokenizer::Token>& tokens, const std::span<Tokenizer::Token>::iterator& it, const Tokenizer::Token::Type& type) {
+        return it + 1 != tokens.end() && (it + 1)->type == type;
     }
 
   private:
