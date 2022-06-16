@@ -266,3 +266,51 @@ TEST(Other, MandelbrotFor) {
     EXPECT_EQ(interpreter.get_return_value().type, GenericValue::Type::Boolean);
     EXPECT_EQ(interpreter.get_return_value().value.as_bool, true);
 }
+
+TEST(Type, TwoSimpleTypes) {
+    PARSE_INTERP(R"(
+    type type1 {
+        int i;
+    }
+    type type2 {
+        int j;
+    }
+    type1 var1;
+    type2 var2;
+)");
+}
+
+TEST(Type, MemberAccess) {
+    PARSE_INTERP(R"(
+    type complex {
+        float i = 0;
+        float j = 0;
+    }
+
+    complex z;
+    z.i = 2.55;
+    z.j = 2.0 * z.i;
+    return z.j;
+)");
+    EXPECT_EQ(interpreter.get_return_value().type, GenericValue::Type::Float);
+    EXPECT_FLOAT_EQ(interpreter.get_return_value().value.as_float, 2.0f * 2.55f);
+}
+
+TEST(Type, TwoSimpleTypesMemberAccess) {
+    PARSE_INTERP(R"(
+    type type1 {
+        int i;
+    }
+    type type2 {
+        int j;
+    }
+    type1 var1;
+    type2 var2;
+    var1.i = 6;
+    var2.j = 8;
+    var2.j = var2.j * var1.i;
+    return var2.j;
+)");
+    EXPECT_EQ(interpreter.get_return_value().type, GenericValue::Type::Integer);
+    EXPECT_EQ(interpreter.get_return_value().value.as_int32_t, 6 * 8);
+}
