@@ -356,6 +356,21 @@ TEST(Type, TwoSimpleTypesMemberAccess) {
     EXPECT_EQ(interpreter.get_return_value().value.as_int32_t, 6 * 8);
 }
 
+TEST(Type, Assignment) {
+    PARSE_INTERP(R"(
+    type NewType {
+        int i = 0;
+    }
+    NewType var1;
+    NewType var2;
+    var2.i = 1337;
+    var1 = var2;
+    return var1.i;
+)");
+    EXPECT_EQ(interpreter.get_return_value().type, GenericValue::Type::Integer);
+    EXPECT_EQ(interpreter.get_return_value().value.as_int32_t, 1337);
+}
+
 TEST(Type, Nested) {
     PARSE_INTERP(R"(
     type type1 {

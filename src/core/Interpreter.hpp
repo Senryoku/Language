@@ -46,6 +46,7 @@ class Interpreter : public Scoped {
         auto arr = new GenericValue[member_count];
         _allocated_arrays.push_back(arr);
         var.value.as_composite.members = arr;
+        var.value.as_composite.member_count = member_count;
         for(size_t idx = 0; idx < type->children.size(); ++idx) {
             arr[idx].type = type->children[idx]->value.type;
             // Also allocate nested variables

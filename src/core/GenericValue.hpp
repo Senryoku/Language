@@ -60,6 +60,7 @@ struct GenericValue {
     struct Composite {
         TypeID        type_id;
         GenericValue* members; // FIXME?
+        size_t        member_count;
     };
 
     union ValueUnion {
@@ -74,6 +75,10 @@ struct GenericValue {
 
     static GenericValue::Type resolve_operator_type(const std::string_view& op, GenericValue::Type lhs, GenericValue::Type rhs) {
         // TODO: Cleanup?
+        if(op == ".")
+            return rhs;
+        if(op == "=")
+            return lhs;
         if(op == "==" || op == "!=" || op == "<" || op == ">" || op == "=>" || op == "<=" || op == "&&" || op == "||")
             return GenericValue::Type::Boolean;
         else if(lhs == GenericValue::Type::Integer && rhs == GenericValue::Type::Integer)
@@ -102,6 +107,13 @@ struct GenericValue {
                     return *this;
                 }
                 break;
+            }
+            case GenericValue::Type::Composite: {
+                assert(value.as_composite.type_id == rhs.value.as_composite.type_id);
+                assert(value.as_composite.member_count == rhs.value.as_composite.member_count);
+                for(size_t i = 0; i < rhs.value.as_composite.member_count; ++i)
+                    value.as_composite.members[i] = rhs.value.as_composite.members[i];
+                return *this;
             }
         }
         error("[GenericValue:{}] Error assigning {} to {}.\n", __LINE__, rhs, *this);
