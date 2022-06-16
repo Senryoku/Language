@@ -267,6 +267,47 @@ TEST(Other, MandelbrotFor) {
     EXPECT_EQ(interpreter.get_return_value().value.as_bool, true);
 }
 
+TEST(Type, BasicDeclaration) {
+    PARSE_INTERP(R"(
+    type type1 {
+        int i;
+    }
+)");
+}
+
+TEST(Type, DefaultValue) {
+    PARSE_INTERP(R"(
+    type type1 {
+        int i = 1337;
+    }
+)");
+}
+
+TEST(Type, MemberAccess) {
+    PARSE_INTERP(R"(
+    type user_type {
+        int i = 1337;
+    }
+    user_type var;
+    return var.i;
+)");
+    EXPECT_EQ(interpreter.get_return_value().type, GenericValue::Type::Integer);
+    EXPECT_EQ(interpreter.get_return_value().value.as_int32_t, 1337);
+}
+
+TEST(Type, MemberMutation) {
+    PARSE_INTERP(R"(
+    type user_type {
+        int i = 1337;
+    }
+    user_type var;
+    var.i = 1234;
+    return var.i;
+)");
+    EXPECT_EQ(interpreter.get_return_value().type, GenericValue::Type::Integer);
+    EXPECT_EQ(interpreter.get_return_value().value.as_int32_t, 1234);
+}
+
 TEST(Type, TwoSimpleTypes) {
     PARSE_INTERP(R"(
     type type1 {
@@ -280,7 +321,7 @@ TEST(Type, TwoSimpleTypes) {
 )");
 }
 
-TEST(Type, MemberAccess) {
+TEST(Type, MemberAccessAndMutation) {
     PARSE_INTERP(R"(
     type complex {
         float i = 0;
