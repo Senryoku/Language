@@ -39,7 +39,7 @@ bool Parser::parse(const std::span<Tokenizer::Token>& tokens, AST::Node* curr_no
                 }
                 auto ifNode = curr_node->add_child(new AST::Node(AST::Node::Type::IfStatement, *it));
                 it += 2;
-                if(!parse_next_expression(tokens, it, ifNode, -1, true)) {
+                if(!parse_next_expression(tokens, it, ifNode, max_precedence, true)) {
                     delete curr_node->pop_child();
                     return false;
                 }
@@ -210,7 +210,7 @@ bool Parser::parse_next_expression(const std::span<Tokenizer::Token>& tokens, st
 
     if(it->type == Tokenizer::Token::Type::OpenParenthesis) {
         ++it;
-        if(!parse_next_expression(tokens, it, exprNode, -1, true)) {
+        if(!parse_next_expression(tokens, it, exprNode, max_precedence, true)) {
             delete curr_node->pop_child();
             return false;
         }
@@ -384,7 +384,7 @@ bool Parser::parse_identifier(const std::span<Tokenizer::Token>& tokens, std::sp
         it += 2;
         // Get the index and add it as a child.
         // FIXME: Search the matching ']' here?
-        if(!parse_next_expression(tokens, it, access_operator_node, -1, false)) {
+        if(!parse_next_expression(tokens, it, access_operator_node, max_precedence, false)) {
             delete curr_node->pop_child();
             return false;
         }
@@ -433,7 +433,7 @@ bool Parser::parse_while(const std::span<Tokenizer::Token>& tokens, std::span<To
     }
     // Parse condition and add it as first child
     ++it; // Point to the beginning of the expression until ')' ('search_for_matching_bracket': true)
-    if(!parse_next_expression(tokens, it, whileNode, -1, true)) {
+    if(!parse_next_expression(tokens, it, whileNode, max_precedence, true)) {
         delete curr_node->pop_child();
         return false;
     }
@@ -471,7 +471,7 @@ bool Parser::parse_for(const std::span<Tokenizer::Token>& tokens, std::span<Toke
         return false;
     }
     // Increment (until bracket)
-    if(!parse_next_expression(tokens, it, forNode, -1, true)) {
+    if(!parse_next_expression(tokens, it, forNode, max_precedence, true)) {
         delete curr_node->pop_child();
         return false;
     }
@@ -773,7 +773,7 @@ bool Parser::parse_operator(const std::span<Tokenizer::Token>& tokens, std::span
             delete curr_node->pop_child();
             return false;
         }
-        auto identifierNode = binaryOperatorNode->add_child(new AST::Node(AST::Node::Type::MemberIdentifier, *it));
+        binaryOperatorNode->add_child(new AST::Node(AST::Node::Type::MemberIdentifier, *it));
         ++it;
     } else {
         // Lookahead for rhs

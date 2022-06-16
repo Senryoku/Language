@@ -20,6 +20,7 @@ class Parser : public Scoped {
         push_scope();
     }
 
+    static const uint32_t max_precedence = static_cast<uint32_t>(-1);
     // FIXME: Pre and postfix versions of --/++ should have different precedences
     inline static const std::unordered_map<Tokenizer::Token::Type, uint32_t> operator_precedence{
         {Tokenizer::Token::Type::Assignment, 16u},    {Tokenizer::Token::Type::Or, 15u},          {Tokenizer::Token::Type::And, 14u},
@@ -111,7 +112,7 @@ class Parser : public Scoped {
     bool parse(const std::span<Tokenizer::Token>& tokens, AST::Node* curr_node);
 
     bool parse_next_scope(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* curr_node);
-    bool parse_next_expression(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* curr_node, uint32_t precedence = -1,
+    bool parse_next_expression(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* curr_node, uint32_t precedence = max_precedence,
                                bool search_for_matching_bracket = false);
     bool parse_identifier(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* curr_node);
     bool parse_statement(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* curr_node);
