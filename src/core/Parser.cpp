@@ -164,7 +164,7 @@ bool Parser::parse(const std::span<Tokenizer::Token>& tokens, AST::Node* curr_no
 }
 
 bool Parser::parse_next_scope(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* curr_node) {
-    if(it == tokens.end() || it->value != "{") {
+    if(it == tokens.end() || it->type != Tokenizer::Token::Type::OpenScope) {
         if(it == tokens.end())
             error("[Parser] Syntax error: Expected scope opening, got end-of-document.\n");
         else
@@ -175,9 +175,9 @@ bool Parser::parse_next_scope(const std::span<Tokenizer::Token>& tokens, std::sp
     auto   end = it;
     size_t opened_scopes = 0;
     while(end != tokens.end()) {
-        if(end->value == "{")
+        if(end->type == Tokenizer::Token::Type::OpenScope)
             ++opened_scopes;
-        if(end->value == "}") {
+        if(end->type == Tokenizer::Token::Type::CloseScope) {
             --opened_scopes;
             if(opened_scopes == 0)
                 break;
@@ -306,7 +306,7 @@ bool Parser::parse_next_expression(const std::span<Tokenizer::Token>& tokens, st
         }
     }
 
-    if(search_for_matching_bracket && (it == tokens.end() || it->value != ")")) {
+    if(search_for_matching_bracket && (it == tokens.end() || it->type != Tokenizer::Token::Type::CloseParenthesis)) {
         if(it == tokens.end())
             error("[Parser] Unmatched '(' after reaching end-of-document.\n");
         else
@@ -390,7 +390,7 @@ bool Parser::parse_identifier(const std::span<Tokenizer::Token>& tokens, std::sp
         }
 
         // TODO: Make sure this is an integer? And compile-time constant?
-        assert(it->value == "]");
+        assert(it->type == Tokenizer::Token::Type::CloseSubscript);
         ++it; // Skip ']'
     } else {
         ++it;
@@ -401,7 +401,7 @@ bool Parser::parse_identifier(const std::span<Tokenizer::Token>& tokens, std::sp
 bool Parser::parse_statement(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* curr_node) {
     // FIXME: Probably
     auto end = it;
-    while(end != tokens.end() && end->value != ";")
+    while(end != tokens.end() && end->type != Tokenizer::Token::Type::EndStatement)
         ++end;
     // Include ',' in the sub-parsing
     if(end != tokens.end())
@@ -413,7 +413,7 @@ bool Parser::parse_statement(const std::span<Tokenizer::Token>& tokens, std::spa
 }
 
 bool Parser::parse_scope_or_single_statement(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* curr_node) {
-    if(it->value == "{") {
+    if(it->type == Tokenizer::Token::Type::OpenScope) {
         if(!parse_next_scope(tokens, it, curr_node))
             return false;
     } else {
@@ -426,7 +426,7 @@ bool Parser::parse_scope_or_single_statement(const std::span<Tokenizer::Token>& 
 bool Parser::parse_while(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* curr_node) {
     auto whileNode = curr_node->add_child(new AST::Node(AST::Node::Type::WhileStatement, *it));
     ++it;
-    if(it->value != "(") {
+    if(it->type != Tokenizer::Token::Type::OpenParenthesis) {
         error("Expected '(' after while on line {}, got {}.\n", it->line, it->value);
         delete curr_node->pop_child();
         return false;
@@ -454,7 +454,7 @@ bool Parser::parse_while(const std::span<Tokenizer::Token>& tokens, std::span<To
 bool Parser::parse_for(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* curr_node) {
     auto forNode = curr_node->add_child(new AST::Node(AST::Node::Type::ForStatement, *it));
     ++it;
-    if(it->value != "(") {
+    if(it->type != Tokenizer::Token::Type::OpenParenthesis) {
         error("Expected '(' after for on line {}, got {}.\n", it->line, it->value);
         delete curr_node->pop_child();
         return false;
@@ -499,7 +499,7 @@ bool Parser::parse_function_declaration(const std::span<Tokenizer::Token>& token
     functionNode->token = *it;                              // Store the function name using its token.
     functionNode->value.type = GenericValue::Type::Integer; // TODO: Actually compute the return type (will probably just be part of the declation.)
     ++it;
-    if(it->value != "(") {
+    if(it->type != Tokenizer::Token::Type::OpenParenthesis) {
         error("Expected '(' in function declaration on line {}, got {}.\n", it->line, it->value);
         delete curr_node->pop_child();
         return false;
@@ -514,20 +514,20 @@ bool Parser::parse_function_declaration(const std::span<Tokenizer::Token>& token
 
     ++it;
     // Parse parameters
-    while(it != tokens.end() && it->value != ")") {
+    while(it != tokens.end() && it->type != Tokenizer::Token::Type::CloseParenthesis) {
         if(!parse_variable_declaration(tokens, it, functionNode)) {
             cleanup_on_error();
             return false;
         }
-        if(it->value == ",")
+        if(it->type == Tokenizer::Token::Type::Comma)
             ++it;
-        else if(it->value != ")") {
+        else if(it->type != Tokenizer::Token::Type::CloseParenthesis) {
             error("Expected ',' in function declaration argument list on line {}, got {}.\n", it->line, it->value);
             cleanup_on_error();
             return false;
         }
     }
-    if(it == tokens.end() || it->value != ")") {
+    if(it == tokens.end() || it->type != Tokenizer::Token::Type::CloseParenthesis) {
         error("Unmatched '(' in function declaration on line {}.\n", it->line);
         cleanup_on_error();
         return false;
@@ -700,13 +700,13 @@ bool Parser::parse_operator(const std::span<Tokenizer::Token>& tokens, std::span
         call_node->add_child(function_node);
         ++it;
         // Parse arguments
-        while(it != tokens.end() && it->value != ")") {
+        while(it != tokens.end() && it->type != Tokenizer::Token::Type::CloseParenthesis) {
             if(!parse_next_expression(tokens, it, call_node)) {
                 delete curr_node->pop_child();
                 return false;
             }
             // Skip ","
-            if(it != tokens.end() && it->value == ",")
+            if(it != tokens.end() && it->type == Tokenizer::Token::Type::Comma)
                 ++it;
         }
         if(it == tokens.end()) {
@@ -742,7 +742,7 @@ bool Parser::parse_operator(const std::span<Tokenizer::Token>& tokens, std::span
             return false;
         }
         // Check for ']' and advance
-        if(it->value != "]") {
+        if(it->type != Tokenizer::Token::Type::CloseSubscript) {
             error("[Parser::parse_operator] Syntax error: Expected ']', got '{}' (line {}).\n", it->value, it->line);
             delete curr_node->pop_child();
             return false;
@@ -856,7 +856,7 @@ bool Parser::parse_variable_declaration(const std::span<Tokenizer::Token>& token
             error("[Parser] Syntax error: Expected ']', got end-of-document.");
             cleanup_on_error();
             return false;
-        } else if(it->value != "]") {
+        } else if(it->type != Tokenizer::Token::Type::CloseSubscript) {
             error("[Parser] Syntax error: Expected ']', got {}.", *it);
             cleanup_on_error();
             return false;
