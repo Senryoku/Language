@@ -48,6 +48,11 @@ class Interpreter : public Scoped {
         var.value.as_composite.members = arr;
         for(size_t idx = 0; idx < type->children.size(); ++idx) {
             arr[idx].type = type->children[idx]->value.type;
+            // Also allocate nested variables
+            if(arr[idx].type == GenericValue::Type::Composite) {
+                arr[idx].value.as_composite.type_id = type->children[idx]->value.value.as_composite.type_id;
+                allocate_composite(static_cast<Variable&>(arr[idx]));
+            }
             // If this member as a default value, compute it.
             if(type->children[idx]->children.size() > 0)
                 arr[idx].value = execute(*type->children[idx]->children[0]).value; // FIXME: We stored the default value as a child.
@@ -222,8 +227,7 @@ class Interpreter : public Scoped {
                 assert(node.children.size() == 2);
                 auto rhs = execute(*node.children[1]);
 
-                // Assignment (Should probably be its own Node::Type...)
-                if(node.token.value.length() == 1 && node.token.value[0] == '=') {
+                if(node.token.type == Tokenizer::Token::Type::Assignment) {
                     // Search for an l-value (FIXME: should execute the whole left-hand side)
                     if(node.children[0]->type == Variable) { // Variable
                         if(is_assignable(node.children[0]->value, node.children[1]->value)) {
@@ -235,7 +239,7 @@ class Interpreter : public Scoped {
                             break;
                         } else
                             error("[Interpreter] {} can't be assigned to {}\n", node.children[0]->token, node.children[1]->token);
-                    } else if(node.children[0]->type == BinaryOperator && node.children[0]->token.value == "[") { // Array accessor
+                    } else if(node.children[0]->type == BinaryOperator && node.children[0]->token.type == Tokenizer::Token::Type::OpenSubscript) { // Array accessor
                         assert(node.children[0]->children.size() == 2);
                         const auto index = execute(*node.children[0]->children[1]);
                         assert(index.type == GenericValue::Type::Integer);
@@ -251,7 +255,8 @@ class Interpreter : public Scoped {
                             break;
                         } else
                             error("[Interpreter] {}[{}] can't be assigned to {}\n", node.children[0]->children[0]->token, index, node.children[1]->token);
-                    } else if(node.children[0]->type == BinaryOperator && node.children[0]->token.value == ".") { // Member access assignement (foo.bar = baz)
+                    } else if(node.children[0]->type == BinaryOperator &&
+                              node.children[0]->token.type == Tokenizer::Token::Type::MemberAccess) { // Member access assignement (foo.bar = baz)
                         // TODO: We can't chain (foo.bar.baz = ...) nested composite types.
                         auto variable = node.children[0]->children[0];
                         assert(variable->type == AST::Node::Type::Variable);
@@ -274,9 +279,10 @@ class Interpreter : public Scoped {
 
                 auto lhs = execute(*node.children[0]);
 
-                if(node.token.value == "(") {
+                if(node.token.type == Tokenizer::Token::Type::OpenParenthesis) {
                     // FIXME
-                } else if(node.token.value == "[") {
+                    error("[Interpreter] Operator '(' not implemented.\n");
+                } else if(node.token.type == Tokenizer::Token::Type::OpenSubscript) {
                     auto variableNode = node.children[0];
                     auto pVar = get(variableNode->token.value);
                     auto index = execute(*node.children[1]);
@@ -300,7 +306,7 @@ class Interpreter : public Scoped {
                         _return_value = ret;
                         return ret;
                     }
-                } else if(node.token.value == ".") {
+                } else if(node.token.type == Tokenizer::Token::Type::MemberAccess) {
                     assert(node.children[1]->type == AST::Node::Type::MemberIdentifier);
                     assert(lhs.type == GenericValue::Type::Composite);
                     auto        lhs_type = get_type(lhs.value.as_composite.type_id);

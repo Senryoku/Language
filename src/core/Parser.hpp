@@ -38,38 +38,40 @@ class Parser : public Scoped {
                type == Tokenizer::Token::Type::Decrement;
     }
 
-    void resolve_operator_type(AST::Node* opNode) {
-        assert(opNode->type == AST::Node::Type::BinaryOperator || opNode->type == AST::Node::Type::UnaryOperator);
-        if(opNode->type == AST::Node::Type::UnaryOperator) {
-            auto rhs = opNode->children[0]->value.type;
-            if(rhs == GenericValue::Type::Array && opNode->children[0]->children.size() > 0)
-                rhs = opNode->children[0]->value.value.as_array.type;
-            opNode->value.type = rhs;
+    void resolve_operator_type(AST::Node* op_node) {
+        assert(op_node->type == AST::Node::Type::BinaryOperator || op_node->type == AST::Node::Type::UnaryOperator);
+        if(op_node->type == AST::Node::Type::UnaryOperator) {
+            auto rhs = op_node->children[0]->value.type;
+            if(rhs == GenericValue::Type::Array && op_node->children[0]->children.size() > 0)
+                rhs = op_node->children[0]->value.value.as_array.type;
+            op_node->value.type = rhs;
         } else {
-            if(opNode->token.value == ".") {
-                assert(opNode->children[0]->value.type == GenericValue::Type::Composite);
-                auto type_node = get_type(opNode->children[0]->value.value.as_composite.type_id);
+            if(op_node->token.value == ".") {
+                assert(op_node->children[0]->value.type == GenericValue::Type::Composite);
+                auto type_node = get_type(op_node->children[0]->value.value.as_composite.type_id);
                 for(const auto& c : type_node->children)
-                    if(c->token.value == opNode->children[1]->token.value) {
-                        opNode->value.type = c->value.type;
+                    if(c->token.value == op_node->children[1]->token.value) {
+                        op_node->value.type = c->value.type;
+                        if(op_node->value.type == GenericValue::Type::Composite)
+                            op_node->value.value.as_composite.type_id = c->value.value.as_composite.type_id;
                         return;
                     }
                 assert(false);
             }
 
-            auto lhs = opNode->children[0]->value.type;
-            auto rhs = opNode->children[1]->value.type;
+            auto lhs = op_node->children[0]->value.type;
+            auto rhs = op_node->children[1]->value.type;
             // FIXME: Here we're getting the item type if we're accessing array items. This should be done automatically elsewhere I think (wrap the indexed access in an
             // expression, or another node type?)
-            if(lhs == GenericValue::Type::Array && opNode->children[0]->children.size() > 0)
-                lhs = opNode->children[0]->value.value.as_array.type;
-            if(rhs == GenericValue::Type::Array && opNode->children[1]->children.size() > 0)
-                rhs = opNode->children[1]->value.value.as_array.type;
-            opNode->value.type = GenericValue::resolve_operator_type(opNode->token.value, lhs, rhs);
+            if(lhs == GenericValue::Type::Array && op_node->children[0]->children.size() > 0)
+                lhs = op_node->children[0]->value.value.as_array.type;
+            if(rhs == GenericValue::Type::Array && op_node->children[1]->children.size() > 0)
+                rhs = op_node->children[1]->value.value.as_array.type;
+            op_node->value.type = GenericValue::resolve_operator_type(op_node->token.value, lhs, rhs);
         }
-        if(opNode->value.type == GenericValue::Type::Undefined) {
-            warn("[Parser] Couldn't resolve operator return type (Missing impl.) on line {}. Node:\n", opNode->token.line);
-            fmt::print("{}\n", *opNode);
+        if(op_node->value.type == GenericValue::Type::Undefined) {
+            warn("[Parser] Couldn't resolve operator return type (Missing impl.) on line {}. Node:\n", op_node->token.line);
+            fmt::print("{}\n", *op_node);
         }
     }
 

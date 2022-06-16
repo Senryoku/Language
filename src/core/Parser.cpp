@@ -591,6 +591,10 @@ bool Parser::parse_type_declaration(const std::span<Tokenizer::Token>& tokens, s
             delete assignment_node;
             // FIXME: Should we require a constexpr value here? In this case we could store it directly in the declaration node value.
         }
+
+        if(type_node->children.back()->type == AST::Node::Type::VariableDeclaration && type_node->children.back()->value.type == GenericValue::Type::Composite) {
+            // FIXME: Add a call to the constructor here? Like the default values?
+        }
     }
     pop_scope();
 
@@ -722,11 +726,11 @@ bool Parser::parse_operator(const std::span<Tokenizer::Token>& tokens, std::span
         error("Syntax error: unexpected binary operator: {}.\n", *it);
         return false;
     }
-    AST::Node* prevExpr = curr_node->pop_child();
+    AST::Node* prev_expr = curr_node->pop_child();
     // TODO: Test type of previous node! (Must be an expression resolving to something operable)
-    AST::Node* binaryOperatorNode = curr_node->add_child(new AST::Node(AST::Node::Type::BinaryOperator, *it));
+    AST::Node* binary_operator_node = curr_node->add_child(new AST::Node(AST::Node::Type::BinaryOperator, *it));
 
-    binaryOperatorNode->add_child(prevExpr);
+    binary_operator_node->add_child(prev_expr);
 
     auto precedence = operator_precedence.at(operator_type);
     ++it;
@@ -737,7 +741,7 @@ bool Parser::parse_operator(const std::span<Tokenizer::Token>& tokens, std::span
     }
 
     if(operator_type == Tokenizer::Token::Type::OpenSubscript) {
-        if(!parse_next_expression(tokens, it, binaryOperatorNode)) {
+        if(!parse_next_expression(tokens, it, binary_operator_node)) {
             delete curr_node->pop_child();
             return false;
         }
@@ -749,7 +753,7 @@ bool Parser::parse_operator(const std::span<Tokenizer::Token>& tokens, std::span
         }
         ++it;
     } else if(operator_type == Tokenizer::Token::Type::MemberAccess) {
-        if(!(prevExpr->type == AST::Node::Type::Variable && prevExpr->value.type == GenericValue::Type::Composite)) {
+        if(prev_expr->value.type != GenericValue::Type::Composite) {
             error("[Parser] Syntax error: Use of the '.' operator is only valid on composite types.\n");
             delete curr_node->pop_child();
             return false;
@@ -760,12 +764,14 @@ bool Parser::parse_operator(const std::span<Tokenizer::Token>& tokens, std::span
             delete curr_node->pop_child();
             return false;
         }
-        const auto identifier_name = it->value;
-        const auto type = get_type(prevExpr->value.value.as_composite.type_id);
-        bool       member_exists = false;
+        const auto       identifier_name = it->value;
+        const auto       type = get_type(prev_expr->value.value.as_composite.type_id);
+        bool             member_exists = false;
+        const AST::Node* member_node = nullptr;
         for(const auto& c : type->children)
             if(c->token.value == identifier_name) {
                 member_exists = true;
+                member_node = c;
                 break;
             }
         if(!member_exists) {
@@ -773,11 +779,11 @@ bool Parser::parse_operator(const std::span<Tokenizer::Token>& tokens, std::span
             delete curr_node->pop_child();
             return false;
         }
-        binaryOperatorNode->add_child(new AST::Node(AST::Node::Type::MemberIdentifier, *it));
+        binary_operator_node->add_child(new AST::Node(AST::Node::Type::MemberIdentifier, *it));
         ++it;
     } else {
         // Lookahead for rhs
-        if(!parse_next_expression(tokens, it, binaryOperatorNode, precedence)) {
+        if(!parse_next_expression(tokens, it, binary_operator_node, precedence)) {
             delete curr_node->pop_child();
             return false;
         }
@@ -788,36 +794,36 @@ bool Parser::parse_operator(const std::span<Tokenizer::Token>& tokens, std::span
     // Assignment: if variable is const and value is constexpr, mark the variable as constexpr.
     if(operator_type == Tokenizer::Token::Type::Assignment) {
         // FIXME: Workaround to allow more constant propagation. Should be done in a later stage.
-        binaryOperatorNode->children[1] = AST::optimize(binaryOperatorNode->children[1]);
-        if(binaryOperatorNode->children[0]->type == AST::Node::Type::Variable && binaryOperatorNode->children[0]->subtype == AST::Node::SubType::Const &&
-           binaryOperatorNode->children[1]->type == AST::Node::Type::ConstantValue) {
-            auto maybe_variable = get(binaryOperatorNode->children[0]->token.value);
+        binary_operator_node->children[1] = AST::optimize(binary_operator_node->children[1]);
+        if(binary_operator_node->children[0]->type == AST::Node::Type::Variable && binary_operator_node->children[0]->subtype == AST::Node::SubType::Const &&
+           binary_operator_node->children[1]->type == AST::Node::Type::ConstantValue) {
+            auto maybe_variable = get(binary_operator_node->children[0]->token.value);
             assert(maybe_variable);
-            *maybe_variable = binaryOperatorNode->children[1]->value;
+            *maybe_variable = binary_operator_node->children[1]->value;
             maybe_variable->flags = maybe_variable->flags | GenericValue::Flags::CompileConst;
         }
     }
 
-    resolve_operator_type(binaryOperatorNode);
+    resolve_operator_type(binary_operator_node);
     // Implicit casts
-    if(binaryOperatorNode->value.type == GenericValue::Type::Float) {
-        if(binaryOperatorNode->children[0]->value.type == GenericValue::Type::Integer) {
+    if(binary_operator_node->value.type == GenericValue::Type::Float) {
+        if(binary_operator_node->children[0]->value.type == GenericValue::Type::Integer) {
             auto castNode = new AST::Node(AST::Node::Type::Cast);
             castNode->value.type = GenericValue::Type::Float;
-            castNode->parent = binaryOperatorNode;
-            auto lhs = binaryOperatorNode->children[0];
+            castNode->parent = binary_operator_node;
+            auto lhs = binary_operator_node->children[0];
             lhs->parent = nullptr;
             castNode->add_child(lhs);
-            binaryOperatorNode->children[0] = castNode;
+            binary_operator_node->children[0] = castNode;
         }
-        if(binaryOperatorNode->children[1]->value.type == GenericValue::Type::Integer) {
+        if(binary_operator_node->children[1]->value.type == GenericValue::Type::Integer) {
             auto castNode = new AST::Node(AST::Node::Type::Cast);
             castNode->value.type = GenericValue::Type::Float;
-            castNode->parent = binaryOperatorNode;
-            auto rhs = binaryOperatorNode->children[1];
+            castNode->parent = binary_operator_node;
+            auto rhs = binary_operator_node->children[1];
             rhs->parent = nullptr;
             castNode->add_child(rhs);
-            binaryOperatorNode->children[1] = castNode;
+            binary_operator_node->children[1] = castNode;
         }
     }
     return true;

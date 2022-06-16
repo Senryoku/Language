@@ -355,3 +355,46 @@ TEST(Type, TwoSimpleTypesMemberAccess) {
     EXPECT_EQ(interpreter.get_return_value().type, GenericValue::Type::Integer);
     EXPECT_EQ(interpreter.get_return_value().value.as_int32_t, 6 * 8);
 }
+
+TEST(Type, Nested) {
+    PARSE_INTERP(R"(
+    type type1 {
+        int i = 1337;
+    }
+    type type2 {
+        type1 j;
+    }
+    type2 var;
+)");
+}
+
+TEST(Type, NestedAccess) {
+    PARSE_INTERP(R"(
+    type type1 {
+        int i = 1337;
+    }
+    type type2 {
+        type1 j;
+    }
+    type2 var;
+    return var.j.i;
+)");
+    EXPECT_EQ(interpreter.get_return_value().type, GenericValue::Type::Integer);
+    EXPECT_EQ(interpreter.get_return_value().value.as_int32_t, 1337);
+}
+
+TEST(Type, NestedAssignment) {
+    PARSE_INTERP(R"(
+    type type1 {
+        int i = 1337;
+    }
+    type type2 {
+        type1 j;
+    }
+    type2 var;
+    var.j.i = 1234;
+    return var.j.i;
+)");
+    EXPECT_EQ(interpreter.get_return_value().type, GenericValue::Type::Integer);
+    EXPECT_EQ(interpreter.get_return_value().value.as_int32_t, 1234);
+}
