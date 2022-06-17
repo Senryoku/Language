@@ -460,32 +460,34 @@ bool Parser::parse_for(const std::span<Tokenizer::Token>& tokens, std::span<Toke
         return false;
     }
     ++it; // Skip '('
+
+    push_scope(); // Encapsulate variable declaration from initialisation and single statement body.
+
+    const auto cleanup_on_error = [&]() {
+        delete curr_node->pop_child();
+        pop_scope();
+        return false;
+    };
+
     // Initialisation
-    if(!parse_statement(tokens, it, forNode)) {
-        delete curr_node->pop_child();
-        return false;
-    }
+    if(!parse_statement(tokens, it, forNode))
+        return cleanup_on_error();
     // Condition
-    if(!parse_statement(tokens, it, forNode)) {
-        delete curr_node->pop_child();
-        return false;
-    }
+    if(!parse_statement(tokens, it, forNode))
+        return cleanup_on_error();
     // Increment (until bracket)
-    if(!parse_next_expression(tokens, it, forNode, max_precedence, true)) {
-        delete curr_node->pop_child();
-        return false;
-    }
+    if(!parse_next_expression(tokens, it, forNode, max_precedence, true))
+        return cleanup_on_error();
 
     if(it == tokens.end()) {
         error("Expected while body on line {}, got end-of-file.\n", it->line);
-        delete curr_node->pop_child();
-        return false;
+        return cleanup_on_error();
     }
 
-    if(!parse_scope_or_single_statement(tokens, it, forNode)) {
-        delete curr_node->pop_child();
-        return false;
-    }
+    if(!parse_scope_or_single_statement(tokens, it, forNode))
+        return cleanup_on_error();
+
+    pop_scope();
     return true;
 }
 

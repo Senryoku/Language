@@ -101,6 +101,7 @@ class Interpreter : public Scoped {
                 auto condition = node.children[1];
                 auto increment = node.children[2];
                 auto body = node.children[3];
+                push_scope();
                 execute(*initialisation);
                 while(execute(*condition).value.as_bool) {
                     execute(*body);
@@ -108,6 +109,7 @@ class Interpreter : public Scoped {
                     if(_returning_value)
                         break;
                 }
+                pop_scope();
                 break;
             }
             case IfStatement: {
