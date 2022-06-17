@@ -19,6 +19,7 @@ struct GenericValue {
         String,
         Array,
         Composite,
+        Reference,
         Undefined
     };
 
@@ -59,8 +60,13 @@ struct GenericValue {
 
     struct Composite {
         TypeID        type_id;
-        GenericValue* members; // FIXME?
+        GenericValue* members; // FIXME? Managed by the runtime.
         size_t        member_count;
+    };
+
+    // Should only be used by the Interpreter
+    struct Reference {
+        GenericValue* value; // FIXME? Weak pointer to memory managed by the runtime.
     };
 
     union ValueUnion {
@@ -71,6 +77,7 @@ struct GenericValue {
         StringView as_string; // Not sure if this is the right choice?
         Array      as_array;
         Composite  as_composite;
+        Reference  as_reference;
     };
 
     static GenericValue::Type resolve_operator_type(const std::string_view& op, GenericValue::Type lhs, GenericValue::Type rhs) {
@@ -490,8 +497,9 @@ struct fmt::formatter<GenericValue::Type> {
             case Boolean: return fmt::format_to(ctx.out(), fg(fmt::color::royal_blue), "{}", "Boolean");
             case Array: return fmt::format_to(ctx.out(), "{}", "Array");
             case Composite: return fmt::format_to(ctx.out(), fg(fmt::color::light_green), "{}", "Composite");
+            case Reference: return fmt::format_to(ctx.out(), fg(fmt::color::blue), "{}", "Reference");
             case Undefined: return fmt::format_to(ctx.out(), fg(fmt::color::gray), "{}", "Undefined");
-            default: return fmt::format_to(ctx.out(), fg(fmt::color::red), "{}", "Unknown Generic Value Type [by the formatter]");
+            default: return fmt::format_to(ctx.out(), fg(fmt::color::red), "{}: {}", "Unknown Generic Value Type [by the formatter]", static_cast<int>(t));
         }
     }
 };
@@ -523,9 +531,10 @@ struct fmt::formatter<GenericValue> {
                 }
                 return r;
             }
-            case Composite: return fmt::format_to(ctx.out(), "{}", v.type); // TODO
+            case Composite: return fmt::format_to(ctx.out(), "{}", v.type);                                         // TODO
+            case Reference: return fmt::format_to(ctx.out(), "{} to {}", v.type, v.value.as_reference.value->type); // TODO
             case Undefined: return fmt::format_to(ctx.out(), fg(fmt::color::gray), "{}", "Undefined");
-            default: return fmt::format_to(ctx.out(), fg(fmt::color::red), "{}", "Generic Value of Unknown type [by the formatter]");
+            default: return fmt::format_to(ctx.out(), fg(fmt::color::red), "Generic Value of type {}", v.type);
         }
     }
 };

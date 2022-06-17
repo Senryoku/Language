@@ -7,8 +7,7 @@
 
 constexpr bool is_assignable(const GenericValue& var, const GenericValue& val) {
     // TODO
-    return var.type == val.type || (GenericValue::is_numeric(var.type) && GenericValue::is_numeric(val.type)) ||
-           (var.type == GenericValue::Type::Array && (var.value.as_array.type == val.type));
+    return var.type == val.type || (GenericValue::is_numeric(var.type) && GenericValue::is_numeric(val.type));
 }
 
 class Interpreter : public Scoped {
@@ -37,6 +36,11 @@ class Interpreter : public Scoped {
         auto arr = new GenericValue[var.value.as_array.capacity];
         _allocated_arrays.push_back(arr);
         var.value.as_array.items = arr;
+        for(auto i = 0u; i < var.value.as_array.capacity; ++i) {
+            var.value.as_array.items[i].type = var.value.as_array.type;
+            // TODO: Also call constructors if necessary/default value?
+            // TODO: Correctly handle composite types?
+        }
     }
 
     void allocate_composite(Variable& var) {
@@ -66,7 +70,8 @@ class Interpreter : public Scoped {
             case Root:
             case Statement:
                 for(const auto& child : node.children) {
-                    execute(*child);
+                    _return_value = execute(*child);
+                    dereference_return_value();
                     if(_returning_value)
                         break;
                 }
@@ -74,7 +79,8 @@ class Interpreter : public Scoped {
             case Scope: {
                 push_scope();
                 for(const auto& child : node.children) {
-                    execute(*child);
+                    _return_value = execute(*child);
+                    dereference_return_value();
                     if(_returning_value)
                         break;
                 }
@@ -82,8 +88,9 @@ class Interpreter : public Scoped {
                 break;
             }
             case Expression: {
-                return execute(*node.children[0]);
-                break;
+                _return_value = execute(*node.children[0]);
+                dereference_return_value();
+                return _return_value;
             }
             case WhileStatement: {
                 auto condition = execute(*node.children[0]);
@@ -193,19 +200,20 @@ class Interpreter : public Scoped {
                     error("Syntax error: Undeclared variable '{}' on line {}.\n", node.token.value, node.token.line);
                     break;
                 }
-                _return_value = *pVar;
-                return *pVar; // FIXME: Make sure GenericValue & Variable are transparent? Remove the 'Variable' type?
+                _return_value.type = GenericValue::Type::Reference;
+                _return_value.value.as_reference.value = pVar;
+                return _return_value;
                 break;
             }
             case UnaryOperator: {
                 assert(node.children.size() == 1);
-                if(node.token.value == "-") {
+                if(node.token.type == Tokenizer::Token::Type::Substraction) {
                     auto rhs = execute(*node.children[0]);
                     _return_value = -rhs;
-                } else if(node.token.value == "+") {
+                } else if(node.token.type == Tokenizer::Token::Type::Addition) {
                     auto rhs = execute(*node.children[0]);
                     _return_value = rhs;
-                } else if(node.token.value == "++") {
+                } else if(node.token.type == Tokenizer::Token::Type::Increment) {
                     assert(node.children.size() == 1);
                     assert(node.children[0]->type == Variable);
                     auto* v = get(node.children[0]->token.value);
@@ -213,7 +221,7 @@ class Interpreter : public Scoped {
                         _return_value = ++(*v);
                     else
                         _return_value = (*v)++;
-                } else if(node.token.value == "--") {
+                } else if(node.token.type == Tokenizer::Token::Type::Decrement) {
                     assert(node.children.size() == 1);
                     assert(node.children[0]->type == Variable);
                     auto* v = get(node.children[0]->token.value);
@@ -228,73 +236,40 @@ class Interpreter : public Scoped {
             }
             case BinaryOperator: {
                 assert(node.children.size() == 2);
+                auto lhs = execute(*node.children[0]);
                 auto rhs = execute(*node.children[1]);
+                // rhs will never need to be accessed as a reference.
+                if(rhs.type == GenericValue::Type::Reference)
+                    rhs = *rhs.value.as_reference.value;
 
                 if(node.token.type == Tokenizer::Token::Type::Assignment) {
-                    // Search for an l-value (FIXME: should execute the whole left-hand side)
-                    if(node.children[0]->type == Variable) { // Variable
-                        if(is_assignable(node.children[0]->value, node.children[1]->value)) {
-                            auto* v = get(node.children[0]->token.value);
-                            assert(v);
-                            v->assign(rhs);
-                            _return_value.type = v->type;
-                            _return_value.value = v->value;
-                            break;
-                        } else
-                            error("[Interpreter] {} can't be assigned to {}\n", node.children[0]->token, node.children[1]->token);
-                    } else if(node.children[0]->type == BinaryOperator && node.children[0]->token.type == Tokenizer::Token::Type::OpenSubscript) { // Array accessor
-                        assert(node.children[0]->children.size() == 2);
-                        const auto index = execute(*node.children[0]->children[1]);
-                        assert(index.type == GenericValue::Type::Integer);
-                        if(is_assignable(node.children[0]->children[1]->value, node.children[1]->value)) {
-                            GenericValue* v = get(node.children[0]->children[0]->token.value);
-                            assert(v);
-                            assert((size_t)index.value.as_int32_t < v->value.as_array.capacity); // FIXME: Runtime error?
-                            v = v->value.as_array.items + index.value.as_int32_t;
-                            v->type = rhs.type;
-                            v->assign(rhs);
-                            _return_value.type = v->type;
-                            _return_value.value = v->value;
-                            break;
-                        } else
-                            error("[Interpreter] {}[{}] can't be assigned to {}\n", node.children[0]->children[0]->token, index, node.children[1]->token);
-                    } else if(node.children[0]->type == BinaryOperator &&
-                              node.children[0]->token.type == Tokenizer::Token::Type::MemberAccess) { // Member access assignement (foo.bar = baz)
-                        // TODO: We can't chain (foo.bar.baz = ...) nested composite types.
-                        auto variable = node.children[0]->children[0];
-                        assert(variable->type == AST::Node::Type::Variable);
-                        assert(node.children[0]->children[1]->type == AST::Node::Type::MemberIdentifier);
-                        const auto&   member_identifier = node.children[0]->children[1]->token.value;
-                        auto          lhs_type = get_type(variable->value.value.as_composite.type_id);
-                        GenericValue* structure = get(variable->token.value);
-                        for(auto idx = 0; idx < lhs_type->children.size(); ++idx)
-                            if(lhs_type->children[idx]->token.value == member_identifier) {
-                                auto target_value = structure->value.as_composite.members + idx;
-                                target_value->assign(rhs);
-                                _return_value = rhs;
-                                return _return_value;
-                            }
+                    assert(lhs.type == GenericValue::Type::Reference);
+
+                    if(is_assignable(*lhs.value.as_reference.value, rhs)) {
+                        lhs.value.as_reference.value->assign(rhs);
+                        _return_value = *lhs.value.as_reference.value;
+                        return _return_value;
                     } else {
-                        error("[Interpreter] Trying to assign to something ({}) that's not neither a variable or an array?\n", node.children[0]->token);
-                        break;
+                        error("[Interpreter] {} can't be assigned to {}\n", rhs, *lhs.value.as_reference.value);
+                        print("{}", node);
+                        return _return_value;
                     }
                 }
-
-                auto lhs = execute(*node.children[0]);
 
                 if(node.token.type == Tokenizer::Token::Type::OpenParenthesis) {
                     // FIXME
                     error("[Interpreter] Operator '(' not implemented.\n");
                 } else if(node.token.type == Tokenizer::Token::Type::OpenSubscript) {
-                    auto variableNode = node.children[0];
-                    auto pVar = get(variableNode->token.value);
-                    auto index = execute(*node.children[1]);
-                    if(variableNode->value.type == GenericValue::Type::Array) {
+                    assert(lhs.type == GenericValue::Type::Reference);
+                    auto index = rhs;
+                    auto variable = lhs.value.as_reference.value;
+                    if(variable->type == GenericValue::Type::Array) {
                         assert(index.type == GenericValue::Type::Integer);
-                        assert((size_t)index.value.as_int32_t < pVar->value.as_array.capacity); // FIXME: Should be a runtime error?
-                        _return_value = pVar->value.as_array.items[index.value.as_int32_t];
-                        return pVar->value.as_array.items[index.value.as_int32_t];
-                    } else if(variableNode->value.type == GenericValue::Type::String) {
+                        assert((size_t)index.value.as_int32_t < variable->value.as_array.capacity); // FIXME: Should be a runtime error?
+                        _return_value.type = GenericValue::Type::Reference;
+                        _return_value.value.as_reference.value = &variable->value.as_array.items[index.value.as_int32_t];
+                        return _return_value;
+                    } else if(lhs.value.as_reference.value->type == GenericValue::Type::String) {
                         // FIXME: This would be much cleaner if string was just a char[]...
                         // Automatically convert float indices to integer, because we don't have in-language easy conversion (yet?)
                         // FIXME: I don't think this should be handled here.
@@ -303,25 +278,33 @@ class Interpreter : public Scoped {
                             index.type = GenericValue::Type::Integer;
                         }
                         assert(index.type == GenericValue::Type::Integer);
-                        assert((size_t)index.value.as_int32_t < pVar->value.as_string.size); // FIXME: Should be a runtime error?
+                        assert((size_t)index.value.as_int32_t < lhs.value.as_string.size); // FIXME: Should be a runtime error?
                         GenericValue ret{.type = GenericValue::Type::Char};
-                        ret.value.as_char = *(pVar->value.as_string.begin + index.value.as_int32_t);
+                        ret.value.as_char = *(lhs.value.as_string.begin + index.value.as_int32_t);
                         _return_value = ret;
+                        // FIXME: Should also return a reference (Which is not possible with our current implementation of strings as string_views
                         return ret;
                     }
                 } else if(node.token.type == Tokenizer::Token::Type::MemberAccess) {
+                    assert(lhs.type == GenericValue::Type::Reference);
+                    auto variable = lhs.value.as_reference.value;
                     assert(node.children[1]->type == AST::Node::Type::MemberIdentifier);
-                    assert(lhs.type == GenericValue::Type::Composite);
-                    auto        lhs_type = get_type(lhs.value.as_composite.type_id);
+                    assert(variable->type == GenericValue::Type::Composite);
+                    auto        lhs_type = get_type(variable->value.as_composite.type_id);
                     const auto& member_name = node.children[1]->token.value;
                     for(auto idx = 0; idx < lhs_type->children.size(); ++idx)
                         if(lhs_type->children[idx]->token.value == member_name) {
-                            _return_value = lhs.value.as_composite.members[idx];
+                            _return_value.type = GenericValue::Type::Reference;
+                            _return_value.value.as_reference.value = &variable->value.as_composite.members[idx];
                             return _return_value;
                         }
                     assert(false);
                 } else {
-                    // Call the appropriate operator, see GenericValue operator overloads
+                    // Dereference lhs if it is a reference, we now need the actual value
+                    if(lhs.type == GenericValue::Type::Reference)
+                        lhs = *lhs.value.as_reference.value;
+
+                        // Call the appropriate operator, see GenericValue operator overloads
 #define OP(O)                  \
     if(node.token.value == #O) \
         _return_value = lhs O rhs;
@@ -359,8 +342,10 @@ class Interpreter : public Scoped {
             }
             case ReturnStatement: {
                 assert(node.children.size() == 1);
-                const auto result = execute(*node.children[0]);
+                auto result = execute(*node.children[0]);
                 _return_value = result;
+                // Fixme: Maybe we'll want to be able to return references at some point?
+                dereference_return_value();
                 _returning_value = true;
                 break;
             }
@@ -384,6 +369,12 @@ class Interpreter : public Scoped {
     Variable _return_value{GenericValue::Type::Integer, 0}; // FIXME: Probably not the right move!
 
     std::vector<GenericValue*> _allocated_arrays;
+
+    // FIXME: Not exactly elegant.
+    void dereference_return_value() {
+        if(_return_value.type == GenericValue::Type::Reference)
+            _return_value = *_return_value.value.as_reference.value;
+    }
 
     // FIXME
     std::shared_ptr<AST::Node> _builtin_print{nullptr};
