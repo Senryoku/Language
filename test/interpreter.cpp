@@ -148,6 +148,39 @@ TEST(Arithmetic, Float) {
     EXPECT_EQ(static_cast<int>(interpreter.get_return_value().value.as_float), 11313); // We shouldn't compare floats directly.
 }
 
+TEST(Array, Declaration) {
+    PARSE_INTERP("int[8] arr");
+}
+
+TEST(Array, Assignment) {
+    PARSE_INTERP("int[8] arr; arr[2] = 1337; return arr[2];");
+    EXPECT_EQ(interpreter.get_return_value().value.as_int32_t, 1337);
+}
+
+TEST(Array, ExternalSize) {
+    PARSE_INTERP(R"(
+const int size = 8;
+int[size] arr;
+)");
+}
+
+TEST(Array, VariableAccess) {
+    PARSE_INTERP(R"(
+const int size = 8;
+int[size] arr;
+int total = 0;
+for(int i = 0; i < size; ++i) {
+    arr[i] = i;
+}
+for(int i = 0; i < size; ++i) {
+    total = total + arr[i];
+}
+return total;
+)");
+    EXPECT_EQ(interpreter.get_return_value().type, GenericValue::Type::Integer);
+    EXPECT_EQ(interpreter.get_return_value().value.as_int32_t, 0 + 1 + 2 + 3 + 4 + 5 + 6 + 7);
+}
+
 TEST(Keywords, Return) {
     PARSE_INTERP("return 458;");
     EXPECT_EQ(interpreter.get_return_value().value.as_int32_t, 458);
@@ -161,6 +194,33 @@ TEST(Keywords, ReturnWithExpression) {
 TEST(Keywords, While) {
     LOAD_PARSE_INTERP("basic/while.lang");
     EXPECT_EQ(interpreter.get_return_value().value.as_int32_t, 10);
+}
+
+TEST(Keywords, For) {
+    PARSE_INTERP(R"(
+int ret = 0;
+for(int i = 0; i < 8; ++i) {
+    ret = ret + i;
+}
+return ret;
+)");
+    EXPECT_EQ(interpreter.get_return_value().type, GenericValue::Type::Integer);
+    EXPECT_EQ(interpreter.get_return_value().value.as_int32_t, 0 + 1 + 2 + 3 + 4 + 5 + 6 + 7);
+}
+
+TEST(Keywords, MultipleFor) {
+    PARSE_INTERP(R"(
+int ret = 0;
+for(int i = 0; i < 8; ++i) {
+    ret = ret + i;
+}
+for(int i = 0; i < 8; ++i) {
+    ret = ret + i;
+}
+return ret;
+)");
+    EXPECT_EQ(interpreter.get_return_value().type, GenericValue::Type::Integer);
+    EXPECT_EQ(interpreter.get_return_value().value.as_int32_t, 2 * (0 + 1 + 2 + 3 + 4 + 5 + 6 + 7));
 }
 
 TEST(Keywords, VariableDeclarationInWhile) {
