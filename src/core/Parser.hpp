@@ -20,6 +20,8 @@ class Parser : public Scoped {
         push_scope();
     }
 
+    virtual ~Parser() = default;
+
     static const uint32_t max_precedence = static_cast<uint32_t>(-1);
     // FIXME: Pre and postfix versions of --/++ should have different precedences
     inline static const std::unordered_map<Tokenizer::Token::Type, uint32_t> operator_precedence{

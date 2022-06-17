@@ -8,9 +8,10 @@ struct Variable : public GenericValue {
   public:
     Variable() : GenericValue() {}
     Variable(const GenericValue& v) : GenericValue(v) {}
-	Variable(GenericValue::Type type, int32_t _value) : GenericValue(type) {
-		value.as_int32_t = _value;
-	} 
+    Variable(GenericValue::Type _type, int32_t _value) {
+        type = _type;
+        value.as_int32_t = _value;
+    }
 
     Variable& operator++() {
         assert(!is_const());
@@ -43,7 +44,8 @@ struct Variable : public GenericValue {
     }
 };
 
-using VariableStore = het_unordered_map<Variable>;
+// I'd prefer if this would hold unique_ptr<Variable>, but it really doesn't want to.
+using VariableStore = het_unordered_map<Variable*>;
 
 template<>
 struct fmt::formatter<Variable> {

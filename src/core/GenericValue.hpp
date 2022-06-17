@@ -67,6 +67,7 @@ struct GenericValue {
     // Should only be used by the Interpreter
     struct Reference {
         GenericValue* value; // FIXME? Weak pointer to memory managed by the runtime.
+                             // FIXME: This forces the Variable pointer to be stable in the interpreter implementation, which is a shame.
     };
 
     union ValueUnion {

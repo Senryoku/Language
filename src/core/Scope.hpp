@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <vector>
 
 #include <VariableStore.hpp>
@@ -7,9 +8,18 @@
 
 using TypeRegistry = std::unordered_map<TypeID, const AST::Node*>;
 
+/*
+ * The interpreter needs stable pointer for variables.
+ * I hate the current VariableStore, but it's the easiest solution I got right now.
+ */
 class Scope {
   public:
     Scope(TypeRegistry& type_registry) : _type_registry(&type_registry) {}
+
+    ~Scope() {
+        for(auto& p : _variables)
+            delete p.second;
+    }
 
     struct FunctionDeclaration {
         const AST::Node* node;
@@ -68,23 +78,24 @@ class Scope {
             case GenericValue::Type::Integer: [[fallthrough]];
             case GenericValue::Type::Float: [[fallthrough]];
             case GenericValue::Type::Char: [[fallthrough]];
-            case GenericValue::Type::String:
-                _variables[std::string{name}] =
-                    Variable{{decNode.value.type, decNode.subtype == AST::Node::SubType::Const ? GenericValue::Flags::Const : GenericValue::Flags::None}};
+            case GenericValue::Type::String: {
+                auto v = new Variable{GenericValue{decNode.value.type, decNode.subtype == AST::Node::SubType::Const ? GenericValue::Flags::Const : GenericValue::Flags::None}};
+                _variables.emplace(name, v);
                 break;
+            }
             case GenericValue::Type::Array: {
-                Variable v{{Variable::Type::Array}};
-                v.value.as_array.type = decNode.value.value.as_array.type;
-                v.value.as_array.capacity = decNode.value.value.as_array.capacity;
-                v.value.as_array.items = nullptr;
-                _variables[std::string{name}] = v;
+                auto v = new Variable{{Variable::Type::Array}};
+                v->value.as_array.type = decNode.value.value.as_array.type;
+                v->value.as_array.capacity = decNode.value.value.as_array.capacity;
+                v->value.as_array.items = nullptr;
+                _variables.emplace(name, v);
                 break;
             };
             case GenericValue::Type::Composite: {
-                Variable v{{Variable::Type::Composite}};
-                v.value.as_composite.type_id = decNode.value.value.as_composite.type_id;
-                v.value.as_composite.members = nullptr;
-                _variables[std::string{name}] = v;
+                auto v = new Variable{{Variable::Type::Composite}};
+                v->value.as_composite.type_id = decNode.value.value.as_composite.type_id;
+                v->value.as_composite.members = nullptr;
+                _variables.emplace(name, v);
                 break;
             }
             default: error("[Scope] Error on line {}: Unimplemented type '{}'.\n", line, decNode.value.type); return false;
@@ -94,10 +105,10 @@ class Scope {
 
     bool is_declared(const std::string_view& name) const { return _variables.find(name) != _variables.end(); }
 
-    inline Variable&       operator[](const std::string_view& name) { return _variables.find(name)->second; }
-    inline const Variable& operator[](const std::string_view& name) const { return _variables.find(name)->second; }
-    inline Variable&       get(const std::string_view& name) { return _variables.find(name)->second; }
-    inline const Variable& get(const std::string_view& name) const { return _variables.find(name)->second; }
+    inline Variable&       operator[](const std::string_view& name) { return *_variables.find(name)->second; }
+    inline const Variable& operator[](const std::string_view& name) const { return *_variables.find(name)->second; }
+    inline Variable&       get(const std::string_view& name) { return *_variables.find(name)->second; }
+    inline const Variable& get(const std::string_view& name) const { return *_variables.find(name)->second; }
 
     const VariableStore& get_variables() const { return _variables; }
 
@@ -118,36 +129,44 @@ class Scope {
 // TODO: Fetch variables from others scopes
 class Scoped {
   protected:
-    Scope&       get_scope() { return _scopes.back(); }
-    const Scope& get_scope() const { return _scopes.back(); }
+    virtual ~Scoped() {
+        for(auto& s : _scopes)
+            delete s;
+    }
+
+    Scope&       get_scope() { return *_scopes.back(); }
+    const Scope& get_scope() const { return *_scopes.back(); }
 
     Scope& push_scope() {
-        _scopes.push_back(Scope{_type_registry});
+        _scopes.emplace_back(new Scope{_type_registry});
         return get_scope();
     }
 
-    void pop_scope() { _scopes.pop_back(); }
+    void pop_scope() {
+        delete _scopes.back();
+        _scopes.pop_back();
+    }
 
     const AST::Node* get_function(const std::string_view& name) const {
         auto it = _scopes.rbegin();
-        auto val = it->find_function(name);
-        while(it != _scopes.rend() && !it->is_valid(val)) {
+        auto val = (*it)->find_function(name);
+        while(it != _scopes.rend() && !(*it)->is_valid(val)) {
             it++;
             if(it != _scopes.rend())
-                val = it->find_function(name);
+                val = (*it)->find_function(name);
         }
-        return it != _scopes.rend() && it->is_valid(val) ? val->second.node : nullptr;
+        return it != _scopes.rend() && (*it)->is_valid(val) ? val->second.node : nullptr;
     }
 
     Scope::TypeDeclaration get_type(const std::string_view& name) const {
         auto it = _scopes.rbegin();
-        auto val = it->find_type(name);
-        while(it != _scopes.rend() && !it->is_valid(val)) {
+        auto val = (*it)->find_type(name);
+        while(it != _scopes.rend() && !(*it)->is_valid(val)) {
             it++;
             if(it != _scopes.rend())
-                val = it->find_type(name);
+                val = (*it)->find_type(name);
         }
-        assert(it != _scopes.rend() && it->is_valid(val));
+        assert(it != _scopes.rend() && (*it)->is_valid(val));
         return val->second;
     }
 
@@ -159,23 +178,23 @@ class Scoped {
     */
     Variable* get(const std::string_view& name) {
         auto it = _scopes.rbegin();
-        auto val = it->find(name);
-        while(it != _scopes.rend() && !it->is_valid(val)) {
+        auto val = (*it)->find(name);
+        while(it != _scopes.rend() && !(*it)->is_valid(val)) {
             it++;
             if(it != _scopes.rend())
-                val = it->find(name);
+                val = (*it)->find(name);
         }
-        return it != _scopes.rend() && it->is_valid(val) ? &val->second : nullptr;
+        return it != _scopes.rend() && (*it)->is_valid(val) ? val->second : nullptr;
     }
     const Variable* get(const std::string_view& name) const {
         auto it = _scopes.rbegin();
-        auto val = it->find(name);
-        while(it != _scopes.rend() && !it->is_valid(val)) {
+        auto val = (*it)->find(name);
+        while(it != _scopes.rend() && !(*it)->is_valid(val)) {
             it++;
             if(it != _scopes.rend())
-                val = it->find(name);
+                val = (*it)->find(name);
         }
-        return it != _scopes.rend() && it->is_valid(val) ? &val->second : nullptr;
+        return it != _scopes.rend() && (*it)->is_valid(val) ? val->second : nullptr;
     }
 
     bool is_declared(const std::string_view& name) const { return get(name) != nullptr; }
@@ -185,16 +204,16 @@ class Scoped {
         if(builtin != GenericValue::Type::Undefined)
             return true;
         auto it = _scopes.rbegin();
-        auto val = it->find_type(name);
-        while(it != _scopes.rend() && !it->is_valid(val)) {
+        auto val = (*it)->find_type(name);
+        while(it != _scopes.rend() && !(*it)->is_valid(val)) {
             it++;
             if(it != _scopes.rend())
-                val = it->find_type(name);
+                val = (*it)->find_type(name);
         }
-        return it != _scopes.rend() && it->is_valid(val);
+        return it != _scopes.rend() && (*it)->is_valid(val);
     }
 
   private:
-    std::vector<Scope> _scopes;
-    TypeRegistry       _type_registry;
+    std::vector<Scope*> _scopes;
+    TypeRegistry        _type_registry;
 };

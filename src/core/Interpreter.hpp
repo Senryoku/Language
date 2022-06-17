@@ -22,7 +22,7 @@ class Interpreter : public Scoped {
         get_scope().declare_function(*_builtin_put);
     }
 
-    ~Interpreter() {
+    virtual ~Interpreter() {
         for(auto p : _allocated_arrays)
             delete[] p;
         _allocated_arrays.clear();
@@ -260,30 +260,37 @@ class Interpreter : public Scoped {
                     // FIXME
                     error("[Interpreter] Operator '(' not implemented.\n");
                 } else if(node.token.type == Tokenizer::Token::Type::OpenSubscript) {
-                    assert(lhs.type == GenericValue::Type::Reference);
                     auto index = rhs;
-                    auto variable = lhs.value.as_reference.value;
-                    if(variable->type == GenericValue::Type::Array) {
-                        assert(index.type == GenericValue::Type::Integer);
-                        assert((size_t)index.value.as_int32_t < variable->value.as_array.capacity); // FIXME: Should be a runtime error?
-                        _return_value.type = GenericValue::Type::Reference;
-                        _return_value.value.as_reference.value = &variable->value.as_array.items[index.value.as_int32_t];
-                        return _return_value;
-                    } else if(lhs.value.as_reference.value->type == GenericValue::Type::String) {
-                        // FIXME: This would be much cleaner if string was just a char[]...
-                        // Automatically convert float indices to integer, because we don't have in-language easy conversion (yet?)
-                        // FIXME: I don't think this should be handled here.
-                        if(index.type == GenericValue::Type::Float) {
-                            index.value.as_int32_t = index.to_int32_t();
-                            index.type = GenericValue::Type::Integer;
+                    assert(index.type == GenericValue::Type::Integer);
+                    if(lhs.type == GenericValue::Type::Reference) {
+                        auto variable = lhs.value.as_reference.value;
+                        if(variable->type == GenericValue::Type::Array) {
+                            assert((size_t)index.value.as_int32_t < variable->value.as_array.capacity); // FIXME: Should be a runtime error?
+                            _return_value.type = GenericValue::Type::Reference;
+                            _return_value.value.as_reference.value = &variable->value.as_array.items[index.value.as_int32_t];
+                            return _return_value;
                         }
-                        assert(index.type == GenericValue::Type::Integer);
-                        assert((size_t)index.value.as_int32_t < lhs.value.as_string.size); // FIXME: Should be a runtime error?
-                        GenericValue ret{.type = GenericValue::Type::Char};
-                        ret.value.as_char = *(lhs.value.as_string.begin + index.value.as_int32_t);
-                        _return_value = ret;
-                        // FIXME: Should also return a reference (Which is not possible with our current implementation of strings as string_views
-                        return ret;
+                        // FIXME: Handle Strings (Which is not possible with our current implementation of strings as string_views)
+                    } else { // Constants
+                        if(lhs.type == GenericValue::Type::Array) {
+                            assert((size_t)index.value.as_int32_t < lhs.value.as_array.capacity); // FIXME: Should be a runtime error?
+                            _return_value = lhs.value.as_array.items[index.value.as_int32_t];
+                            return _return_value;
+                        } else if(lhs.type == GenericValue::Type::String) {
+                            // FIXME: This would be much cleaner if string was just a char[]...
+                            // Automatically convert float indices to integer, because we don't have in-language easy conversion (yet?)
+                            // FIXME: I don't think this should be handled here.
+                            if(index.type == GenericValue::Type::Float) {
+                                index.value.as_int32_t = index.to_int32_t();
+                                index.type = GenericValue::Type::Integer;
+                            }
+                            assert(index.type == GenericValue::Type::Integer);
+                            assert((size_t)index.value.as_int32_t < lhs.value.as_string.size); // FIXME: Should be a runtime error?
+                            GenericValue ret{.type = GenericValue::Type::Char};
+                            ret.value.as_char = *(lhs.value.as_string.begin + index.value.as_int32_t);
+                            _return_value = ret;
+                            return _return_value;
+                        }
                     }
                 } else if(node.token.type == Tokenizer::Token::Type::MemberAccess) {
                     assert(lhs.type == GenericValue::Type::Reference);
@@ -325,7 +332,9 @@ class Interpreter : public Scoped {
             }
             case Cast: {
                 auto child = execute(*node.children[0]);
-                switch(node.value.type) {
+                if(child.type == GenericValue::Type::Reference)
+                    child = *child.value.as_reference.value;
+                switch(child.type) {
                     case GenericValue::Type::Integer: {
                         _return_value.type = GenericValue::Type::Integer;
                         _return_value.value.as_int32_t = child.to_int32_t();
@@ -336,7 +345,7 @@ class Interpreter : public Scoped {
                         _return_value.value.as_float = child.to_float();
                         break;
                     }
-                    default: error("[Interpreter] Unimplemented cast {}.\n", node.value.type);
+                    default: error("[Interpreter] Unimplemented cast {}.\n", child.type);
                 }
                 break;
             }
