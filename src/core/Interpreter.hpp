@@ -258,9 +258,15 @@ class Interpreter : public Scoped {
 
                 if(node.token.type == Tokenizer::Token::Type::OpenParenthesis) {
                     // FIXME
-                    error("[Interpreter] Operator '(' not implemented.\n");
+                    error("[Interpreter:{}] Operator '(' not implemented.\n", __LINE__);
                 } else if(node.token.type == Tokenizer::Token::Type::OpenSubscript) {
                     auto index = rhs;
+                    // Automatically convert float indices to integer, because we don't have in-language easy conversion (yet?)
+                    // FIXME: I don't think this should be handled here, or at least not in this way.
+                    if(index.type == GenericValue::Type::Float) {
+                        index.value.as_int32_t = index.to_int32_t();
+                        index.type = GenericValue::Type::Integer;
+                    }
                     assert(index.type == GenericValue::Type::Integer);
                     if(lhs.type == GenericValue::Type::Reference) {
                         auto variable = lhs.value.as_reference.value;
@@ -277,14 +283,6 @@ class Interpreter : public Scoped {
                             _return_value = lhs.value.as_array.items[index.value.as_int32_t];
                             return _return_value;
                         } else if(lhs.type == GenericValue::Type::String) {
-                            // FIXME: This would be much cleaner if string was just a char[]...
-                            // Automatically convert float indices to integer, because we don't have in-language easy conversion (yet?)
-                            // FIXME: I don't think this should be handled here.
-                            if(index.type == GenericValue::Type::Float) {
-                                index.value.as_int32_t = index.to_int32_t();
-                                index.type = GenericValue::Type::Integer;
-                            }
-                            assert(index.type == GenericValue::Type::Integer);
                             assert((size_t)index.value.as_int32_t < lhs.value.as_string.size); // FIXME: Should be a runtime error?
                             GenericValue ret{.type = GenericValue::Type::Char};
                             ret.value.as_char = *(lhs.value.as_string.begin + index.value.as_int32_t);
