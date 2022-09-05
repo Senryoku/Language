@@ -828,6 +828,27 @@ bool Parser::parse_operator(const std::span<Tokenizer::Token>& tokens, std::span
             binary_operator_node->children[1] = castNode;
         }
     }
+    // Truncation to integer (in assignments for example)
+    if(binary_operator_node->value.type == GenericValue::Type::Integer) {
+        if(binary_operator_node->children[0]->value.type == GenericValue::Type::Float) {
+            auto castNode = new AST::Node(AST::Node::Type::Cast);
+            castNode->value.type = GenericValue::Type::Integer;
+            castNode->parent = binary_operator_node;
+            auto lhs = binary_operator_node->children[0];
+            lhs->parent = nullptr;
+            castNode->add_child(lhs);
+            binary_operator_node->children[0] = castNode;
+        }
+        if(binary_operator_node->children[1]->value.type == GenericValue::Type::Float) {
+            auto castNode = new AST::Node(AST::Node::Type::Cast);
+            castNode->value.type = GenericValue::Type::Integer;
+            castNode->parent = binary_operator_node;
+            auto rhs = binary_operator_node->children[1];
+            rhs->parent = nullptr;
+            castNode->add_child(rhs);
+            binary_operator_node->children[1] = castNode;
+        }
+    }
     return true;
 }
 

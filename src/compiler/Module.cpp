@@ -2,12 +2,36 @@
 
 #include <vector>
 
-llvm::Value* Module::codegen(const GenericValue& val) {
+llvm::Constant* Module::codegen(const GenericValue& val) {
+    assert(val.is_constexpr());
     switch(val.type) {
         case GenericValue::Type::Float: return llvm::ConstantFP::get(*_llvm_context, llvm::APFloat(val.value.as_float));
         case GenericValue::Type::Integer: return llvm::ConstantInt::get(*_llvm_context, llvm::APInt(32, val.value.as_int32_t));
+        case GenericValue::Type::Array: {
+            const auto& arr = val.value.as_array;
+            auto        itemType = llvm::IntegerType::get(*_llvm_context, 32);
+            // FIXME: Determine the item type:
+            /*
+            switch(arr.type) {
+                case GenericValue::Type::Integer:
+                    ...
+                    break;
+                ...
+            }
+            */
+            std::vector<llvm::Constant*> values(arr.capacity);
+            for(unsigned int i = 0; i < arr.capacity; i++)
+                values[i] = llvm::ConstantInt::get(itemType, arr.items[i].value.as_int32_t); // FIXME: Depends on the item type
+
+            auto arrayType = llvm::ArrayType::get(itemType, values.size());
+            auto globalDeclaration = (llvm::GlobalVariable*)_llvm_module->getOrInsertGlobal(".array", arrayType);
+            globalDeclaration->setInitializer(llvm::ConstantArray::get(arrayType, values));
+            globalDeclaration->setConstant(true);
+            globalDeclaration->setLinkage(llvm::GlobalValue::LinkageTypes::PrivateLinkage);
+            globalDeclaration->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Global);
+            return llvm::ConstantExpr::getBitCast(globalDeclaration, arrayType->getPointerTo());
+        }
         case GenericValue::Type::String: {
-            // TEMP: Constant String.
             const auto& str = val.value.as_string;
             auto        charType = llvm::IntegerType::get(*_llvm_context, 8);
 
@@ -33,7 +57,7 @@ llvm::Value* Module::codegen(const GenericValue& val) {
             // 4. Return a cast to an i8*
             return llvm::ConstantExpr::getBitCast(globalDeclaration, charType->getPointerTo());
         }
-        default: warn("LLVM Codegen: Unsupported value type '{}'.\n", val.type);
+        default: warn("LLVM Codegen: Unsupported constant value type '{}'.\n", val.type);
     }
     return nullptr;
 }
@@ -61,11 +85,19 @@ llvm::Value* Module::codegen(const AST::Node* node) {
         case AST::Node::Type::Cast: {
             assert(node->children.size() == 1);
             auto&& child = codegen(node->children[0]);
-            if(child)
+            if(!child)
                 return nullptr;
+            // TODO: Handle child's type.
             switch(node->value.type) {
-                case GenericValue::Type::Float: return _llvm_ir_builder.CreateSIToFP(child, llvm::Type::getFloatTy(*_llvm_context), "conv");
-                default: error("LLVM::Codegen: Cast to {} not supported.", node->value.type); return nullptr;
+                case GenericValue::Type::Float: {
+                    assert(node->children[0]->value.type == GenericValue::Type::Integer); // TEMP
+                    return _llvm_ir_builder.CreateSIToFP(child, llvm::Type::getFloatTy(*_llvm_context), "conv");
+                }
+                case GenericValue::Type::Integer: {
+                    assert(node->children[0]->value.type == GenericValue::Type::Float); // TEMP
+                    return _llvm_ir_builder.CreateFPToSI(child, llvm::Type::getInt32Ty(*_llvm_context), "conv");
+                }
+                default: error("LLVM::Codegen: Cast from {} to {} not supported.", ->children[0]->value.type, node->value.type); return nullptr;
             }
         }
         case AST::Node::Type::FunctionDeclaration: {
@@ -134,6 +166,19 @@ llvm::Value* Module::codegen(const AST::Node* node) {
             switch(node->value.type) {
                 case GenericValue::Type::Float: ret = create_entry_block_alloca(parent_function, llvm::Type::getFloatTy(*_llvm_context), std::string{node->token.value}); break;
                 case GenericValue::Type::Integer: ret = create_entry_block_alloca(parent_function, llvm::Type::getInt32Ty(*_llvm_context), std::string{node->token.value}); break;
+                case GenericValue::Type::Array: {
+                    // FIXME: Handle more types.
+                    auto arrayType = llvm::ArrayType::get(llvm::IntegerType::get(*_llvm_context, 32), node->value.value.as_array.capacity);
+                    ret = create_entry_block_alloca(parent_function, arrayType, std::string{node->token.value});
+                    break;
+                }
+                case GenericValue::Type::String: {
+                    // FIXME: Change this to a struct with size
+                    auto charType = llvm::IntegerType::get(*_llvm_context, 8);
+                    auto stringType = llvm::PointerType::get(charType, 0);
+                    ret = create_entry_block_alloca(parent_function, stringType, std::string{node->token.value});
+                    break;
+                }
                 default: warn("LLVM Codegen: Unsupported variable type '{}'.\n", node->value.type); break;
             }
             if(!set(node->token.value, ret)) {
@@ -155,77 +200,88 @@ llvm::Value* Module::codegen(const AST::Node* node) {
             auto rhs = codegen(node->children[1]);
             if(!lhs || !rhs)
                 return nullptr;
-            if(node->token.value == "+") {
-                switch(node->value.type) {
-                    case GenericValue::Type::Integer: return _llvm_ir_builder.CreateAdd(lhs, rhs, "addtmp");
-                    case GenericValue::Type::Float: {
-                        // TODO: Temp, tidy up.
-                        if(lhs->getType() == llvm::Type::getInt32Ty(*_llvm_context)) {
-                            assert(rhs->getType() != llvm::Type::getInt32Ty(*_llvm_context));
-                            lhs = _llvm_ir_builder.CreateSIToFP(lhs, llvm::Type::getFloatTy(*_llvm_context), "conv");
-                        } else if(rhs->getType() == llvm::Type::getInt32Ty(*_llvm_context)) {
-                            assert(lhs->getType() != llvm::Type::getInt32Ty(*_llvm_context));
-                            rhs = _llvm_ir_builder.CreateSIToFP(rhs, llvm::Type::getFloatTy(*_llvm_context), "conv");
+            switch(node->token.type) {
+                case Tokenizer::Token::Type::Addition: {
+                    switch(node->value.type) {
+                        case GenericValue::Type::Integer: return _llvm_ir_builder.CreateAdd(lhs, rhs, "addtmp");
+                        case GenericValue::Type::Float: {
+                            // TODO: Temp, tidy up.
+                            if(lhs->getType() == llvm::Type::getInt32Ty(*_llvm_context)) {
+                                assert(rhs->getType() != llvm::Type::getInt32Ty(*_llvm_context));
+                                lhs = _llvm_ir_builder.CreateSIToFP(lhs, llvm::Type::getFloatTy(*_llvm_context), "conv");
+                            } else if(rhs->getType() == llvm::Type::getInt32Ty(*_llvm_context)) {
+                                assert(lhs->getType() != llvm::Type::getInt32Ty(*_llvm_context));
+                                rhs = _llvm_ir_builder.CreateSIToFP(rhs, llvm::Type::getFloatTy(*_llvm_context), "conv");
+                            }
+                            return _llvm_ir_builder.CreateFAdd(lhs, rhs, "addftmp");
                         }
-                        return _llvm_ir_builder.CreateFAdd(lhs, rhs, "addftmp");
+                        default: error("LLVM::Codegen: Binary operator '{}' does not support type '{}'.", node->token.value, node->value.type); return nullptr;
                     }
-                    default: error("LLVM::Codegen: Binary operator '{}' does not support type '{}'.", node->token.value, node->value.type); return nullptr;
                 }
-            } else if(node->token.value == "-") {
-                if(node->value.type == GenericValue::Type::Integer)
-                    return _llvm_ir_builder.CreateSub(lhs, rhs, "subtmp");
-                else
-                    return _llvm_ir_builder.CreateFSub(lhs, rhs, "subftmp");
-            } else if(node->token.value == "*") {
-                switch(node->value.type) {
-                    case GenericValue::Type::Integer: return _llvm_ir_builder.CreateMul(lhs, rhs, "multmp");
-                    case GenericValue::Type::Float: {
-                        // TODO: Temp, tidy up.
-                        if(lhs->getType() == llvm::Type::getInt32Ty(*_llvm_context)) {
-                            assert(rhs->getType() != llvm::Type::getInt32Ty(*_llvm_context));
-                            lhs = _llvm_ir_builder.CreateSIToFP(lhs, llvm::Type::getFloatTy(*_llvm_context), "conv");
-                        } else if(rhs->getType() == llvm::Type::getInt32Ty(*_llvm_context)) {
-                            assert(lhs->getType() != llvm::Type::getInt32Ty(*_llvm_context));
-                            rhs = _llvm_ir_builder.CreateSIToFP(rhs, llvm::Type::getFloatTy(*_llvm_context), "conv");
+                case Tokenizer::Token::Type::Substraction: {
+                    if(node->value.type == GenericValue::Type::Integer)
+                        return _llvm_ir_builder.CreateSub(lhs, rhs, "subtmp");
+                    else
+                        return _llvm_ir_builder.CreateFSub(lhs, rhs, "subftmp");
+                }
+                case Tokenizer::Token::Type::Multiplication: {
+                    switch(node->value.type) {
+                        case GenericValue::Type::Integer: return _llvm_ir_builder.CreateMul(lhs, rhs, "multmp");
+                        case GenericValue::Type::Float: {
+                            // TODO: Temp, tidy up.
+                            if(lhs->getType() == llvm::Type::getInt32Ty(*_llvm_context)) {
+                                assert(rhs->getType() != llvm::Type::getInt32Ty(*_llvm_context));
+                                lhs = _llvm_ir_builder.CreateSIToFP(lhs, llvm::Type::getFloatTy(*_llvm_context), "conv");
+                            } else if(rhs->getType() == llvm::Type::getInt32Ty(*_llvm_context)) {
+                                assert(lhs->getType() != llvm::Type::getInt32Ty(*_llvm_context));
+                                rhs = _llvm_ir_builder.CreateSIToFP(rhs, llvm::Type::getFloatTy(*_llvm_context), "conv");
+                            }
+                            return _llvm_ir_builder.CreateFMul(lhs, rhs, "mulftmp");
                         }
-                        return _llvm_ir_builder.CreateFMul(lhs, rhs, "mulftmp");
-                    }
-                    default: error("LLVM::Codegen: Binary operator '{}' does not support type '{}'.", node->token.value, node->value.type); return nullptr;
-                }
-            } else if(node->token.value == "/") {
-                auto div = _llvm_ir_builder.CreateFDiv(lhs, rhs, "divftmp");
-                if(node->value.type == GenericValue::Type::Integer)
-                    return _llvm_ir_builder.CreateFPToUI(div, llvm::Type::getInt32Ty(*_llvm_context), "intcasttmp");
-                else
-                    return div;
-                // Boolean Operators
-            } else if(node->token.value == "<") {
-                // TODO: More types
-                if(node->children[0]->value.type == GenericValue::Type::Integer && node->children[1]->value.type == GenericValue::Type::Integer)
-                    return _llvm_ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_SLT, lhs, rhs, "ICMP_SLT");
-                else if(node->children[0]->value.type == GenericValue::Type::Float && node->children[1]->value.type == GenericValue::Type::Float)
-                    return _llvm_ir_builder.CreateFCmp(llvm::CmpInst::Predicate::FCMP_OLT, lhs, rhs, "FCMP_OLT");
-            } else if(node->token.value == ">") {
-                // TODO: More types
-                if(node->children[0]->value.type == GenericValue::Type::Integer && node->children[1]->value.type == GenericValue::Type::Integer)
-                    return _llvm_ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_SGT, lhs, rhs, "ICMP_SGT");
-                else if(node->children[0]->value.type == GenericValue::Type::Float && node->children[1]->value.type == GenericValue::Type::Float)
-                    return _llvm_ir_builder.CreateFCmp(llvm::CmpInst::Predicate::FCMP_OGT, lhs, rhs, "FCMP_OGT");
-            } else if(node->token.value == "=") {
-                assert(node->children[0]->type == AST::Node::Type::Variable); // FIXME
-                auto variable = get(node->children[0]->token.value);
-                // FIXME
-                if(variable->getAllocatedType() != rhs->getType()) {
-                    if(variable->getAllocatedType() == llvm::Type::getInt32Ty(*_llvm_context) && rhs->getType() == llvm::Type::getFloatTy(*_llvm_context)) {
-                        rhs = _llvm_ir_builder.CreateFPToSI(rhs, llvm::Type::getFloatTy(*_llvm_context), "conv");
-                    } else {
-                        error("LLVM::Codegen: No automatic conversion from ... to ... .\n");
+                        default: error("LLVM::Codegen: Binary operator '{}' does not support type '{}'.", node->token.value, node->value.type); return nullptr;
                     }
                 }
-                _llvm_ir_builder.CreateStore(rhs, variable);
-                return rhs;
+                case Tokenizer::Token::Type::Division: {
+                    auto div = _llvm_ir_builder.CreateFDiv(lhs, rhs, "divftmp");
+                    if(node->value.type == GenericValue::Type::Integer)
+                        return _llvm_ir_builder.CreateFPToUI(div, llvm::Type::getInt32Ty(*_llvm_context), "intcasttmp");
+                    else
+                        return div;
+                }
+                case Tokenizer::Token::Type::Lesser: {
+                    // TODO: More types
+                    if(node->children[0]->value.type == GenericValue::Type::Integer && node->children[1]->value.type == GenericValue::Type::Integer)
+                        return _llvm_ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_SLT, lhs, rhs, "ICMP_SLT");
+                    else if(node->children[0]->value.type == GenericValue::Type::Float && node->children[1]->value.type == GenericValue::Type::Float)
+                        return _llvm_ir_builder.CreateFCmp(llvm::CmpInst::Predicate::FCMP_OLT, lhs, rhs, "FCMP_OLT");
+                }
+                case Tokenizer::Token::Type::Greater: {
+                    // TODO: More types
+                    if(node->children[0]->value.type == GenericValue::Type::Integer && node->children[1]->value.type == GenericValue::Type::Integer)
+                        return _llvm_ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_SGT, lhs, rhs, "ICMP_SGT");
+                    else if(node->children[0]->value.type == GenericValue::Type::Float && node->children[1]->value.type == GenericValue::Type::Float)
+                        return _llvm_ir_builder.CreateFCmp(llvm::CmpInst::Predicate::FCMP_OGT, lhs, rhs, "FCMP_OGT");
+                }
+                case Tokenizer::Token::Type::Assignment: {
+                    assert(node->children[0]->type == AST::Node::Type::Variable); // FIXME
+                    auto variable = get(node->children[0]->token.value);
+                    if(!variable) {
+                        error("LLVM Codegen: Undeclared variable '{}'.\n", node->children[0]->token.value);
+                        return nullptr;
+                    }
+                    // FIXME: Define rules for automatic conversion and implement them. (But not here?)
+                    if(variable->getAllocatedType() != rhs->getType()) {
+                        std::string              rhs_type_str, lhs_type_str;
+                        llvm::raw_string_ostream rhs_type_rso(rhs_type_str), lhs_type_rso(lhs_type_str);
+                        rhs->getType()->print(rhs_type_rso);
+                        variable->getAllocatedType()->print(lhs_type_rso);
+                        error("LLVM::Codegen: No automatic conversion from {} to {} .\n", rhs_type_rso.str(), lhs_type_rso.str());
+                    }
+                    _llvm_ir_builder.CreateStore(rhs, variable);
+                    return variable;
+                }
+                default: warn("LLVM Codegen: Unimplemented Binary Operator '{}'.\n", node->token.value); break;
             }
-            warn("LLVM Code: Unimplemented Binary Operator '{}'.\n", node->token.value);
             break;
         }
         case AST::Node::Type::WhileStatement: {

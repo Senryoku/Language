@@ -93,6 +93,6 @@ class Module {
     Scope&       get_scope() { return _scopes.back(); }
     const Scope& get_scope() const { return _scopes.back(); }
 
-    llvm::Value* codegen(const GenericValue& val);
-    llvm::Value* codegen(const AST::Node* node);
+    llvm::Constant* codegen(const GenericValue& val);
+    llvm::Value*    codegen(const AST::Node* node);
 };
