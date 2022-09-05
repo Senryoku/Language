@@ -14,7 +14,6 @@
 
 #include <Parser.hpp>
 #include <Tokenizer.hpp>
-#include <asm/wasm.hpp>
 #include <compiler/Module.hpp>
 #include <utils/CLIArg.hpp>
 
@@ -40,7 +39,6 @@ int main(int argc, char* argv[]) {
     args.add('a', "ast", false, "Dump the parsed AST to the command line.");
     args.add('i', "ir", false, "Output LLVM Intermediate Representation.");
     args.add('w', "watch", false, "Watch the supplied file and re-run on changes.");
-    args.add('s', "wasm", false, "Output WASM S-Expression Text format (Currently only works for exporting top-level functions and is extremly limited).");
     args.parse(argc, argv);
 
     if(args.get_default_arg() == "") {
@@ -92,9 +90,6 @@ int main(int argc, char* argv[]) {
                 } else
                     fmt::print("{}", *ast);
             }
-
-            if(args['s'].set)
-                generate_wasm_s_expression(*ast);
 
             if(args['i'].set) {
                 auto ir_filepath = std::filesystem::path(filename).stem().replace_extension(".ll");
