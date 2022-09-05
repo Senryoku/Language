@@ -38,6 +38,9 @@ int main(int argc, char* argv[]) {
     args.add('t', "tokens", false, "Dump the state after the tokenizing stage.");
     args.add('a', "ast", false, "Dump the parsed AST to the command line.");
     args.add('i', "ir", false, "Output LLVM Intermediate Representation.");
+    args.add('r', "run", false, "Run the resulting executable.");
+    args.add('b', "object", false, "Output an object file.");
+    args.add('j', "jit", false, "Run the module using JIT.");
     args.add('w', "watch", false, "Watch the supplied file and re-run on changes.");
     args.parse(argc, argv);
 
@@ -86,66 +89,73 @@ int main(int argc, char* argv[]) {
                     auto out = fmt::output_file(args['o'].value);
                     out.print("{}", *ast);
                     fmt::print("AST written to '{}'.\n", args['o'].value);
-                    system(fmt::format("cat \"{}\"", args['o'].value).c_str());
+                    std::system(fmt::format("cat \"{}\"", args['o'].value).c_str());
                 } else
                     fmt::print("{}", *ast);
+                return 0;
             }
 
-            if(args['i'].set) {
-                auto ir_filepath = std::filesystem::path(filename).stem().replace_extension(".ll");
-                if(args['o'].set)
-                    ir_filepath = args['o'].value;
+            auto ir_filepath = std::filesystem::path(filename).stem().replace_extension(".ll");
+            if(args['o'].set)
+                ir_filepath = args['o'].value;
 
-                try {
-                    std::unique_ptr<llvm::LLVMContext> llvm_context(new llvm::LLVMContext());
-                    Module                             new_module{filename, llvm_context.get()};
-                    auto                               result = new_module.codegen(*ast);
-                    if(!result) {
-                        error("LLVM Codegen returned nullptr.\n");
-                        return 1;
-                    }
+            try {
+                std::unique_ptr<llvm::LLVMContext> llvm_context(new llvm::LLVMContext());
+                Module                             new_module{filename, llvm_context.get()};
+                auto                               result = new_module.codegen(*ast);
+                if(!result) {
+                    error("LLVM Codegen returned nullptr.\n");
+                    return 1;
+                }
 
-                    // TODO: Remove
-                    // new_module.get_llvm_module().dump();
-                    if(llvm::verifyModule(new_module.get_llvm_module(), &llvm::errs())) {
-                        error("Errors in LLVM Module, exiting...\n");
-                        return 1;
-                    }
+                // TODO: Remove
+                // new_module.get_llvm_module().dump();
+                if(llvm::verifyModule(new_module.get_llvm_module(), &llvm::errs())) {
+                    error("Errors in LLVM Module, exiting...\n");
+                    return 1;
+                }
 
-                    // Output text IR to output file
-                    std::error_code err;
-                    auto            file = llvm::raw_fd_ostream(ir_filepath.string(), err);
-                    if(!err)
-                        new_module.get_llvm_module().print(file, nullptr);
-                    else {
-                        error("Error opening '{}': {}\n", ir_filepath.string(), err);
-                        return 1;
-                    }
+                // Output text IR to output file
+                std::error_code err;
+                auto            file = llvm::raw_fd_ostream(ir_filepath.string(), err);
+                if(!err)
+                    new_module.get_llvm_module().print(file, nullptr);
+                else {
+                    error("Error opening '{}': {}\n", ir_filepath.string(), err);
+                    return 1;
+                }
 
-#if 1
-                    auto target_triple = llvm::sys::getDefaultTargetTriple();
-                    llvm::InitializeNativeTarget();
-                    llvm::InitializeNativeTargetAsmParser();
-                    llvm::InitializeNativeTargetAsmPrinter();
-                    std::string error_str;
-                    auto        target = llvm::TargetRegistry::lookupTarget(target_triple, error_str);
-                    if(!target) {
-                        error("Could not lookup target: {}.\n", error_str);
-                        return 1;
-                    }
-                    auto cpu = "generic";
-                    auto features = "";
+                // Requested only the IR file, stop there.
+                if(args['i'].set) {
+                    success("LLVM IR written to {}.\n", ir_filepath.string());
+                    return 0;
+                }
 
-                    llvm::TargetOptions opt;
-                    auto                reloc_model = llvm::Optional<llvm::Reloc::Model>();
-                    auto                target_machine = target->createTargetMachine(target_triple, cpu, features, opt, reloc_model);
+                auto target_triple = llvm::sys::getDefaultTargetTriple();
+                llvm::InitializeNativeTarget();
+                llvm::InitializeNativeTargetAsmParser();
+                llvm::InitializeNativeTargetAsmPrinter();
+                std::string error_str;
+                auto        target = llvm::TargetRegistry::lookupTarget(target_triple, error_str);
+                if(!target) {
+                    error("Could not lookup target: {}.\n", error_str);
+                    return 1;
+                }
+                auto cpu = "generic";
+                auto features = "";
 
-                    new_module.get_llvm_module().setDataLayout(target_machine->createDataLayout());
-                    new_module.get_llvm_module().setTargetTriple(target_triple);
+                llvm::TargetOptions opt;
+                auto                reloc_model = llvm::Optional<llvm::Reloc::Model>();
+                auto                target_machine = target->createTargetMachine(target_triple, cpu, features, opt, reloc_model);
 
+                new_module.get_llvm_module().setDataLayout(target_machine->createDataLayout());
+                new_module.get_llvm_module().setTargetTriple(target_triple);
+
+                // Generate Object file
+                if(args['b'].set) {
                     auto o_filepath = std::filesystem::path(filename).stem().replace_extension(".o");
-                    // if(args['o'].set)
-                    //     o_filepath = args['o'].value;
+                    if(args['o'].set)
+                        o_filepath = args['o'].value;
                     std::error_code      error_code;
                     llvm::raw_fd_ostream dest(o_filepath.string(), error_code, llvm::sys::fs::OF_None);
 
@@ -162,26 +172,39 @@ int main(int argc, char* argv[]) {
                         return 1;
                     }
 
-                    std::system(fmt::format("llc {}", ir_filepath.string()).c_str());
-                    std::system(fmt::format("clang {} -o {}", ir_filepath.replace_extension(".ll").string(), ir_filepath.replace_extension(".exe").string()).c_str());
+                    pass.run(new_module.get_llvm_module());
+                    dest.flush();
+                    success("Wrote object file '{}'.\n", o_filepath.string());
+                    return 0;
+                }
 
-                    // pass.run(new_module.get_llvm_module());
-                    // dest.flush();
-                    // success("Wrote object file '{}'.\n", o_filepath.string());
-
-                    // std::error_code EC;
-                    // auto            out = llvm::raw_fd_ostream(ir_filepath.string(), EC, llvm::sys::fs::OF_None);
-                    // new_module.get_llvm_module().print(out, nullptr);
-#else
-                    // Quick Test JIT (TODO: Remove)
+                if(args['j'].set) {
+                    // Quick Test JIT (TODO: Remove?)
                     lang::LLVMJIT jit;
                     auto          return_value = jit.run(std::move(new_module.get_llvm_module_ptr()), std::move(llvm_context));
                     success("JIT main function returned '{}'\n", return_value);
-#endif
-                } catch(const std::exception& e) {
-                    error("Exception: {}", e.what());
+                    return 0;
+                }
+
+                if(auto retval = std::system(fmt::format("llc \"{}\"", ir_filepath.string()).c_str()); retval != 0) {
+                    error("Error running llc: {}.\n", retval);
                     return 1;
                 }
+                auto final_outputfile = args['o'].set ? args['o'].value : ir_filepath.replace_extension(".exe").string();
+                if(auto retval = std::system(fmt::format("clang \"{}\" -o \"{}\"", ir_filepath.replace_extension(".ll").string(), final_outputfile).c_str()); retval != 0) {
+                    error("Error running clang: {}.\n", retval);
+                    return 1;
+                }
+                success("Compiled successfully to {}.\n", final_outputfile);
+
+                // Run the generated program. FIXME: Handy, but dangerous.
+                if(args['r'].set) {
+                    success("Running {}...\n", final_outputfile);
+                    std::system(final_outputfile.c_str());
+                }
+            } catch(const std::exception& e) {
+                error("Exception: {}", e.what());
+                return 1;
             }
         }
         return 0;

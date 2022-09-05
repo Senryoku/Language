@@ -27,9 +27,9 @@ class CLIArg {
     const std::string& get_default_arg() const { return _default_arg; }
 
     void print_help() const {
-        success("  [{}] Help:\n", _program_name);
+        print("  [{}] Help:\n", _program_name);
         for(const ArgumentDescription& d : _arguments)
-            success("    -{}  --{:8} {}\n", d.short_name, d.long_name, d.description);
+            print("    -{}  --{:8} {}\n", d.short_name, d.long_name, d.description);
     }
 
   private:
@@ -99,5 +99,6 @@ void CLIArg::parse(int argc, char* argv[]) {
 
     if(get_short('h')->set) {
         print_help();
+        exit(0);
     }
 }
