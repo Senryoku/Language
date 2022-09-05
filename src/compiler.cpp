@@ -1,5 +1,6 @@
 #include <array>
 #include <cassert>
+#include <chrono>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -60,6 +61,8 @@ int main(int argc, char* argv[]) {
         }
         std::string source{(std::istreambuf_iterator<char>(input_file)), std::istreambuf_iterator<char>()};
 
+        auto tokenizing_start = std::chrono::high_resolution_clock::now();
+
         std::vector<Tokenizer::Token> tokens;
         try {
             Tokenizer tokenizer(source);
@@ -70,6 +73,8 @@ int main(int argc, char* argv[]) {
             return 1;
         }
 
+        auto tokenizing_end = std::chrono::high_resolution_clock::now();
+
         // Print tokens
         if(args['t'].set) {
             int i = 0;
@@ -79,10 +84,13 @@ int main(int argc, char* argv[]) {
                     fmt::print("\n");
             }
             fmt::print("\n");
+            return 0;
         }
 
+        auto   parsing_start = std::chrono::high_resolution_clock::now();
         Parser parser;
         auto   ast = parser.parse(tokens);
+        auto   parsing_end = std::chrono::high_resolution_clock::now();
         if(ast.has_value()) {
             if(args['a'].set) {
                 if(args['o'].set) {
@@ -100,6 +108,7 @@ int main(int argc, char* argv[]) {
                 ir_filepath = args['o'].value;
 
             try {
+                auto                               codegen_start = std::chrono::high_resolution_clock::now();
                 std::unique_ptr<llvm::LLVMContext> llvm_context(new llvm::LLVMContext());
                 Module                             new_module{filename, llvm_context.get()};
                 auto                               result = new_module.codegen(*ast);
@@ -107,28 +116,37 @@ int main(int argc, char* argv[]) {
                     error("LLVM Codegen returned nullptr.\n");
                     return 1;
                 }
-
                 if(llvm::verifyModule(new_module.get_llvm_module(), &llvm::errs())) {
                     error("Errors in LLVM Module, exiting...\n");
                     return 1;
                 }
+                auto codegen_end = std::chrono::high_resolution_clock::now();
 
-                // Output text IR to output file
-                std::error_code err;
-                auto            file = llvm::raw_fd_ostream(ir_filepath.string(), err);
-                if(!err)
-                    new_module.get_llvm_module().print(file, nullptr);
-                else {
-                    error("Error opening '{}': {}\n", ir_filepath.string(), err);
-                    return 1;
-                }
+// Will use assembly on disk as an intermediary step if set to 1
+#define USING_LLC 0
 
-                // Requested only the IR file, stop there.
-                if(args['i'].set) {
+                auto write_ir_start = std::chrono::high_resolution_clock::now();
+#if !USING_LLC
+                if(args['i'].set)
+#endif
+                {
+                    // Output text IR to output file
+                    std::error_code err;
+                    auto            file = llvm::raw_fd_ostream(ir_filepath.string(), err);
+                    if(!err)
+                        new_module.get_llvm_module().print(file, nullptr);
+                    else {
+                        error("Error opening '{}': {}\n", ir_filepath.string(), err);
+                        return 1;
+                    }
                     success("LLVM IR written to {}.\n", ir_filepath.string());
-                    return 0;
+                    if(args['i'].set)
+                        return 0;
                 }
 
+                auto write_ir_end = std::chrono::high_resolution_clock::now();
+
+                auto object_gen_start = std::chrono::high_resolution_clock::now();
                 auto target_triple = llvm::sys::getDefaultTargetTriple();
                 llvm::InitializeNativeTarget();
                 llvm::InitializeNativeTargetAsmParser();
@@ -150,9 +168,12 @@ int main(int argc, char* argv[]) {
                 new_module.get_llvm_module().setTargetTriple(target_triple);
 
                 // Generate Object file
-                if(args['b'].set) {
-                    auto o_filepath = std::filesystem::path(filename).stem().replace_extension(".o");
-                    if(args['o'].set)
+                auto o_filepath = std::filesystem::path(filename).stem().replace_extension(".o");
+#if USING_LLC
+                if(args['b'].set)
+#endif
+                {
+                    if(args['b'].set && args['o'].set)
                         o_filepath = args['o'].value;
                     std::error_code      error_code;
                     llvm::raw_fd_ostream dest(o_filepath.string(), error_code, llvm::sys::fs::OF_None);
@@ -173,7 +194,8 @@ int main(int argc, char* argv[]) {
                     pass.run(new_module.get_llvm_module());
                     dest.flush();
                     success("Wrote object file '{}'.\n", o_filepath.string());
-                    return 0;
+                    if(args['b'].set)
+                        return 0;
                 }
 
                 if(args['j'].set) {
@@ -183,17 +205,37 @@ int main(int argc, char* argv[]) {
                     success("JIT main function returned '{}'\n", return_value);
                     return 0;
                 }
+                auto object_gen_end = std::chrono::high_resolution_clock::now();
 
+                auto llc_start = std::chrono::high_resolution_clock::now();
+#if USING_LLC
                 if(auto retval = std::system(fmt::format("llc \"{}\"", ir_filepath.string()).c_str()); retval != 0) {
                     error("Error running llc: {}.\n", retval);
                     return 1;
                 }
+#endif
+                auto llc_end = std::chrono::high_resolution_clock::now();
+
+                auto clang_start = std::chrono::high_resolution_clock::now();
                 auto final_outputfile = args['o'].set ? args['o'].value : ir_filepath.replace_extension(".exe").string();
-                if(auto retval = std::system(fmt::format("clang \"{}\" -o \"{}\"", ir_filepath.replace_extension(".ll").string(), final_outputfile).c_str()); retval != 0) {
+#if USING_LLC
+                if(auto retval = std::system(fmt::format("clang -O3 \"{}\" -o \"{}\"", ir_filepath.replace_extension(".ll").string(), final_outputfile).c_str()); retval != 0)
+#else
+                // From object file
+                if(auto retval = std::system(fmt::format("clang \"{}\" -o \"{}\"", std::filesystem::absolute(o_filepath).string(), final_outputfile).c_str()); retval != 0)
+#endif
+                {
                     error("Error running clang: {}.\n", retval);
                     return 1;
                 }
-                success("Compiled successfully to {}.\n", final_outputfile);
+                auto clang_end = std::chrono::high_resolution_clock::now();
+                success("Compiled successfully to {}\n", final_outputfile);
+                print(" {:<12} | {:<12} | {:<12} | {:<12} | {:<12} | {:<12} | {:<12} \n", "Tokenizer", "Parser", "LLVMCodegen", "IR", "ObjectGen", "LLC", "Clang");
+                print(" {:^12.2} | {:^12.2} | {:^12.2} | {:^12.2} | {:^12.2} | {:^12.2} | {:^12.2} \n",
+                      std::chrono::duration<double, std::milli>(tokenizing_end - tokenizing_start), std::chrono::duration<double, std::milli>(parsing_end - parsing_start),
+                      std::chrono::duration<double, std::milli>(write_ir_end - write_ir_start), std::chrono::duration<double, std::milli>(object_gen_end - object_gen_start),
+                      std::chrono::duration<double, std::milli>(codegen_end - codegen_start), std::chrono::duration<double, std::milli>(llc_end - llc_start),
+                      std::chrono::duration<double, std::milli>(clang_end - clang_start));
 
                 // Run the generated program. FIXME: Handy, but dangerous.
                 if(args['r'].set) {
@@ -216,6 +258,8 @@ int main(int argc, char* argv[]) {
                                                       if(std::chrono::system_clock::now() - last_run < std::chrono::seconds(1)) // Ignore double events
                                                           return;
                                                       fmt::print("[{:%T}] <insert lang name> compiler: {} changed, reprocessing...\n", std::chrono::system_clock::now(), path);
+                                                      // Wait a bit, at least on Windows it looks like the file read will fail if attempted right after the modification event.
+                                                      std::this_thread::sleep_for(std::chrono::milliseconds(100));
                                                       handle_file();
                                                       last_run = std::chrono::system_clock::now();
                                                       success("\n[{:%T}] Watching for changes on {}... ", std::chrono::system_clock::now(), args.get_default_arg());

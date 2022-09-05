@@ -70,9 +70,9 @@ class Module {
     llvm::Value* codegen(const AST& ast) {
         // TEMP: "Standard Library"
         // Make libc printf available
-        std::vector<llvm::Type*> printfArgsTypes({llvm::Type::getInt8PtrTy(*_llvm_context)});
-        llvm::FunctionType*      printfType = llvm::FunctionType::get(llvm::Type::getInt32Ty(*_llvm_context), printfArgsTypes, true);
-        auto                     printfFunc = _llvm_module->getOrInsertFunction("printf", printfType);
+        std::vector<llvm::Type*> printf_args_types({llvm::Type::getInt8PtrTy(*_llvm_context)});
+        llvm::FunctionType*      printf_type = llvm::FunctionType::get(llvm::Type::getInt32Ty(*_llvm_context), printf_args_types, true);
+        auto                     printf_func = _llvm_module->getOrInsertFunction("printf", printf_type);
 
         // Actual codegen
         auto r = codegen(&ast.getRoot());

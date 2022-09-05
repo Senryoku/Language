@@ -2,13 +2,36 @@ function double(int k) {
 	return k * 2;
 }
 
+int[32] arr;
+int[32] arr2;
+
+//struct str {
+	char[32] data
+	int      size
+//}
+
+printf("
+ float j   j   i ***********!!
+--------------------------------
+")
+
 int i = 2 * 2 + 6;
 float j = 0.0; 
-while(i > 0) {
+while(i > 0) {	
 	j = 0.5 * j + double(i);
+	
+	int casted = j;
+	printf("%3f %3d %3d ", j, casted, i) // Float printing doesn't work correctly
+	int k = i;
+	while(k > 0) {
+		printf("*")
+		k = k - 1
+	}
+	printf(" !!
+")
+	
 	i = i - 1;
 }
 
 int r = j; // Poor man's cast
-
 return double(r);

@@ -24,7 +24,7 @@ llvm::Constant* Module::codegen(const GenericValue& val) {
                 values[i] = llvm::ConstantInt::get(itemType, arr.items[i].value.as_int32_t); // FIXME: Depends on the item type
 
             auto arrayType = llvm::ArrayType::get(itemType, values.size());
-            auto globalDeclaration = (llvm::GlobalVariable*)_llvm_module->getOrInsertGlobal(".array", arrayType);
+            auto globalDeclaration = (llvm::GlobalVariable*)_llvm_module->getOrInsertGlobal("", arrayType);
             globalDeclaration->setInitializer(llvm::ConstantArray::get(arrayType, values));
             globalDeclaration->setConstant(true);
             globalDeclaration->setLinkage(llvm::GlobalValue::LinkageTypes::PrivateLinkage);
@@ -48,7 +48,7 @@ llvm::Constant* Module::codegen(const GenericValue& val) {
             auto stringType = llvm::ArrayType::get(charType, chars.size());
 
             // 3. Create the declaration statement
-            auto globalDeclaration = (llvm::GlobalVariable*)_llvm_module->getOrInsertGlobal(".str", stringType);
+            auto globalDeclaration = (llvm::GlobalVariable*)_llvm_module->getOrInsertGlobal(val.value.as_string.to_std_string_view().data(), stringType);
             globalDeclaration->setInitializer(llvm::ConstantArray::get(stringType, chars));
             globalDeclaration->setConstant(true);
             globalDeclaration->setLinkage(llvm::GlobalValue::LinkageTypes::PrivateLinkage);
@@ -97,7 +97,7 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                     assert(node->children[0]->value.type == GenericValue::Type::Float); // TEMP
                     return _llvm_ir_builder.CreateFPToSI(child, llvm::Type::getInt32Ty(*_llvm_context), "conv");
                 }
-                default: error("LLVM::Codegen: Cast from {} to {} not supported.", ->children[0]->value.type, node->value.type); return nullptr;
+                default: error("LLVM::Codegen: Cast from {} to {} not supported.", node->children[0]->value.type, node->value.type); return nullptr;
             }
         }
         case AST::Node::Type::FunctionDeclaration: {
@@ -141,12 +141,13 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                 return nullptr;
             }
             // TODO: Handle default values.
+            // TODO: Handle vargs functions (variable number of parameters, like printf :^) )
             if(function->arg_size() != node->children.size() - 1) {
                 error("Unexpected number of parameters in function call '{}' (line {}): Expected {}, got {}.\n", function_name, node->token.line, function->arg_size(),
                       node->children.size() - 1);
                 for(auto i = 1u; i < node->children.size(); ++i)
-                    print("\tArgument #{}: {}\n", i, *node->children[i]);
-                return nullptr;
+                    print("\tArgument #{}: {}", i, *node->children[i]);
+                // return nullptr; // FIXME: Disabled to 'support' vargs, should return an error
             }
             std::vector<llvm::Value*> parameters;
             // Skip the first one, it (will) holds the function name (FIXME: No used yet, we don't support function as result of expression yet)
