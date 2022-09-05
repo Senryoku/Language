@@ -1,5 +1,6 @@
 #include <array>
 #include <cassert>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <sstream>
@@ -8,6 +9,7 @@
 
 #include <FileWatch.hpp>
 #include <fmt/chrono.h>
+#include <fmt/format.h>
 #include <fmt/os.h>
 
 #include <Parser.hpp>
@@ -28,9 +30,9 @@
 #include <jit/LLVMJIT.hpp>
 
 int main(int argc, char* argv[]) {
-    fmt::print("?{0:-^{2}}?\n"
-               "¦{1: ^{2}}¦\n"
-               "?{0:-^{2}}?\n",
+    fmt::print("┌{0:─^{2}}┐\n"
+               "│{1: ^{2}}│\n"
+               "└{0:─^{2}}┘\n",
                "", "<insert language name> compiler.", 80);
     CLIArg args;
     args.add('o', "out", true, "Specify the output file.");
@@ -90,8 +92,10 @@ int main(int argc, char* argv[]) {
                 } else
                     fmt::print("{}", *ast);
             }
+
             if(args['s'].set)
                 generate_wasm_s_expression(*ast);
+
             if(args['i'].set) {
                 auto ir_filepath = std::filesystem::path(filename).stem().replace_extension(".ll");
                 if(args['o'].set)
@@ -107,7 +111,7 @@ int main(int argc, char* argv[]) {
                     }
 
                     // TODO: Remove
-                    new_module.get_llvm_module().dump();
+                    // new_module.get_llvm_module().dump();
                     if(llvm::verifyModule(new_module.get_llvm_module(), &llvm::errs())) {
                         error("Errors in LLVM Module, exiting...\n");
                         return 1;
@@ -123,49 +127,56 @@ int main(int argc, char* argv[]) {
                         return 1;
                     }
 
-#if 0
-                auto target_triple = llvm::sys::getDefaultTargetTriple();
-                llvm::InitializeNativeTarget();
-                llvm::InitializeNativeTargetAsmParser();
-                llvm::InitializeNativeTargetAsmPrinter();
-                std::string error_str;
-                auto        target = llvm::TargetRegistry::lookupTarget(target_triple, error_str);
-                if(!target) {
-                    error("Could not lookup target: {}.\n", error_str);
-                    return 1;
-                }
-                auto cpu = "generic";
-                auto features = "";
+#if 1
+                    auto target_triple = llvm::sys::getDefaultTargetTriple();
+                    llvm::InitializeNativeTarget();
+                    llvm::InitializeNativeTargetAsmParser();
+                    llvm::InitializeNativeTargetAsmPrinter();
+                    std::string error_str;
+                    auto        target = llvm::TargetRegistry::lookupTarget(target_triple, error_str);
+                    if(!target) {
+                        error("Could not lookup target: {}.\n", error_str);
+                        return 1;
+                    }
+                    auto cpu = "generic";
+                    auto features = "";
 
-                llvm::TargetOptions opt;
-                auto                reloc_model = llvm::Optional<llvm::Reloc::Model>();
-                auto                target_machine = target->createTargetMachine(target_triple, cpu, features, opt, reloc_model);
+                    llvm::TargetOptions opt;
+                    auto                reloc_model = llvm::Optional<llvm::Reloc::Model>();
+                    auto                target_machine = target->createTargetMachine(target_triple, cpu, features, opt, reloc_model);
 
-                new_module.get_llvm_module().setDataLayout(target_machine->createDataLayout());
-                new_module.get_llvm_module().setTargetTriple(target_triple);
+                    new_module.get_llvm_module().setDataLayout(target_machine->createDataLayout());
+                    new_module.get_llvm_module().setTargetTriple(target_triple);
 
-                auto o_filepath = std::filesystem::path(filename).stem().replace_extension(".o");
-                // if(args['o'].set)
-                //     o_filepath = args['o'].value;
-                std::error_code      error_code;
-                llvm::raw_fd_ostream dest(o_filepath.string(), error_code, llvm::sys::fs::OF_None);
+                    auto o_filepath = std::filesystem::path(filename).stem().replace_extension(".o");
+                    // if(args['o'].set)
+                    //     o_filepath = args['o'].value;
+                    std::error_code      error_code;
+                    llvm::raw_fd_ostream dest(o_filepath.string(), error_code, llvm::sys::fs::OF_None);
 
-                if(error_code) {
-                    error("Could not open file '{}': {}.\n", o_filepath.string(), error_code.message());
-                    return 1;
-                }
+                    if(error_code) {
+                        error("Could not open file '{}': {}.\n", o_filepath.string(), error_code.message());
+                        return 1;
+                    }
 
-                llvm::legacy::PassManager pass;
-                auto                      file_type = llvm::CGFT_ObjectFile;
+                    llvm::legacy::PassManager pass;
+                    auto                      file_type = llvm::CGFT_ObjectFile;
 
-                if(target_machine->addPassesToEmitFile(pass, dest, nullptr, file_type)) {
-                    error("Target Machine can't emit a file of this type.\n");
-                    return 1;
-                }
+                    if(target_machine->addPassesToEmitFile(pass, dest, nullptr, file_type)) {
+                        error("Target Machine can't emit a file of this type.\n");
+                        return 1;
+                    }
 
-                pass.run(new_module.get_llvm_module());
-                dest.flush();
-                success("Wrote object file '{}'.\n", o_filepath.string());
+                    std::system(fmt::format("llc {}", ir_filepath.string()).c_str());
+                    std::system(fmt::format("clang {} -o {}", ir_filepath.replace_extension(".ll").string(), ir_filepath.replace_extension(".exe").string()).c_str());
+
+                    // pass.run(new_module.get_llvm_module());
+                    // dest.flush();
+                    // success("Wrote object file '{}'.\n", o_filepath.string());
+
+                    // std::error_code EC;
+                    // auto            out = llvm::raw_fd_ostream(ir_filepath.string(), EC, llvm::sys::fs::OF_None);
+                    // new_module.get_llvm_module().print(out, nullptr);
 #else
                     // Quick Test JIT (TODO: Remove)
                     lang::LLVMJIT jit;

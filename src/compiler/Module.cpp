@@ -1,9 +1,38 @@
 #include "Module.hpp"
 
+#include <vector>
+
 llvm::Value* Module::codegen(const GenericValue& val) {
     switch(val.type) {
         case GenericValue::Type::Float: return llvm::ConstantFP::get(*_llvm_context, llvm::APFloat(val.value.as_float));
         case GenericValue::Type::Integer: return llvm::ConstantInt::get(*_llvm_context, llvm::APInt(32, val.value.as_int32_t));
+        case GenericValue::Type::String: {
+            // TEMP: Constant String.
+            const auto& str = val.value.as_string;
+            auto        charType = llvm::IntegerType::get(*_llvm_context, 8);
+
+            // 1. Initialize chars vector
+            std::vector<llvm::Constant*> chars(str.size);
+            for(unsigned int i = 0; i < str.size; i++)
+                chars[i] = llvm::ConstantInt::get(charType, *(str.begin + i));
+
+            // 1b. add a zero terminator too
+            // FIXME: Ultimately string will have a built-in length, should we keep the terminating null byte anyway?
+            chars.push_back(llvm::ConstantInt::get(charType, 0));
+
+            // 2. Initialize the string from the characters
+            auto stringType = llvm::ArrayType::get(charType, chars.size());
+
+            // 3. Create the declaration statement
+            auto globalDeclaration = (llvm::GlobalVariable*)_llvm_module->getOrInsertGlobal(".str", stringType);
+            globalDeclaration->setInitializer(llvm::ConstantArray::get(stringType, chars));
+            globalDeclaration->setConstant(true);
+            globalDeclaration->setLinkage(llvm::GlobalValue::LinkageTypes::PrivateLinkage);
+            globalDeclaration->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Global);
+
+            // 4. Return a cast to an i8*
+            return llvm::ConstantExpr::getBitCast(globalDeclaration, charType->getPointerTo());
+        }
         default: warn("LLVM Codegen: Unsupported value type '{}'.\n", val.type);
     }
     return nullptr;
@@ -42,7 +71,7 @@ llvm::Value* Module::codegen(const AST::Node* node) {
             auto function_name = std::string{node->token.value};
             auto prev_function = _llvm_module->getFunction(function_name);
             if(prev_function) {
-                error("Redefinition of function '{}' (line {}, already defined on line ??[TODO]).", function_name, node->token.line);
+                error("Redefinition of function '{}' (line {}, already defined on line ??[TODO]).\n", function_name, node->token.line);
                 return nullptr;
             }
 
@@ -75,13 +104,15 @@ llvm::Value* Module::codegen(const AST::Node* node) {
             auto function_name = std::string{node->token.value};
             auto function = _llvm_module->getFunction(function_name);
             if(!function) {
-                error("Call to undeclared function '{}' (line {}).", function_name, node->token.line);
+                error("Call to undeclared function '{}' (line {}).\n", function_name, node->token.line);
                 return nullptr;
             }
             // TODO: Handle default values.
             if(function->arg_size() != node->children.size() - 1) {
-                error("Unexpected number of parameters in function call '{}' (line {}): Expected {}, got {}.", function_name, node->token.line, function->arg_size(),
-                      node->children.size());
+                error("Unexpected number of parameters in function call '{}' (line {}): Expected {}, got {}.\n", function_name, node->token.line, function->arg_size(),
+                      node->children.size() - 1);
+                for(auto i = 1u; i < node->children.size(); ++i)
+                    print("\tArgument #{}: {}\n", i, *node->children[i]);
                 return nullptr;
             }
             std::vector<llvm::Value*> parameters;

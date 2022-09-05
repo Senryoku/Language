@@ -67,7 +67,19 @@ class Module {
             return _llvm_ir_builder.CreateAlloca(type, 0, name.c_str());
     }
 
-    llvm::Value* codegen(const AST& ast) { return codegen(&ast.getRoot()); }
+    llvm::Value* codegen(const AST& ast) {
+        // TEMP: "Standard Library"
+        // Make libc printf available
+        std::vector<llvm::Type*> printfArgsTypes({llvm::Type::getInt8PtrTy(*_llvm_context)});
+        llvm::FunctionType*      printfType = llvm::FunctionType::get(llvm::Type::getInt32Ty(*_llvm_context), printfArgsTypes, true);
+        auto                     printfFunc = _llvm_module->getOrInsertFunction("printf", printfType);
+
+        // Actual codegen
+        auto r = codegen(&ast.getRoot());
+        // Add a return to our generated main (from constructor) (FIXME?)
+        _llvm_ir_builder.CreateRet(llvm::ConstantInt::get(*_llvm_context, llvm::APInt(32, 0)));
+        return r;
+    }
 
   private:
     std::vector<Scope>            _scopes{Scope{}};
