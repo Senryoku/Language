@@ -53,6 +53,7 @@ int main(int argc, char* argv[]) {
     }
 
     auto handle_file = [&]() {
+        auto           total_start = std::chrono::high_resolution_clock::now();
         auto           filename = args.get_default_arg();
         std ::ifstream input_file(filename);
         if(!input_file) {
@@ -147,25 +148,6 @@ int main(int argc, char* argv[]) {
                 auto write_ir_end = std::chrono::high_resolution_clock::now();
 
                 auto object_gen_start = std::chrono::high_resolution_clock::now();
-                auto target_triple = llvm::sys::getDefaultTargetTriple();
-                llvm::InitializeNativeTarget();
-                llvm::InitializeNativeTargetAsmParser();
-                llvm::InitializeNativeTargetAsmPrinter();
-                std::string error_str;
-                auto        target = llvm::TargetRegistry::lookupTarget(target_triple, error_str);
-                if(!target) {
-                    error("Could not lookup target: {}.\n", error_str);
-                    return 1;
-                }
-                auto cpu = "generic";
-                auto features = "";
-
-                llvm::TargetOptions opt;
-                auto                reloc_model = llvm::Optional<llvm::Reloc::Model>();
-                auto                target_machine = target->createTargetMachine(target_triple, cpu, features, opt, reloc_model);
-
-                new_module.get_llvm_module().setDataLayout(target_machine->createDataLayout());
-                new_module.get_llvm_module().setTargetTriple(target_triple);
 
                 // Generate Object file
                 auto o_filepath = std::filesystem::path(filename).stem().replace_extension(".o");
@@ -173,6 +155,26 @@ int main(int argc, char* argv[]) {
                 if(args['b'].set)
 #endif
                 {
+                    auto target_triple = llvm::sys::getDefaultTargetTriple();
+                    llvm::InitializeNativeTarget();
+                    llvm::InitializeNativeTargetAsmParser();
+                    llvm::InitializeNativeTargetAsmPrinter();
+                    std::string error_str;
+                    auto        target = llvm::TargetRegistry::lookupTarget(target_triple, error_str);
+                    if(!target) {
+                        error("Could not lookup target: {}.\n", error_str);
+                        return 1;
+                    }
+                    auto cpu = "generic";
+                    auto features = "";
+
+                    llvm::TargetOptions opt;
+                    auto                reloc_model = llvm::Optional<llvm::Reloc::Model>();
+                    auto                target_machine = target->createTargetMachine(target_triple, cpu, features, opt, reloc_model);
+
+                    new_module.get_llvm_module().setDataLayout(target_machine->createDataLayout());
+                    new_module.get_llvm_module().setTargetTriple(target_triple);
+
                     if(args['b'].set && args['o'].set)
                         o_filepath = args['o'].value;
                     std::error_code      error_code;
@@ -187,13 +189,13 @@ int main(int argc, char* argv[]) {
                     auto                      file_type = llvm::CGFT_ObjectFile;
 
                     if(target_machine->addPassesToEmitFile(pass, dest, nullptr, file_type)) {
-                        error("Target Machine can't emit a file of this type.\n");
+                        error("Target Machine (Target Triple: {}) can't emit a file of this type.\n", target_triple);
                         return 1;
                     }
 
                     pass.run(new_module.get_llvm_module());
                     dest.flush();
-                    success("Wrote object file '{}'.\n", o_filepath.string());
+                    success("Wrote object file '{}' (Target Triple: {}).\n", o_filepath.string(), target_triple);
                     if(args['b'].set)
                         return 0;
                 }
@@ -219,23 +221,28 @@ int main(int argc, char* argv[]) {
                 auto clang_start = std::chrono::high_resolution_clock::now();
                 auto final_outputfile = args['o'].set ? args['o'].value : ir_filepath.replace_extension(".exe").string();
 #if USING_LLC
-                if(auto retval = std::system(fmt::format("clang -O3 \"{}\" -o \"{}\"", ir_filepath.replace_extension(".ll").string(), final_outputfile).c_str()); retval != 0)
+                if(auto retval =
+                       std::system(fmt::format("clang -O3 \"{}\" -o \"{}\" -fuse-ld=lld-link -v", ir_filepath.replace_extension(".ll").string(), final_outputfile).c_str());
+                   retval != 0)
 #else
                 // From object file
-                if(auto retval = std::system(fmt::format("clang \"{}\" -o \"{}\"", std::filesystem::absolute(o_filepath).string(), final_outputfile).c_str()); retval != 0)
+                if(auto retval = std::system(fmt::format("clang \"{}\" -o \"{}\" -O0 -fuse-ld=lld", std::filesystem::absolute(o_filepath).string(), final_outputfile).c_str());
+                   retval != 0)
 #endif
                 {
                     error("Error running clang: {}.\n", retval);
                     return 1;
                 }
                 auto clang_end = std::chrono::high_resolution_clock::now();
+                auto total_end = std::chrono::high_resolution_clock::now();
                 success("Compiled successfully to {}\n", final_outputfile);
-                print(" {:<12} | {:<12} | {:<12} | {:<12} | {:<12} | {:<12} | {:<12} \n", "Tokenizer", "Parser", "LLVMCodegen", "IR", "ObjectGen", "LLC", "Clang");
-                print(" {:^12.2} | {:^12.2} | {:^12.2} | {:^12.2} | {:^12.2} | {:^12.2} | {:^12.2} \n",
+                print(" {:<12} | {:<12} | {:<12} | {:<12} | {:<12} | {:<12} | {:<12} | {:<12} \n", "Tokenizer", "Parser", "LLVMCodegen", "IR", "ObjectGen", "LLC", "Clang",
+                      "Total");
+                print(" {:^12.2} | {:^12.2} | {:^12.2} | {:^12.2} | {:^12.2} | {:^12.2} | {:^12.2} | {:^12.2} \n",
                       std::chrono::duration<double, std::milli>(tokenizing_end - tokenizing_start), std::chrono::duration<double, std::milli>(parsing_end - parsing_start),
-                      std::chrono::duration<double, std::milli>(write_ir_end - write_ir_start), std::chrono::duration<double, std::milli>(object_gen_end - object_gen_start),
-                      std::chrono::duration<double, std::milli>(codegen_end - codegen_start), std::chrono::duration<double, std::milli>(llc_end - llc_start),
-                      std::chrono::duration<double, std::milli>(clang_end - clang_start));
+                      std::chrono::duration<double, std::milli>(codegen_end - codegen_start), std::chrono::duration<double, std::milli>(write_ir_end - write_ir_start),
+                      std::chrono::duration<double, std::milli>(object_gen_end - object_gen_start), std::chrono::duration<double, std::milli>(llc_end - llc_start),
+                      std::chrono::duration<double, std::milli>(clang_end - clang_start), std::chrono::duration<double, std::milli>(total_end - total_start));
 
                 // Run the generated program. FIXME: Handy, but dangerous.
                 if(args['r'].set) {
