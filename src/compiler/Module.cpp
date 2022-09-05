@@ -39,6 +39,7 @@ llvm::Value* Module::codegen(const GenericValue& val) {
 }
 
 llvm::Value* Module::codegen(const AST::Node* node) {
+    _generated_return = false;
     switch(node->type) {
         case AST::Node::Type::Root: [[fallthrough]];
         case AST::Node::Type::Statement: {
@@ -253,7 +254,11 @@ llvm::Value* Module::codegen(const AST::Node* node) {
             _llvm_ir_builder.SetInsertPoint(after_block);
             return llvm::Constant::getNullValue(llvm::Type::getInt32Ty(*_llvm_context));
         }
-        case AST::Node::Type::ReturnStatement: return _llvm_ir_builder.CreateRet(codegen(node->children[0]));
+        case AST::Node::Type::ReturnStatement: {
+            auto val = codegen(node->children[0]);
+            _generated_return = true;
+            return _llvm_ir_builder.CreateRet(val);
+        }
         default: warn("LLVM Codegen: Unsupported node type '{}'.\n", node->type);
     }
     return nullptr;

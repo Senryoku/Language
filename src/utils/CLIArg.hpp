@@ -34,7 +34,7 @@ class CLIArg {
 
   private:
     std::string                      _program_name{};
-    std::string                      _default_arg{};
+    std::string                      _default_arg{}; // TODO: Handle multiple arguments
     std::vector<ArgumentDescription> _arguments;
 
     ArgumentDescription* get_long(const char* arg_name) {

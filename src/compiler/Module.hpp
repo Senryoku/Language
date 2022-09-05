@@ -76,8 +76,9 @@ class Module {
 
         // Actual codegen
         auto r = codegen(&ast.getRoot());
-        // Add a return to our generated main (from constructor) (FIXME?)
-        _llvm_ir_builder.CreateRet(llvm::ConstantInt::get(*_llvm_context, llvm::APInt(32, 0)));
+        // Add a return to our generated main (from constructor) if needed (FIXME?)
+        if(!_generated_return)
+            _llvm_ir_builder.CreateRet(llvm::ConstantInt::get(*_llvm_context, llvm::APInt(32, 0)));
         return r;
     }
 
@@ -86,6 +87,8 @@ class Module {
     llvm::LLVMContext*            _llvm_context;
     std::unique_ptr<llvm::Module> _llvm_module;
     llvm::IRBuilder<>             _llvm_ir_builder;
+
+    bool _generated_return = false; // Tracks if the last node generated a return statement (FIXME: Remove?)
 
     Scope&       get_scope() { return _scopes.back(); }
     const Scope& get_scope() const { return _scopes.back(); }

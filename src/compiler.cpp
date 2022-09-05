@@ -108,8 +108,6 @@ int main(int argc, char* argv[]) {
                     return 1;
                 }
 
-                // TODO: Remove
-                // new_module.get_llvm_module().dump();
                 if(llvm::verifyModule(new_module.get_llvm_module(), &llvm::errs())) {
                     error("Errors in LLVM Module, exiting...\n");
                     return 1;
@@ -199,8 +197,9 @@ int main(int argc, char* argv[]) {
 
                 // Run the generated program. FIXME: Handy, but dangerous.
                 if(args['r'].set) {
-                    success("Running {}...\n", final_outputfile);
-                    std::system(final_outputfile.c_str());
+                    print("Running {}...\n", final_outputfile);
+                    auto retval = std::system(final_outputfile.c_str());
+                    print(" > {} returned {}.\n", final_outputfile, retval);
                 }
             } catch(const std::exception& e) {
                 error("Exception: {}", e.what());
@@ -212,15 +211,19 @@ int main(int argc, char* argv[]) {
 
     if(args['w'].set) {
         handle_file();
+        auto                              last_run = std::chrono::system_clock::now();
         filewatch::FileWatch<std::string> watcher{args.get_default_arg(), [&](const std::string& path, const filewatch::Event) {
-                                                      puts("\033[2J"); // Clear screen
+                                                      if(std::chrono::system_clock::now() - last_run < std::chrono::seconds(1)) // Ignore double events
+                                                          return;
                                                       fmt::print("[{:%T}] <insert lang name> compiler: {} changed, reprocessing...\n", std::chrono::system_clock::now(), path);
                                                       handle_file();
-                                                      success("[{:%T}] Watching for changes on {}... ", std::chrono::system_clock::now(), args.get_default_arg());
+                                                      last_run = std::chrono::system_clock::now();
+                                                      success("\n[{:%T}] Watching for changes on {}... ", std::chrono::system_clock::now(), args.get_default_arg());
                                                       fmt::print("(CTRL+C to exit)\n\n");
                                                   }};
-        success("[{:%T}] Watching for changes on {}... ", std::chrono::system_clock::now(), args.get_default_arg());
-        fmt::print("(CTRL+C to exit)\n");
+        success("\n[{:%T}] Watching for changes on {}... ", std::chrono::system_clock::now(), args.get_default_arg());
+        fmt::print("(CTRL+C to exit)\n\n");
+        // TODO: Provide a prompt?
         while(true) {
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }

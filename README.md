@@ -52,6 +52,7 @@ Toy Language
    - cmake .. -DLLVM_INCLUDE_BENCHMARKS=OFF
    - cmake --build . --target install
    - CMake should now find LLVM automatically, otherwise set the LLVM_DIR variable (-DLLVM_DIR=path/to/llvm-14.0.0.src/build)
+   - Make sure llc and clang are available in PATH
 
 ## Notes
 
