@@ -4,6 +4,21 @@
 
 #include <win_error.hpp>
 
+std::string longest_common_prefix(auto arr) {
+    if(arr.size() == 0)
+        return "";
+    std::string r = arr[0];
+    for(auto i = 1; i < arr.size(); ++i) {
+        auto j = 0;
+        while(j < r.size() && j < arr[i].size() && r[j] == arr[i][j])
+            ++j;
+        if(j == 0)
+            return "";
+        r.resize(j);
+    }
+    return r;
+}
+
 #ifdef WIN32
 std::string get_clipboard_text() {
     if(!OpenClipboard(nullptr))
@@ -125,14 +140,19 @@ std::string Prompt::get_line() {
                                 case 0x09: { // Tab
                                     // TODO: Autocomplete on the cursor and not exclusively at the end of the string.
                                     auto candidates = autocomplete(current_line);
-                                    if(candidates.size() == 1) {
+                                    auto apply_candidate = [&](const auto& value) {
                                         auto last_blank = current_line.find_last_of(" \""); // FIXME
                                         if(last_blank != current_line.npos)
-                                            current_line = current_line.substr(0, last_blank + 1) + candidates[0];
+                                            current_line = current_line.substr(0, last_blank + 1) + value;
                                         else
                                             current_line = candidates[0];
                                         cursor = current_line.size();
+                                    };
+                                    if(candidates.size() == 1) {
+                                        apply_candidate(candidates[0]);
                                     } else {
+                                        apply_candidate(longest_common_prefix(candidates));
+
                                         CONSOLE_SCREEN_BUFFER_INFO console_info;
                                         if(!GetConsoleScreenBufferInfo(_stdout_handle, &console_info))
                                             win_error_exit("GetConsoleScreenBufferInfo");
