@@ -1,8 +1,10 @@
-function get_float(int i) {
+function get(int i) : char {
 	if(i % 2 == 0)
-		return 1;
+		return 'a';
 	else
-		return 1425.0;
+		return 'b';
 }
 
-return get_float();
+int i = get(1);
+
+return get();

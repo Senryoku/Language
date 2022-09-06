@@ -6,6 +6,8 @@
 #include <VariableStore.hpp>
 #include <het_unordered_map.hpp>
 
+#include <AST.hpp>
+
 using TypeRegistry = std::unordered_map<TypeID, const AST::Node*>;
 
 /*
@@ -55,17 +57,15 @@ class Scope {
 
     bool                                                   is_valid(const het_unordered_map<FunctionDeclaration>::iterator& it) const { return it != _functions.end(); }
     bool                                                   is_valid(const het_unordered_map<FunctionDeclaration>::const_iterator& it) const { return it != _functions.cend(); }
-    het_unordered_map<FunctionDeclaration>::iterator       find_function(const std::string_view& name) { return _functions.find(name); }
-    het_unordered_map<FunctionDeclaration>::const_iterator find_function(const std::string_view& name) const { return _functions.find(name); }
-    const AST::Node*                                       get_function(const std::string_view& name) { return _functions.find(name)->second.node; }
-    const AST::Node*                                       get_function(const std::string_view& name) const { return _functions.find(name)->second.node; }
+    [[nodiscard]] het_unordered_map<FunctionDeclaration>::iterator       find_function(const std::string_view& name) { return _functions.find(name); }
+    [[nodiscard]] het_unordered_map<FunctionDeclaration>::const_iterator find_function(const std::string_view& name) const { return _functions.find(name); }
+    [[nodiscard]] const AST::Node*                         get_function(const std::string_view& name) const;
 
     bool                                               is_valid(const het_unordered_map<TypeDeclaration>::iterator& it) const { return it != _types.end(); }
     bool                                               is_valid(const het_unordered_map<TypeDeclaration>::const_iterator& it) const { return it != _types.cend(); }
-    het_unordered_map<TypeDeclaration>::iterator       find_type(const std::string_view& name) { return _types.find(name); }
-    het_unordered_map<TypeDeclaration>::const_iterator find_type(const std::string_view& name) const { return _types.find(name); }
-    TypeDeclaration                                    get_type(const std::string_view& name) { return _types.find(name)->second; }
-    TypeDeclaration                                    get_type(const std::string_view& name) const { return _types.find(name)->second; }
+    [[nodiscard]] het_unordered_map<TypeDeclaration>::iterator       find_type(const std::string_view& name) { return _types.find(name); }
+    [[nodiscard]] het_unordered_map<TypeDeclaration>::const_iterator find_type(const std::string_view& name) const { return _types.find(name); }
+    [[nodiscard]] const TypeDeclaration                get_type(const std::string_view& name) const;
 
     bool declare_variable(const AST::Node& decNode, size_t line = 0) {
         const auto& name = decNode.token.value;

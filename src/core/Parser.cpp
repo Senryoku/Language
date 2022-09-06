@@ -15,12 +15,14 @@ bool Parser::parse(const std::span<Tokenizer::Token>& tokens, AST::Node* curr_no
                 break;
             }
             case Tokenizer::Token::Type::CloseScope: {
+                assert(false); // FIXME: I don't think this case is needed, it should already be taken care of and always return an error.
                 while(curr_node->type != AST::Node::Type::Scope && curr_node->parent != nullptr)
                     curr_node = curr_node->parent;
                 if(curr_node->type != AST::Node::Type::Scope) {
                     error("[Parser] Syntax error: Unmatched '}' one line {}.\n", it->line);
                     return false;
                 }
+                curr_node->value.type = get_scope().get_return_type();
                 curr_node = curr_node->parent;
                 pop_scope();
                 ++it;
@@ -206,6 +208,7 @@ bool Parser::parse_next_scope(const std::span<Tokenizer::Token>& tokens, std::sp
     auto scope = curr_node->add_child(new AST::Node(AST::Node::Type::Scope, *it));
     push_scope();
     bool r = parse({begin, end}, scope);
+    scope->value.type = get_scope().get_return_type();
     pop_scope();
     it = end + 1;
     return r;
@@ -512,8 +515,8 @@ bool Parser::parse_function_declaration(const std::span<Tokenizer::Token>& token
         error("Expected identifier in function declaration on line {}, got {}.\n", it->line, it->value);
         return false;
     }
-    functionNode->token = *it;                              // Store the function name using its token.
-    functionNode->value.type = GenericValue::Type::Integer; // TODO: Actually compute the return type (will probably just be part of the declation.)
+    functionNode->token = *it;                                // Store the function name using its token.
+    functionNode->value.type = GenericValue::Type::Undefined; // TODO: Actually compute the return type (will probably just be part of the declation.)
     ++it;
     if(it->type != Tokenizer::Token::Type::OpenParenthesis) {
         error("Expected '(' in function declaration on line {}, got {}.\n", it->line, it->value);
@@ -538,22 +541,33 @@ bool Parser::parse_function_declaration(const std::span<Tokenizer::Token>& token
         if(it->type == Tokenizer::Token::Type::Comma)
             ++it;
         else if(it->type != Tokenizer::Token::Type::CloseParenthesis) {
-            error("Expected ',' in function declaration argument list on line {}, got {}.\n", it->line, it->value);
+            error("[Parser] Expected ',' in function declaration argument list on line {}, got {}.\n", it->line, it->value);
             cleanup_on_error();
             return false;
         }
     }
     if(it == tokens.end() || it->type != Tokenizer::Token::Type::CloseParenthesis) {
-        error("Unmatched '(' in function declaration on line {}.\n", it->line);
+        error("[Parser] Unmatched '(' in function declaration on line {}.\n", it->line);
         cleanup_on_error();
         return false;
     }
 
     ++it;
     if(it == tokens.end()) {
-        error("Expected function body on line {}, got end-of-file.\n", it->line);
+        error("[Parser] Expected function body on line {}, got end-of-file.\n", it->line);
         cleanup_on_error();
         return false;
+    }
+
+    if(it->type == Tokenizer::Token::Type::Colon) {
+        ++it;
+        if(it->type != Tokenizer::Token::Type::Identifier || !is_type(it->value)) {
+            error("[Parser] Expected type identifier after function '{}' declaration body on line {}, got '{}'.\n", functionNode->token.value, it->line, it->value);
+            cleanup_on_error();
+            return false;
+        }
+        functionNode->value.type = GenericValue::parse_type(it->value);
+        ++it;
     }
 
     if(!parse_scope_or_single_statement(tokens, it, functionNode)) {
@@ -561,7 +575,20 @@ bool Parser::parse_function_declaration(const std::span<Tokenizer::Token>& token
         return false;
     }
 
+    // Return type deduction
+    if(functionNode->value.type == GenericValue::Type::Undefined)
+        functionNode->value.type = functionNode->children.back()->value.type;
+    else if(functionNode->value.type != functionNode->children.back()->value.type) {
+        error("[Parser] Syntax error: Incoherent return types for function {}, got {} on line {}, expected {}.\n", functionNode->token.value,
+              functionNode->children.back()->value.type, functionNode->children.back()->token.line, functionNode->value.type);
+        cleanup_on_error();
+        return false;
+    }
+
     pop_scope();
+
+    get_scope().declare_function(*functionNode);
+
     return true;
 }
 
@@ -710,14 +737,24 @@ bool Parser::parse_operator(const std::span<Tokenizer::Token>& tokens, std::span
     if(operator_type == Tokenizer::Token::Type::OpenParenthesis) {
         const auto start = (it + 1);
         auto       function_node = curr_node->pop_child();
+        auto       call_node = curr_node->add_child(new AST::Node(AST::Node::Type::FunctionCall, function_node->token));
+        call_node->add_child(function_node);
+
         // TODO: Check type of functionNode (is it actually callable?)
+        if(function_node->type != AST::Node::Type::Variable) {
+            error("[Parser] '{}' doesn't seem to be callable (may be a missing implementation).\n", function_node->token.value);
+            return false;
+        }
         // FIXME: FunctionCall uses its token for now to get the function name, but this in incorrect, it should look at the
         // first child and execute it to get a reference to the function. Using the function name token as a temporary workaround.
-        auto call_node = curr_node->add_child(new AST::Node(AST::Node::Type::FunctionCall, function_node->token));
-        // auto callNode = curr_node->parent->add_child(new AST::Node(AST::Node::Type::FunctionCall, *it));
-        call_node->value.type = GenericValue::Type::Integer; // TODO: Actually compute the return type (Could it be depend on the actual parameter type at the call site? Like
-                                                             // automatic (albeit maybe only on explicit request at function declaration) templating?).
-        call_node->add_child(function_node);
+        auto function_name = function_node->token.value;
+        auto function = get_scope().get_function(function_name);
+        if(!function) {
+            error("[Parser] Call to undefined function '{}' on line {}.\n", function_name, it->line);
+            return false;
+        }
+        call_node->value.type = function->value.type;
+
         ++it;
         // Parse arguments
         while(it != tokens.end() && it->type != Tokenizer::Token::Type::CloseParenthesis) {

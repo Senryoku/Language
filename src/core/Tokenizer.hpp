@@ -35,6 +35,7 @@ class Tokenizer {
             Comma,
             OpenScope,
             CloseScope,
+            Colon,
 
             // Constants
             Digits,
@@ -153,6 +154,7 @@ class Tokenizer {
         {"[", Token::Type::OpenSubscript},
         {"]", Token::Type::CloseSubscript},
         {".", Token::Type::MemberAccess},
+        {":", Token::Type::Colon},
     };
 
     const het_unordered_map<Token::Type> keywords{
