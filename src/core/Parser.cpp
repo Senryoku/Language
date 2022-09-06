@@ -524,11 +524,16 @@ bool Parser::parse_function_declaration(const std::span<Tokenizer::Token>& token
         return false;
     }
 
+    // Declare the function immediatly to allow recursive calls.
+    get_scope().declare_function(*functionNode);
+
     push_scope(); // FIXME: Restrict function parameters to this scope, do better.
 
     auto cleanup_on_error = [&]() {
         delete curr_node->pop_child();
         pop_scope();
+        // Cleanup the declared function.
+        get_scope().remove_function(*functionNode);
     };
 
     ++it;
@@ -586,8 +591,6 @@ bool Parser::parse_function_declaration(const std::span<Tokenizer::Token>& token
     }
 
     pop_scope();
-
-    get_scope().declare_function(*functionNode);
 
     return true;
 }

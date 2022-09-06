@@ -121,8 +121,6 @@ int main(int argc, char* argv[]) {
             auto& line = lines.back();
 
             log.group();
-            log.print("Parsing '{}'...\n", line);
-
             Tokenizer tokenizer(line);
             auto      first = tokens.size();
             try {
@@ -144,8 +142,8 @@ int main(int argc, char* argv[]) {
                     log.print("Done in {}ms, returned: '{}'.\n", std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count(), interpreter.get_return_value());
                     log.end();
                 }
-                log.end();
             } catch(const Exception& e) { e.display(); }
+            log.end();
         }
     } while(true);
 }

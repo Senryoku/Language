@@ -63,6 +63,15 @@ class Scope {
         return true;
     }
 
+    // Only used in case of a parsing error.
+    bool remove_function(const AST::Node& node) {
+        auto sv = node.token.value;
+        if(!is_valid(find_function(sv)))
+            return false;
+        _functions.erase(std::string{sv});
+        return true;
+    }
+
     bool declare_type(const AST::Node& node) {
         auto sv = node.token.value;
         if(is_valid(find_type(sv))) {
