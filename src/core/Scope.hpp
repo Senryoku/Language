@@ -18,6 +18,26 @@ class Scope {
   public:
     Scope(TypeRegistry& type_registry) : _type_registry(&type_registry) {}
 
+    Scope(const Scope& o) { *this = o; }
+
+    Scope(Scope&& s) {
+        _type_registry = std::move(s._type_registry);
+        _functions = std::move(s._functions);
+        _types = std::move(s._types);
+        _variables = std::move(s._variables);
+        _return_type = s._return_type;
+        s._variables.clear();
+    }
+
+    Scope& operator=(const Scope& s) {
+        _type_registry = s._type_registry;
+        _functions = s._functions;
+        _types = s._types;
+        _return_type = s._return_type;
+        for(auto v : s._variables)
+            _variables[v.first] = new Variable(*v.second);
+    }
+
     ~Scope() {
         for(auto& p : _variables)
             delete p.second;
@@ -55,17 +75,17 @@ class Scope {
         return true;
     }
 
-    bool                                                   is_valid(const het_unordered_map<FunctionDeclaration>::iterator& it) const { return it != _functions.end(); }
-    bool                                                   is_valid(const het_unordered_map<FunctionDeclaration>::const_iterator& it) const { return it != _functions.cend(); }
+    bool is_valid(const het_unordered_map<FunctionDeclaration>::iterator& it) const { return it != _functions.end(); }
+    bool is_valid(const het_unordered_map<FunctionDeclaration>::const_iterator& it) const { return it != _functions.cend(); }
     [[nodiscard]] het_unordered_map<FunctionDeclaration>::iterator       find_function(const std::string_view& name) { return _functions.find(name); }
     [[nodiscard]] het_unordered_map<FunctionDeclaration>::const_iterator find_function(const std::string_view& name) const { return _functions.find(name); }
-    [[nodiscard]] const AST::Node*                         get_function(const std::string_view& name) const;
+    [[nodiscard]] const AST::Node*                                       get_function(const std::string_view& name) const;
 
-    bool                                               is_valid(const het_unordered_map<TypeDeclaration>::iterator& it) const { return it != _types.end(); }
-    bool                                               is_valid(const het_unordered_map<TypeDeclaration>::const_iterator& it) const { return it != _types.cend(); }
+    bool                                                             is_valid(const het_unordered_map<TypeDeclaration>::iterator& it) const { return it != _types.end(); }
+    bool                                                             is_valid(const het_unordered_map<TypeDeclaration>::const_iterator& it) const { return it != _types.cend(); }
     [[nodiscard]] het_unordered_map<TypeDeclaration>::iterator       find_type(const std::string_view& name) { return _types.find(name); }
     [[nodiscard]] het_unordered_map<TypeDeclaration>::const_iterator find_type(const std::string_view& name) const { return _types.find(name); }
-    [[nodiscard]] const TypeDeclaration                get_type(const std::string_view& name) const;
+    [[nodiscard]] const TypeDeclaration                              get_type(const std::string_view& name) const;
 
     bool declare_variable(const AST::Node& decNode, size_t line = 0) {
         const auto& name = decNode.token.value;
@@ -124,9 +144,9 @@ class Scope {
     TypeRegistry* _type_registry; // Shared by the whole tree
 
     // FIXME: At some point we'll have ton consolidate these string_view to their final home... Maybe the lexer should have done it already.
-    VariableStore                          _variables;
-    het_unordered_map<FunctionDeclaration> _functions;
-    het_unordered_map<TypeDeclaration>     _types;
+    VariableStore                          _variables; // Owning
+    het_unordered_map<FunctionDeclaration> _functions; // Non-owning
+    het_unordered_map<TypeDeclaration>     _types;     // Non-owning
 
     // Return Type for type checking. FIXME: Handle composite types.
     GenericValue::Type _return_type = GenericValue::Type::Undefined;
@@ -135,6 +155,24 @@ class Scope {
 // TODO: Fetch variables from others scopes
 class Scoped {
   protected:
+    Scoped() = default;
+    Scoped(const Scoped& o) {
+        for(auto s : o._scopes)
+            _scopes.push_back(new Scope(*s));
+        _type_registry = o._type_registry;
+    }
+    Scoped(Scoped&& o) {
+        _scopes = o._scopes;
+        o._scopes.clear();
+        _type_registry = std::move(o._type_registry);
+    }
+    Scoped& operator=(Scoped&& o) {
+        _scopes = o._scopes;
+        o._scopes.clear();
+        _type_registry = std::move(o._type_registry);
+        return *this;
+    }
+
     virtual ~Scoped() {
         for(auto& s : _scopes)
             delete s;

@@ -19,7 +19,10 @@ class Parser : public Scoped {
         // FIXME: Pushing an empty scope for now, we'll probably use that to provide some built-ins
         push_scope();
     }
-
+    Parser(const Parser&) = default;
+    Parser(Parser&&) = default;
+    Parser& operator=(const Parser&) = default;
+    Parser& operator=(Parser&&) = default;
     virtual ~Parser() = default;
 
     static const uint32_t max_precedence = static_cast<uint32_t>(-1);

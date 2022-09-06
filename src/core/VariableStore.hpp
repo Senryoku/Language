@@ -7,6 +7,7 @@
 struct Variable : public GenericValue {
   public:
     Variable() : GenericValue() {}
+    Variable(const Variable&) = default;
     Variable(const GenericValue& v) : GenericValue(v) {}
     Variable(GenericValue::Type _type, int32_t _value) {
         type = _type;

@@ -748,7 +748,7 @@ bool Parser::parse_operator(const std::span<Tokenizer::Token>& tokens, std::span
         // FIXME: FunctionCall uses its token for now to get the function name, but this in incorrect, it should look at the
         // first child and execute it to get a reference to the function. Using the function name token as a temporary workaround.
         auto function_name = function_node->token.value;
-        auto function = get_scope().get_function(function_name);
+        auto function = get_function(function_name);
         if(!function) {
             error("[Parser] Call to undefined function '{}' on line {}.\n", function_name, it->line);
             return false;

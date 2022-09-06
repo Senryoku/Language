@@ -22,6 +22,11 @@ class Interpreter : public Scoped {
         get_scope().declare_function(*_builtin_put);
     }
 
+    Interpreter(const Interpreter&) = default;
+    Interpreter(Interpreter&&) = default;
+    Interpreter& operator=(const Interpreter&) = default;
+    Interpreter& operator=(Interpreter&&) = default;
+
     virtual ~Interpreter() {
         for(auto p : _allocated_arrays)
             delete[] p;
