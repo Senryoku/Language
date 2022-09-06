@@ -162,7 +162,7 @@ struct fmt::formatter<AST::Node> {
                     r = fmt::format_to(ctx.out(), "{}:{}:{}", t.type, t.token.value, t.value.type);
                 break;
             case AST::Node::Type::FunctionDeclaration: r = fmt::format_to(ctx.out(), "{}:{}", t.type, t.token.value); break;
-            case AST::Node::Type::FunctionCall: r = fmt::format_to(ctx.out(), "{}:{}()", t.type, t.token.value); break;
+            case AST::Node::Type::FunctionCall: r = fmt::format_to(ctx.out(), "{}:{}():{}", t.type, t.token.value, t.value.type); break;
             case AST::Node::Type::VariableDeclaration: r = fmt::format_to(ctx.out(), "{}:{} {}", t.type, t.value.type, t.token.value); break;
             case AST::Node::Type::Cast: r = fmt::format_to(ctx.out(), "{}:{}", t.type, t.value.type); break;
             case AST::Node::Type::BinaryOperator:

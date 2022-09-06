@@ -1,10 +1,8 @@
-function get(int i) : char {
+function get(int i) : int {
 	if(i % 2 == 0)
-		return 'a';
+		return 2;
 	else
-		return 'b';
+		return 3;
 }
 
-int i = get(1);
-
-return get();
+return get(2);

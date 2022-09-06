@@ -118,7 +118,7 @@ int main(int argc, char* argv[]) {
                     return 1;
                 }
                 if(llvm::verifyModule(new_module.get_llvm_module(), &llvm::errs())) {
-                    error("Errors in LLVM Module, exiting...\n");
+                    error("\nErrors in LLVM Module, exiting...\n");
                     return 1;
                 }
                 auto codegen_end = std::chrono::high_resolution_clock::now();

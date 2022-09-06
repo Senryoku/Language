@@ -5,6 +5,7 @@
 llvm::Constant* Module::codegen(const GenericValue& val) {
     assert(val.is_constexpr());
     switch(val.type) {
+        case GenericValue::Type::Char: return llvm::ConstantInt::get(*_llvm_context, llvm::APInt(8, val.value.as_char));
         case GenericValue::Type::Float: return llvm::ConstantFP::get(*_llvm_context, llvm::APFloat(val.value.as_float));
         case GenericValue::Type::Integer: return llvm::ConstantInt::get(*_llvm_context, llvm::APInt(32, val.value.as_int32_t));
         case GenericValue::Type::Array: {
@@ -103,34 +104,38 @@ llvm::Value* Module::codegen(const AST::Node* node) {
         case AST::Node::Type::FunctionDeclaration: {
             auto function_name = std::string{node->token.value};
             auto prev_function = _llvm_module->getFunction(function_name);
-            if(prev_function) {
-                error("Redefinition of function '{}' (line {}, already defined on line ??[TODO]).\n", function_name, node->token.line);
+            if(prev_function) { // Should be handled by the parser.
+                error("Redefinition of function '{}' (line {}).\n", function_name, node->token.line);
                 return nullptr;
             }
 
             auto                     current_block = _llvm_ir_builder.GetInsertBlock();
             std::vector<llvm::Type*> param_types;
-            for(auto i = 1u; i < node->children.size(); ++i)
+            for(auto i = 0; i < node->children.size() - 1; ++i)
                 param_types.push_back(llvm::Type::getInt32Ty(*_llvm_context)); // TODO
-            auto  return_type = llvm::Type::getInt32Ty(*_llvm_context);        // TODO
-            auto  function_types = llvm::FunctionType::get(return_type, param_types, false);
-            auto  function = llvm::Function::Create(function_types, llvm::Function::ExternalLinkage, function_name, _llvm_module.get()); // FIXME: Review Linkage
+            auto return_type = llvm::Type::getInt32Ty(*_llvm_context);         // TODO
+            auto function_types = llvm::FunctionType::get(return_type, param_types, false);
+            auto function = llvm::Function::Create(function_types, llvm::Function::ExternalLinkage, function_name, _llvm_module.get()); // FIXME: Review Linkage
+
             auto* block = llvm::BasicBlock::Create(*_llvm_context, "entrypoint", function);
-            auto  arg_idx = 0;
             _llvm_ir_builder.SetInsertPoint(block);
+
             push_scope(); // Scope for variable declarations
+            auto arg_idx = 0;
             for(auto& arg : function->args()) {
-                const auto& argName = node->children[arg_idx]->token.value;
-                arg.setName(std::string{argName});
+                arg.setName(std::string{node->children[arg_idx]->token.value});
                 auto alloca = codegen(node->children[arg_idx]); // Generate variable declarations
                 _llvm_ir_builder.CreateStore(&arg, alloca);
                 ++arg_idx;
             }
-            codegen(node->children.back()); // Generate function body
+            auto function_body = codegen(node->children.back()); // Generate function body
+            _llvm_ir_builder.CreateRet(function_body);
             pop_scope();
+
             // TODO: Correctly handle no return (llvm_ir_builder.CreateRet(RetVal);)
             _llvm_ir_builder.SetInsertPoint(current_block);
-            if(verifyFunction(*function)) {
+            if(verifyFunction(*function, &llvm::errs())) {
+                error("[LLVMCodegen] Error verifying function '{}'.\n", function_name);
                 function->eraseFromParent();
                 return nullptr;
             }
@@ -242,7 +247,7 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                             }
                             return _llvm_ir_builder.CreateFMul(lhs, rhs, "mulftmp");
                         }
-                        default: error("LLVM::Codegen: Binary operator '{}' does not support type '{}'.", node->token.value, node->value.type); return nullptr;
+                        default: error("[LLVMCodegen] Binary operator '{}' does not support type '{}'.", node->token.value, node->value.type); return nullptr;
                     }
                 }
                 case Tokenizer::Token::Type::Division: {
@@ -251,6 +256,20 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                         return _llvm_ir_builder.CreateFPToUI(div, llvm::Type::getInt32Ty(*_llvm_context), "intcasttmp");
                     else
                         return div;
+                }
+                case Tokenizer::Token::Type::Modulus: {
+                    if(node->value.type == GenericValue::Type::Integer) {
+                        return _llvm_ir_builder.CreateSRem(lhs, rhs, "srem"); // FIXME: Is it the correct one?
+                    } else {
+                        error("[LLVMCodegen] Binary operator '{}' does not support type '{}'.", node->token.value, node->value.type);
+                        return nullptr;
+                    }
+                }
+                case Tokenizer::Token::Type::Equal: {
+                    if(node->children[0]->value.type == GenericValue::Type::Integer && node->children[1]->value.type == GenericValue::Type::Integer)
+                        return _llvm_ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_EQ, lhs, rhs, "ICMP_EQ");
+                    else if(node->children[0]->value.type == GenericValue::Type::Float && node->children[1]->value.type == GenericValue::Type::Float)
+                        return _llvm_ir_builder.CreateFCmp(llvm::CmpInst::Predicate::FCMP_OEQ, lhs, rhs, "FCMP_OEQ");
                 }
                 case Tokenizer::Token::Type::Lesser: {
                     // TODO: More types
@@ -312,6 +331,48 @@ llvm::Value* Module::codegen(const AST::Node* node) {
             _llvm_ir_builder.CreateBr(condition_label);
 
             _llvm_ir_builder.SetInsertPoint(after_block);
+            return llvm::Constant::getNullValue(llvm::Type::getInt32Ty(*_llvm_context));
+        }
+        case AST::Node::Type::IfStatement: {
+            auto current_function = _llvm_ir_builder.GetInsertBlock()->getParent();
+            auto if_then_block = llvm::BasicBlock::Create(*_llvm_context, "if_then", current_function);
+            auto if_else_block = llvm::BasicBlock::Create(*_llvm_context, "if_else");
+            auto if_end_block = llvm::BasicBlock::Create(*_llvm_context, "if_end");
+
+            // Condition evaluation and branch
+            auto condition = codegen(node->children[0]);
+            if(!condition)
+                return nullptr;
+            _llvm_ir_builder.CreateCondBr(condition, if_then_block, if_else_block);
+
+            // Then
+            _llvm_ir_builder.SetInsertPoint(if_then_block);
+            auto then_value = codegen(node->children[1]);
+            if(!then_value)
+                return nullptr;
+            if(!_generated_return)
+                _llvm_ir_builder.CreateBr(if_end_block);
+
+            // Note: The current block may have changed, this doesn't matter right now, but if the
+            // if_then_block is reused in the future (to compute a PHI node holding a return value
+            // for the if statement for example), we should update it to the current block:
+            //   if_then_block = _llvm_ir_builder.GetInsertBlock();
+
+            // Else
+            current_function->getBasicBlockList().push_back(if_else_block);
+            _llvm_ir_builder.SetInsertPoint(if_else_block);
+            if(node->children.size() > 2) {
+                auto else_value = codegen(node->children[2]);
+                if(!else_value)
+                    return nullptr;
+            }
+            if(!_generated_return)
+                _llvm_ir_builder.CreateBr(if_end_block);
+
+            current_function->getBasicBlockList().push_back(if_end_block);
+            _llvm_ir_builder.SetInsertPoint(if_end_block);
+
+            // If statement do not return a value (Should we?)
             return llvm::Constant::getNullValue(llvm::Type::getInt32Ty(*_llvm_context));
         }
         case AST::Node::Type::ReturnStatement: {

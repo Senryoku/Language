@@ -151,8 +151,10 @@ std::string Prompt::get_line() {
                                     if(candidates.size() == 1) {
                                         apply_candidate(candidates[0]);
                                     } else {
-                                        apply_candidate(longest_common_prefix(candidates));
+                                        if(!candidates.empty())
+                                            apply_candidate(longest_common_prefix(candidates));
 
+                                        // Display candidates
                                         CONSOLE_SCREEN_BUFFER_INFO console_info;
                                         if(!GetConsoleScreenBufferInfo(_stdout_handle, &console_info))
                                             win_error_exit("GetConsoleScreenBufferInfo");
