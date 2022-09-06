@@ -12,16 +12,7 @@ constexpr bool is_assignable(const GenericValue& var, const GenericValue& val) {
 
 class Interpreter : public Scoped {
   public:
-    Interpreter() {
-        push_scope(); // TODO: Push an empty scope for now.
-        _builtin_print.reset(new AST::Node(AST::Node::Type::BuiltInFunctionDeclaration));
-        _builtin_print->token.value = "print"; // We have to provide a name via the token.
-        get_scope().declare_function(*_builtin_print);
-        _builtin_put.reset(new AST::Node(AST::Node::Type::BuiltInFunctionDeclaration));
-        _builtin_put->token.value = "put"; // We have to provide a name via the token.
-        get_scope().declare_function(*_builtin_put);
-    }
-
+    Interpreter() = default;
     Interpreter(const Interpreter&) = default;
     Interpreter(Interpreter&&) = default;
     Interpreter& operator=(const Interpreter&) = default;
@@ -387,8 +378,4 @@ class Interpreter : public Scoped {
         if(_return_value.type == GenericValue::Type::Reference)
             _return_value = *_return_value.value.as_reference.value;
     }
-
-    // FIXME
-    std::shared_ptr<AST::Node> _builtin_print{nullptr};
-    std::shared_ptr<AST::Node> _builtin_put{nullptr};
 };

@@ -15,10 +15,7 @@
 
 class Parser : public Scoped {
   public:
-    Parser() {
-        // FIXME: Pushing an empty scope for now, we'll probably use that to provide some built-ins
-        push_scope();
-    }
+    Parser() = default;
     Parser(const Parser&) = default;
     Parser(Parser&&) = default;
     Parser& operator=(const Parser&) = default;

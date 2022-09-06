@@ -155,7 +155,16 @@ class Scope {
 // TODO: Fetch variables from others scopes
 class Scoped {
   protected:
-    Scoped() = default;
+    Scoped() {
+        push_scope(); // TODO: Push an empty scope for now.
+
+        if(!s_builtin_put) {
+            s_builtin_put.reset(new AST::Node(AST::Node::Type::BuiltInFunctionDeclaration));
+            s_builtin_put->token.value = "put"; // We have to provide a name via the token.
+        }
+        get_scope().declare_function(*s_builtin_put);
+    }
+
     Scoped(const Scoped& o) {
         for(auto s : o._scopes)
             _scopes.push_back(new Scope(*s));
@@ -260,4 +269,7 @@ class Scoped {
   private:
     std::vector<Scope*> _scopes;
     TypeRegistry        _type_registry;
+
+    // FIXME: Declare put as a builtin function, should be handled elsewhere.
+    inline static std::unique_ptr<AST::Node> s_builtin_put{nullptr};
 };
