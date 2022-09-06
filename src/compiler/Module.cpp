@@ -97,7 +97,7 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                     assert(node->children[0]->value.type == GenericValue::Type::Float); // TEMP
                     return _llvm_ir_builder.CreateFPToSI(child, llvm::Type::getInt32Ty(*_llvm_context), "conv");
                 }
-                default: error("LLVM::Codegen: Cast from {} to {} not supported.", node->children[0]->value.type, node->value.type); return nullptr;
+                default: error("[LLVMCodegen] LLVM::Codegen: Cast from {} to {} not supported.", node->children[0]->value.type, node->value.type); return nullptr;
             }
         }
         case AST::Node::Type::FunctionDeclaration: {
@@ -109,11 +109,14 @@ llvm::Value* Module::codegen(const AST::Node* node) {
             }
 
             auto                     current_block = _llvm_ir_builder.GetInsertBlock();
-            std::vector<llvm::Type*> param_types(1, llvm::Type::getInt32Ty(*_llvm_context));                                               // TODO
-            auto                     function_types = llvm::FunctionType::get(llvm::Type::getInt32Ty(*_llvm_context), param_types, false); // TODO
-            auto                     function = llvm::Function::Create(function_types, llvm::Function::ExternalLinkage, function_name, _llvm_module.get());
-            auto*                    block = llvm::BasicBlock::Create(*_llvm_context, "entrypoint", function);
-            auto                     arg_idx = 0;
+            std::vector<llvm::Type*> param_types;
+            for(auto i = 1u; i < node->children.size(); ++i)
+                param_types.push_back(llvm::Type::getInt32Ty(*_llvm_context)); // TODO
+            auto  return_type = llvm::Type::getInt32Ty(*_llvm_context);        // TODO
+            auto  function_types = llvm::FunctionType::get(return_type, param_types, false);
+            auto  function = llvm::Function::Create(function_types, llvm::Function::ExternalLinkage, function_name, _llvm_module.get()); // FIXME: Review Linkage
+            auto* block = llvm::BasicBlock::Create(*_llvm_context, "entrypoint", function);
+            auto  arg_idx = 0;
             _llvm_ir_builder.SetInsertPoint(block);
             push_scope(); // Scope for variable declarations
             for(auto& arg : function->args()) {
@@ -137,7 +140,7 @@ llvm::Value* Module::codegen(const AST::Node* node) {
             auto function_name = std::string{node->token.value};
             auto function = _llvm_module->getFunction(function_name);
             if(!function) {
-                error("Call to undeclared function '{}' (line {}).\n", function_name, node->token.line);
+                error("[LLVMCodegen] Call to undeclared function '{}' (line {}).\n", function_name, node->token.line);
                 return nullptr;
             }
             // TODO: Handle default values.

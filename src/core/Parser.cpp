@@ -44,12 +44,19 @@ bool Parser::parse(const std::span<Tokenizer::Token>& tokens, AST::Node* curr_no
                     return false;
                 }
                 if(!parse_scope_or_single_statement(tokens, it, ifNode)) {
-                    error("[Parser] Syntax error: expected 'new scope' after 'if'.\n");
+                    error("[Parser] Syntax error: Expected 'new scope' or single statement after 'if'.\n");
                     delete curr_node->pop_child();
                     return false;
                 }
-                // TODO: Handle Else here?
 
+                if(it->type == Tokenizer::Token::Type::Else) {
+                    ++it;
+                    if(!parse_scope_or_single_statement(tokens, it, ifNode)) {
+                        error("[Parser] Syntax error: Expected 'new scope' or single statement after 'else'.\n");
+                        delete curr_node->pop_child();
+                        return false;
+                    }
+                }
                 break;
             }
             case Tokenizer::Token::Type::Const:
@@ -66,6 +73,13 @@ bool Parser::parse(const std::span<Tokenizer::Token>& tokens, AST::Node* curr_no
                     return false;
                 }
                 returnNode->value.type = returnNode->children[0]->value.type;
+                auto scope_return_type = get_scope().get_return_type();
+                if(scope_return_type == GenericValue::Type::Undefined) {
+                    get_scope().set_return_type(returnNode->value.type);
+                } else if(scope_return_type != returnNode->value.type) {
+                    error("[Parser] Syntax error: Incoherent return types, got {} on line {}, expected {}.\n", returnNode->value.type, returnNode->token.line, scope_return_type);
+                    return false;
+                }
                 break;
             }
 
@@ -688,7 +702,7 @@ bool Parser::parse_operator(const std::span<Tokenizer::Token>& tokens, std::span
 
     if(operator_type == Tokenizer::Token::Type::CloseParenthesis) {
         // Should have been handled by others parsing functions.
-        error("Unmatched ')' on line {}.\n", it->line);
+        error("[Parser::parse_operator] Unmatched ')' on line {}.\n", it->line);
         return false;
     }
 
@@ -716,7 +730,7 @@ bool Parser::parse_operator(const std::span<Tokenizer::Token>& tokens, std::span
                 ++it;
         }
         if(it == tokens.end()) {
-            error("[Parser] Syntax error: Unmatched '(' on line {}, got to end-of-file.\n", start->line);
+            error("[Parser::parse_operator] Syntax error: Unmatched '(' on line {}, got to end-of-file.\n", start->line);
             delete curr_node->pop_child();
             return false;
         }
@@ -725,7 +739,7 @@ bool Parser::parse_operator(const std::span<Tokenizer::Token>& tokens, std::span
     }
 
     if(curr_node->children.empty()) {
-        error("Syntax error: unexpected binary operator: {}.\n", *it);
+        error("[Parser::parse_operator] Syntax error: unexpected binary operator: {}.\n", *it);
         return false;
     }
     AST::Node* prev_expr = curr_node->pop_child();

@@ -117,6 +117,9 @@ class Scope {
     bool                                 is_valid(const VariableStore::iterator& it) const { return it != _variables.end(); }
     bool                                 is_valid(const VariableStore::const_iterator& it) const { return it != _variables.end(); }
 
+    GenericValue::Type get_return_type() const { return _return_type; }
+    void               set_return_type(GenericValue::Type t) { _return_type = t; }
+
   private:
     TypeRegistry* _type_registry; // Shared by the whole tree
 
@@ -124,6 +127,9 @@ class Scope {
     VariableStore                          _variables;
     het_unordered_map<FunctionDeclaration> _functions;
     het_unordered_map<TypeDeclaration>     _types;
+
+    // Return Type for type checking. FIXME: Handle composite types.
+    GenericValue::Type _return_type = GenericValue::Type::Undefined;
 };
 
 // TODO: Fetch variables from others scopes
