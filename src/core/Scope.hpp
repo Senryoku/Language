@@ -167,11 +167,15 @@ class Scoped {
     Scoped() {
         push_scope(); // TODO: Push an empty scope for now.
 
-        if(!s_builtin_put) {
-            s_builtin_put.reset(new AST::Node(AST::Node::Type::BuiltInFunctionDeclaration));
-            s_builtin_put->token.value = "put"; // We have to provide a name via the token.
-        }
-        get_scope().declare_function(*s_builtin_put);
+        const auto register_builtin = [&](const std::string& name) {
+            if(!s_builtins[name]) {
+                s_builtins[name].reset(new AST::Node(AST::Node::Type::BuiltInFunctionDeclaration));
+                s_builtins[name]->token.value = name; // We have to provide a name via the token.
+            }
+            get_scope().declare_function(*s_builtins[name]);
+        };
+        register_builtin("put");
+        register_builtin("printf");
     }
 
     Scoped(const Scoped& o) {
@@ -280,5 +284,5 @@ class Scoped {
     TypeRegistry        _type_registry;
 
     // FIXME: Declare put as a builtin function, should be handled elsewhere.
-    inline static std::unique_ptr<AST::Node> s_builtin_put{nullptr};
+    inline static std::unordered_map<std::string, std::unique_ptr<AST::Node>> s_builtins;
 };

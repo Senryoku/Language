@@ -4,4 +4,12 @@ function get(int i) : int {
 	return i;
 }
 
+int i = 0;
+while(i < 20) {
+	printf("%d, ", get(i));
+	i = i + 1;
+}
+printf("%d
+", get(i));
+
 return get(48)
