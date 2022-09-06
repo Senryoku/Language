@@ -283,26 +283,26 @@ bool Parser::parse_next_expression(const std::span<Tokenizer::Token>& tokens, st
             }
             case CloseParenthesis: [[fallthrough]];
             case CloseSubscript: stop = true; break;
-            case Tokenizer::Token::Type::Assignment: [[fallthrough]];
-            case Tokenizer::Token::Type::Xor: [[fallthrough]];
-            case Tokenizer::Token::Type::Or: [[fallthrough]];
-            case Tokenizer::Token::Type::And: [[fallthrough]];
-            case Tokenizer::Token::Type::Equal: [[fallthrough]];
-            case Tokenizer::Token::Type::Different: [[fallthrough]];
-            case Tokenizer::Token::Type::Lesser: [[fallthrough]];
-            case Tokenizer::Token::Type::LesserOrEqual: [[fallthrough]];
-            case Tokenizer::Token::Type::Greater: [[fallthrough]];
-            case Tokenizer::Token::Type::GreaterOrEqual: [[fallthrough]];
-            case Tokenizer::Token::Type::Addition: [[fallthrough]];
-            case Tokenizer::Token::Type::Substraction: [[fallthrough]];
-            case Tokenizer::Token::Type::Multiplication: [[fallthrough]];
-            case Tokenizer::Token::Type::Division: [[fallthrough]];
-            case Tokenizer::Token::Type::Modulus: [[fallthrough]];
-            case Tokenizer::Token::Type::Increment: [[fallthrough]];
-            case Tokenizer::Token::Type::Decrement: [[fallthrough]];
-            case Tokenizer::Token::Type::OpenParenthesis: [[fallthrough]];
-            case Tokenizer::Token::Type::OpenSubscript: [[fallthrough]];
-            case Tokenizer::Token::Type::MemberAccess: {
+            case Assignment: [[fallthrough]];
+            case Xor: [[fallthrough]];
+            case Or: [[fallthrough]];
+            case And: [[fallthrough]];
+            case Equal: [[fallthrough]];
+            case Different: [[fallthrough]];
+            case Lesser: [[fallthrough]];
+            case LesserOrEqual: [[fallthrough]];
+            case Greater: [[fallthrough]];
+            case GreaterOrEqual: [[fallthrough]];
+            case Addition: [[fallthrough]];
+            case Substraction: [[fallthrough]];
+            case Multiplication: [[fallthrough]];
+            case Division: [[fallthrough]];
+            case Modulus: [[fallthrough]];
+            case Increment: [[fallthrough]];
+            case Decrement: [[fallthrough]];
+            case OpenParenthesis: [[fallthrough]];
+            case OpenSubscript: [[fallthrough]];
+            case MemberAccess: {
                 auto p = operator_precedence.at(it->type);
                 if(p < precedence) {
                     if(!parse_operator(tokens, it, exprNode)) {

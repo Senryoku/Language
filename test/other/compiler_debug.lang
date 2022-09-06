@@ -1,8 +1,7 @@
 function get(int i) : int {
-	if(i % 2 == 0)
-		return 2;
-	else
-		return 3;
+	if(i > 10)
+		i = i - 10;
+	return i;
 }
 
-return get(2);
+return get(48)

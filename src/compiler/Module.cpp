@@ -129,13 +129,14 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                 ++arg_idx;
             }
             auto function_body = codegen(node->children.back()); // Generate function body
-            _llvm_ir_builder.CreateRet(function_body);
+            if(!_generated_return)
+                _llvm_ir_builder.CreateRet(function_body);
             pop_scope();
 
             // TODO: Correctly handle no return (llvm_ir_builder.CreateRet(RetVal);)
             _llvm_ir_builder.SetInsertPoint(current_block);
             if(verifyFunction(*function, &llvm::errs())) {
-                error("[LLVMCodegen] Error verifying function '{}'.\n", function_name);
+                error("\n[LLVMCodegen] Error verifying function '{}'.\n", function_name);
                 function->eraseFromParent();
                 return nullptr;
             }
@@ -151,8 +152,8 @@ llvm::Value* Module::codegen(const AST::Node* node) {
             // TODO: Handle default values.
             // TODO: Handle vargs functions (variable number of parameters, like printf :^) )
             if(function->arg_size() != node->children.size() - 1) {
-                error("Unexpected number of parameters in function call '{}' (line {}): Expected {}, got {}.\n", function_name, node->token.line, function->arg_size(),
-                      node->children.size() - 1);
+                error("[LLVMCodegen] Unexpected number of parameters in function call '{}' (line {}): Expected {}, got {}.\n", function_name, node->token.line,
+                      function->arg_size(), node->children.size() - 1);
                 for(auto i = 1u; i < node->children.size(); ++i)
                     print("\tArgument #{}: {}", i, *node->children[i]);
                 // return nullptr; // FIXME: Disabled to 'support' vargs, should return an error
@@ -202,7 +203,7 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                 error("LLVM Codegen: Undeclared variable '{}'.\n", node->token.value);
                 return nullptr;
             }
-            return _llvm_ir_builder.CreateLoad(var->getAllocatedType(), var, std::string{node->token.value}.c_str());
+            return _llvm_ir_builder.CreateLoad(var->getAllocatedType(), var, node->token.value.data());
         }
         case AST::Node::Type::BinaryOperator: {
             auto lhs = codegen(node->children[0]);
