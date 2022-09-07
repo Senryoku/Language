@@ -876,14 +876,15 @@ bool Parser::parse_operator(const std::span<Tokenizer::Token>& tokens, std::span
     if(binary_operator_node->value.type == GenericValue::Type::Float ||
        (binary_operator_node->children[0]->value.type == GenericValue::Type::Integer && binary_operator_node->children[1]->value.type == GenericValue::Type::Float ||
         binary_operator_node->children[0]->value.type == GenericValue::Type::Float && binary_operator_node->children[1]->value.type == GenericValue::Type::Integer)) {
-        if(binary_operator_node->children[0]->value.type == GenericValue::Type::Integer)
+
+        if(binary_operator_node->token.type != Tokenizer::Token::Type::Assignment && binary_operator_node->children[0]->value.type == GenericValue::Type::Integer)
             create_cast_node(0, GenericValue::Type::Float);
         if(binary_operator_node->children[1]->value.type == GenericValue::Type::Integer)
             create_cast_node(1, GenericValue::Type::Float);
     }
     // Truncation to integer (in assignments for example)
     if(binary_operator_node->value.type == GenericValue::Type::Integer) {
-        if(binary_operator_node->children[0]->value.type == GenericValue::Type::Float)
+        if(binary_operator_node->token.type != Tokenizer::Token::Type::Assignment && binary_operator_node->children[0]->value.type == GenericValue::Type::Float)
             create_cast_node(0, GenericValue::Type::Integer);
         if(binary_operator_node->children[1]->value.type == GenericValue::Type::Float)
             create_cast_node(1, GenericValue::Type::Integer);
