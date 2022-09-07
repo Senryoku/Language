@@ -5,6 +5,7 @@
 llvm::Constant* Module::codegen(const GenericValue& val) {
     assert(val.is_constexpr());
     switch(val.type) {
+        case GenericValue::Type::Boolean: return llvm::ConstantInt::get(*_llvm_context, llvm::APInt(1, val.value.as_bool));
         case GenericValue::Type::Char: return llvm::ConstantInt::get(*_llvm_context, llvm::APInt(8, val.value.as_char));
         case GenericValue::Type::Float: return llvm::ConstantFP::get(*_llvm_context, llvm::APFloat(val.value.as_float));
         case GenericValue::Type::Integer: return llvm::ConstantInt::get(*_llvm_context, llvm::APInt(32, val.value.as_int32_t));
@@ -210,6 +211,7 @@ llvm::Value* Module::codegen(const AST::Node* node) {
             auto rhs = codegen(node->children[1]);
             if(!lhs || !rhs)
                 return nullptr;
+            // TODO: Overloads.
             switch(node->token.type) {
                 case Tokenizer::Token::Type::Addition: {
                     switch(node->value.type) {
@@ -271,6 +273,8 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                         return _llvm_ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_EQ, lhs, rhs, "ICMP_EQ");
                     else if(node->children[0]->value.type == GenericValue::Type::Float && node->children[1]->value.type == GenericValue::Type::Float)
                         return _llvm_ir_builder.CreateFCmp(llvm::CmpInst::Predicate::FCMP_OEQ, lhs, rhs, "FCMP_OEQ");
+                    error("[LLVMCodegen] Unsupported types {} and {} for binary operator {}.\n", node->children[0]->value.type, node->children[1]->value.type, node->token.type);
+                    return nullptr;
                 }
                 case Tokenizer::Token::Type::Lesser: {
                     // TODO: More types
@@ -278,6 +282,17 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                         return _llvm_ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_SLT, lhs, rhs, "ICMP_SLT");
                     else if(node->children[0]->value.type == GenericValue::Type::Float && node->children[1]->value.type == GenericValue::Type::Float)
                         return _llvm_ir_builder.CreateFCmp(llvm::CmpInst::Predicate::FCMP_OLT, lhs, rhs, "FCMP_OLT");
+                    error("[LLVMCodegen] Unsupported types {} and {} for binary operator {}.\n", node->children[0]->value.type, node->children[1]->value.type, node->token.type);
+                    return nullptr;
+                }
+                case Tokenizer::Token::Type::LesserOrEqual: {
+                    // TODO: More types
+                    if(node->children[0]->value.type == GenericValue::Type::Integer && node->children[1]->value.type == GenericValue::Type::Integer)
+                        return _llvm_ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_SLE, lhs, rhs, "ICMP_SLE");
+                    else if(node->children[0]->value.type == GenericValue::Type::Float && node->children[1]->value.type == GenericValue::Type::Float)
+                        return _llvm_ir_builder.CreateFCmp(llvm::CmpInst::Predicate::FCMP_OLE, lhs, rhs, "FCMP_OLE");
+                    error("[LLVMCodegen] Unsupported types {} and {} for binary operator {}.\n", node->children[0]->value.type, node->children[1]->value.type, node->token.type);
+                    return nullptr;
                 }
                 case Tokenizer::Token::Type::Greater: {
                     // TODO: More types
@@ -285,6 +300,27 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                         return _llvm_ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_SGT, lhs, rhs, "ICMP_SGT");
                     else if(node->children[0]->value.type == GenericValue::Type::Float && node->children[1]->value.type == GenericValue::Type::Float)
                         return _llvm_ir_builder.CreateFCmp(llvm::CmpInst::Predicate::FCMP_OGT, lhs, rhs, "FCMP_OGT");
+                    error("[LLVMCodegen] Unsupported types {} and {} for binary operator {}.\n", node->children[0]->value.type, node->children[1]->value.type, node->token.type);
+                    return nullptr;
+                }
+                case Tokenizer::Token::Type::GreaterOrEqual: {
+                    // TODO: More types
+                    if(node->children[0]->value.type == GenericValue::Type::Integer && node->children[1]->value.type == GenericValue::Type::Integer)
+                        return _llvm_ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_SGE, lhs, rhs, "ICMP_SGE");
+                    else if(node->children[0]->value.type == GenericValue::Type::Float && node->children[1]->value.type == GenericValue::Type::Float)
+                        return _llvm_ir_builder.CreateFCmp(llvm::CmpInst::Predicate::FCMP_OGE, lhs, rhs, "FCMP_OGE");
+                    error("[LLVMCodegen] Unsupported types {} and {} for binary operator {}.\n", node->children[0]->value.type, node->children[1]->value.type, node->token.type);
+                    return nullptr;
+                }
+                case Tokenizer::Token::Type::And: {
+                    return _llvm_ir_builder.CreateAnd(lhs, rhs, "and");
+                }
+                case Tokenizer::Token::Type::OpenSubscript: {
+                    // FIXME: Remove these checks
+                    assert(node->children[0]->type == AST::Node::Type::Variable);
+                    assert(node->children[0]->value.type == GenericValue::Type::Array);
+                    auto element_type = node->children[0]->value.value.as_array.type;
+                    return _llvm_ir_builder.CreateGEP(get_llvm_type(element_type), lhs, {0, rhs}, "ArrayGEP");
                 }
                 case Tokenizer::Token::Type::Assignment: {
                     assert(node->children[0]->type == AST::Node::Type::Variable); // FIXME

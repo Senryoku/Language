@@ -95,4 +95,12 @@ class Module {
 
     llvm::Constant* codegen(const GenericValue& val);
     llvm::Value*    codegen(const AST::Node* node);
+
+    llvm::Type* get_llvm_type(GenericValue::Type type) {
+        switch(type) {
+            case GenericValue::Type::Integer: return llvm::Type::getInt32Ty(*_llvm_context);
+            default: error("[Module::get_llvm_type] GenericValue Type '{}' not mapped to a LLVM Type.\n", type); assert(false);
+        }
+        return nullptr;
+    }
 };

@@ -862,47 +862,33 @@ bool Parser::parse_operator(const std::span<Tokenizer::Token>& tokens, std::span
 
     resolve_operator_type(binary_operator_node);
     // Implicit casts
-    if(binary_operator_node->value.type == GenericValue::Type::Float) {
-        if(binary_operator_node->children[0]->value.type == GenericValue::Type::Integer) {
-            auto castNode = new AST::Node(AST::Node::Type::Cast);
-            castNode->value.type = GenericValue::Type::Float;
-            castNode->parent = binary_operator_node;
-            auto lhs = binary_operator_node->children[0];
-            lhs->parent = nullptr;
-            castNode->add_child(lhs);
-            binary_operator_node->children[0] = castNode;
-        }
-        if(binary_operator_node->children[1]->value.type == GenericValue::Type::Integer) {
-            auto castNode = new AST::Node(AST::Node::Type::Cast);
-            castNode->value.type = GenericValue::Type::Float;
-            castNode->parent = binary_operator_node;
-            auto rhs = binary_operator_node->children[1];
-            rhs->parent = nullptr;
-            castNode->add_child(rhs);
-            binary_operator_node->children[1] = castNode;
-        }
+    auto create_cast_node = [&](int index, GenericValue::Type type) {
+        auto castNode = new AST::Node(AST::Node::Type::Cast);
+        castNode->value.type = type;
+        castNode->parent = binary_operator_node;
+        auto child = binary_operator_node->children[index];
+        child->parent = nullptr;
+        castNode->add_child(child);
+        binary_operator_node->children[index] = castNode;
+    };
+    // FIXME: Cleanup, like everything else :)
+    // Promotion from integer to float, either because of the binary_operator_node type, or the type of its operands.
+    if(binary_operator_node->value.type == GenericValue::Type::Float ||
+       (binary_operator_node->children[0]->value.type == GenericValue::Type::Integer && binary_operator_node->children[1]->value.type == GenericValue::Type::Float ||
+        binary_operator_node->children[0]->value.type == GenericValue::Type::Float && binary_operator_node->children[1]->value.type == GenericValue::Type::Integer)) {
+        if(binary_operator_node->children[0]->value.type == GenericValue::Type::Integer)
+            create_cast_node(0, GenericValue::Type::Float);
+        if(binary_operator_node->children[1]->value.type == GenericValue::Type::Integer)
+            create_cast_node(1, GenericValue::Type::Float);
     }
     // Truncation to integer (in assignments for example)
     if(binary_operator_node->value.type == GenericValue::Type::Integer) {
-        if(binary_operator_node->children[0]->value.type == GenericValue::Type::Float) {
-            auto castNode = new AST::Node(AST::Node::Type::Cast);
-            castNode->value.type = GenericValue::Type::Integer;
-            castNode->parent = binary_operator_node;
-            auto lhs = binary_operator_node->children[0];
-            lhs->parent = nullptr;
-            castNode->add_child(lhs);
-            binary_operator_node->children[0] = castNode;
-        }
-        if(binary_operator_node->children[1]->value.type == GenericValue::Type::Float) {
-            auto castNode = new AST::Node(AST::Node::Type::Cast);
-            castNode->value.type = GenericValue::Type::Integer;
-            castNode->parent = binary_operator_node;
-            auto rhs = binary_operator_node->children[1];
-            rhs->parent = nullptr;
-            castNode->add_child(rhs);
-            binary_operator_node->children[1] = castNode;
-        }
+        if(binary_operator_node->children[0]->value.type == GenericValue::Type::Float)
+            create_cast_node(0, GenericValue::Type::Integer);
+        if(binary_operator_node->children[1]->value.type == GenericValue::Type::Float)
+            create_cast_node(1, GenericValue::Type::Integer);
     }
+
     return true;
 }
 
