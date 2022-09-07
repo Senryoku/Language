@@ -2,6 +2,16 @@
 
 #include <vector>
 
+#define OP(VALUETYPE, FUNC)                                                                         \
+    {                                                                                               \
+        GenericValue::Type::VALUETYPE, [](llvm::IRBuilder<>& ir_builder, llvm::Value* val) { FUNC } \
+    }
+static std::unordered_map<Tokenizer::Token::Type, std::unordered_map<GenericValue::Type, std::function<llvm::Value*(llvm::IRBuilder<>&, llvm::Value*)>>> unary_ops = {
+    {Tokenizer::Token::Type::Addition, {OP(Integer, (void)ir_builder; return val;), OP(Float, (void)ir_builder; return val;)}},
+    {Tokenizer::Token::Type::Substraction, {OP(Integer, return ir_builder.CreateNeg(val, "neg");), OP(Float, return ir_builder.CreateFNeg(val, "fneg");)}},
+};
+#undef OP
+
 #define OP(VALUETYPE, FUNC)                                                                                           \
     {                                                                                                                 \
         GenericValue::Type::VALUETYPE, [](llvm::IRBuilder<>& ir_builder, llvm::Value* lhs, llvm::Value* rhs) { FUNC } \
@@ -9,7 +19,6 @@
 
 static std::unordered_map<Tokenizer::Token::Type, std::unordered_map<GenericValue::Type, std::function<llvm::Value*(llvm::IRBuilder<>&, llvm::Value*, llvm::Value*)>>> binary_ops =
     {
-
         {Tokenizer::Token::Type::Addition, {OP(Integer, return ir_builder.CreateAdd(lhs, rhs, "add");), OP(Float, return ir_builder.CreateFAdd(lhs, rhs, "fadd");)}},
         {Tokenizer::Token::Type::Substraction, {OP(Integer, return ir_builder.CreateSub(lhs, rhs, "sub");), OP(Float, return ir_builder.CreateFSub(lhs, rhs, "fsub");)}},
         {Tokenizer::Token::Type::Multiplication, {OP(Integer, return ir_builder.CreateMul(lhs, rhs, "mul");), OP(Float, return ir_builder.CreateFMul(lhs, rhs, "fmul");)}},
@@ -238,6 +247,26 @@ llvm::Value* Module::codegen(const AST::Node* node) {
             }
             return _llvm_ir_builder.CreateLoad(var->getAllocatedType(), var, node->token.value.data());
         }
+        case AST::Node::Type::UnaryOperator: {
+            auto val = codegen(node->children[0]);
+            switch(node->token.type) {
+                case Tokenizer::Token::Type::Increment: {
+                    assert(node->children[0]->type == AST::Node::Type::Variable);
+                    // FIXME: Doesn't work
+                    auto var = get(node->children[0]->token.value);
+                    _llvm_ir_builder.CreateAdd(val, _llvm_ir_builder.getInt32(1), "inc");
+                    _llvm_ir_builder.CreateStore(val, var);
+                    return var;
+                }
+                default: {
+                    if(unary_ops[node->token.type].find(node->children[0]->value.type) == unary_ops[node->token.type].end()) {
+                        error("[LLVMCodegen] Unsupported type {} for unary operator {}.\n", node->children[0]->value.type, node->token.type);
+                        return nullptr;
+                    }
+                    return unary_ops[node->token.type][node->children[0]->value.type](_llvm_ir_builder, val);
+                }
+            }
+        }
         case AST::Node::Type::BinaryOperator: {
             auto lhs = codegen(node->children[0]);
             auto rhs = codegen(node->children[1]);
@@ -271,7 +300,7 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                     assert(node->children[0]->type == AST::Node::Type::Variable);
                     assert(node->children[0]->value.type == GenericValue::Type::Array);
                     auto element_type = node->children[0]->value.value.as_array.type;
-                    return _llvm_ir_builder.CreateGEP(get_llvm_type(element_type), lhs, {0, rhs}, "ArrayGEP");
+                    return _llvm_ir_builder.CreateGEP(get_llvm_type(element_type), lhs, {0, rhs}, "ArrayGEP"); // FIXME: I don't know.
                 }
                 case Tokenizer::Token::Type::Assignment: {
                     assert(node->children[0]->type == AST::Node::Type::Variable); // FIXME
