@@ -9,6 +9,13 @@
 
 static std::unordered_map<Tokenizer::Token::Type, std::unordered_map<GenericValue::Type, std::function<llvm::Value*(llvm::IRBuilder<>&, llvm::Value*, llvm::Value*)>>> binary_ops =
     {
+
+        {Tokenizer::Token::Type::Addition, {OP(Integer, return ir_builder.CreateAdd(lhs, rhs, "add");), OP(Float, return ir_builder.CreateFAdd(lhs, rhs, "fadd");)}},
+        {Tokenizer::Token::Type::Substraction, {OP(Integer, return ir_builder.CreateSub(lhs, rhs, "sub");), OP(Float, return ir_builder.CreateFSub(lhs, rhs, "fsub");)}},
+        {Tokenizer::Token::Type::Multiplication, {OP(Integer, return ir_builder.CreateMul(lhs, rhs, "mul");), OP(Float, return ir_builder.CreateFMul(lhs, rhs, "fmul");)}},
+        {Tokenizer::Token::Type::Division, {OP(Float, return ir_builder.CreateFDiv(lhs, rhs, "fdiv");)}},
+        {Tokenizer::Token::Type::Modulus, {OP(Integer, return ir_builder.CreateSRem(lhs, rhs, "srem");)}},
+        // Comparisons
         {Tokenizer::Token::Type::Equal,
          {OP(Integer, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_EQ, lhs, rhs, "ICMP_EQ");),
           OP(Float, return ir_builder.CreateFCmp(llvm::CmpInst::Predicate::FCMP_OEQ, lhs, rhs, "FCMP_OEQ");)}},
@@ -238,61 +245,11 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                 return nullptr;
             // TODO: Overloads.
             switch(node->token.type) {
-                case Tokenizer::Token::Type::Addition: {
-                    switch(node->value.type) {
-                        case GenericValue::Type::Integer: return _llvm_ir_builder.CreateAdd(lhs, rhs, "addtmp");
-                        case GenericValue::Type::Float: {
-                            // TODO: Temp, tidy up.
-                            if(lhs->getType() == llvm::Type::getInt32Ty(*_llvm_context)) {
-                                assert(rhs->getType() != llvm::Type::getInt32Ty(*_llvm_context));
-                                lhs = _llvm_ir_builder.CreateSIToFP(lhs, llvm::Type::getFloatTy(*_llvm_context), "conv");
-                            } else if(rhs->getType() == llvm::Type::getInt32Ty(*_llvm_context)) {
-                                assert(lhs->getType() != llvm::Type::getInt32Ty(*_llvm_context));
-                                rhs = _llvm_ir_builder.CreateSIToFP(rhs, llvm::Type::getFloatTy(*_llvm_context), "conv");
-                            }
-                            return _llvm_ir_builder.CreateFAdd(lhs, rhs, "addftmp");
-                        }
-                        default: error("LLVM::Codegen: Binary operator '{}' does not support type '{}'.", node->token.value, node->value.type); return nullptr;
-                    }
-                }
-                case Tokenizer::Token::Type::Substraction: {
-                    if(node->value.type == GenericValue::Type::Integer)
-                        return _llvm_ir_builder.CreateSub(lhs, rhs, "subtmp");
-                    else
-                        return _llvm_ir_builder.CreateFSub(lhs, rhs, "subftmp");
-                }
-                case Tokenizer::Token::Type::Multiplication: {
-                    switch(node->value.type) {
-                        case GenericValue::Type::Integer: return _llvm_ir_builder.CreateMul(lhs, rhs, "multmp");
-                        case GenericValue::Type::Float: {
-                            // TODO: Temp, tidy up.
-                            if(lhs->getType() == llvm::Type::getInt32Ty(*_llvm_context)) {
-                                assert(rhs->getType() != llvm::Type::getInt32Ty(*_llvm_context));
-                                lhs = _llvm_ir_builder.CreateSIToFP(lhs, llvm::Type::getFloatTy(*_llvm_context), "conv");
-                            } else if(rhs->getType() == llvm::Type::getInt32Ty(*_llvm_context)) {
-                                assert(lhs->getType() != llvm::Type::getInt32Ty(*_llvm_context));
-                                rhs = _llvm_ir_builder.CreateSIToFP(rhs, llvm::Type::getFloatTy(*_llvm_context), "conv");
-                            }
-                            return _llvm_ir_builder.CreateFMul(lhs, rhs, "mulftmp");
-                        }
-                        default: error("[LLVMCodegen] Binary operator '{}' does not support type '{}'.", node->token.value, node->value.type); return nullptr;
-                    }
-                }
-                case Tokenizer::Token::Type::Division: {
-                    auto div = _llvm_ir_builder.CreateFDiv(lhs, rhs, "divftmp");
-                    if(node->value.type == GenericValue::Type::Integer)
-                        return _llvm_ir_builder.CreateFPToUI(div, llvm::Type::getInt32Ty(*_llvm_context), "intcasttmp");
-                    else
-                        return div;
-                }
-                case Tokenizer::Token::Type::Modulus: {
-                    if(node->value.type == GenericValue::Type::Integer) {
-                        return _llvm_ir_builder.CreateSRem(lhs, rhs, "srem"); // FIXME: Is it the correct one?
-                    } else {
-                        error("[LLVMCodegen] Binary operator '{}' does not support type '{}'.", node->token.value, node->value.type);
-                        return nullptr;
-                    }
-                }
+                case Tokenizer::Token::Type::Addition: [[fallthrough]];
+                case Tokenizer::Token::Type::Substraction: [[fallthrough]];
+                case Tokenizer::Token::Type::Multiplication: [[fallthrough]];
+                case Tokenizer::Token::Type::Division: [[fallthrough]];
+                case Tokenizer::Token::Type::Modulus: [[fallthrough]];
                 case Tokenizer::Token::Type::Equal: [[fallthrough]];
                 case Tokenizer::Token::Type::Lesser: [[fallthrough]];
                 case Tokenizer::Token::Type::LesserOrEqual: [[fallthrough]];
