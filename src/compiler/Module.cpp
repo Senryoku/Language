@@ -2,6 +2,31 @@
 
 #include <vector>
 
+#define OP(VALUETYPE, FUNC)                                                                                           \
+    {                                                                                                                 \
+        GenericValue::Type::VALUETYPE, [](llvm::IRBuilder<>& ir_builder, llvm::Value* lhs, llvm::Value* rhs) { FUNC } \
+    }
+
+static std::unordered_map<Tokenizer::Token::Type, std::unordered_map<GenericValue::Type, std::function<llvm::Value*(llvm::IRBuilder<>&, llvm::Value*, llvm::Value*)>>> binary_ops =
+    {
+        {Tokenizer::Token::Type::Equal,
+         {OP(Integer, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_EQ, lhs, rhs, "ICMP_EQ");),
+          OP(Float, return ir_builder.CreateFCmp(llvm::CmpInst::Predicate::FCMP_OEQ, lhs, rhs, "FCMP_OEQ");)}},
+        {Tokenizer::Token::Type::Lesser,
+         {OP(Integer, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_SLT, lhs, rhs, "ICMP_SLT");),
+          OP(Float, return ir_builder.CreateFCmp(llvm::CmpInst::Predicate::FCMP_OLT, lhs, rhs, "FCMP_OLT");)}},
+        {Tokenizer::Token::Type::LesserOrEqual,
+         {OP(Integer, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_SLE, lhs, rhs, "ICMP_SLE");),
+          OP(Float, return ir_builder.CreateFCmp(llvm::CmpInst::Predicate::FCMP_OLE, lhs, rhs, "FCMP_OLE");)}},
+        {Tokenizer::Token::Type::Greater,
+         {OP(Integer, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_SGT, lhs, rhs, "ICMP_SGT");),
+          OP(Float, return ir_builder.CreateFCmp(llvm::CmpInst::Predicate::FCMP_OGT, lhs, rhs, "FCMP_OGT");)}},
+        {Tokenizer::Token::Type::GreaterOrEqual,
+         {OP(Integer, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_SGE, lhs, rhs, "ICMP_SGE");),
+          OP(Float, return ir_builder.CreateFCmp(llvm::CmpInst::Predicate::FCMP_OGE, lhs, rhs, "FCMP_OGE");)}},
+};
+#undef OP
+
 llvm::Constant* Module::codegen(const GenericValue& val) {
     assert(val.is_constexpr());
     switch(val.type) {
@@ -268,49 +293,18 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                         return nullptr;
                     }
                 }
-                case Tokenizer::Token::Type::Equal: {
-                    if(node->children[0]->value.type == GenericValue::Type::Integer && node->children[1]->value.type == GenericValue::Type::Integer)
-                        return _llvm_ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_EQ, lhs, rhs, "ICMP_EQ");
-                    else if(node->children[0]->value.type == GenericValue::Type::Float && node->children[1]->value.type == GenericValue::Type::Float)
-                        return _llvm_ir_builder.CreateFCmp(llvm::CmpInst::Predicate::FCMP_OEQ, lhs, rhs, "FCMP_OEQ");
-                    error("[LLVMCodegen] Unsupported types {} and {} for binary operator {}.\n", node->children[0]->value.type, node->children[1]->value.type, node->token.type);
-                    return nullptr;
-                }
-                case Tokenizer::Token::Type::Lesser: {
-                    // TODO: More types
-                    if(node->children[0]->value.type == GenericValue::Type::Integer && node->children[1]->value.type == GenericValue::Type::Integer)
-                        return _llvm_ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_SLT, lhs, rhs, "ICMP_SLT");
-                    else if(node->children[0]->value.type == GenericValue::Type::Float && node->children[1]->value.type == GenericValue::Type::Float)
-                        return _llvm_ir_builder.CreateFCmp(llvm::CmpInst::Predicate::FCMP_OLT, lhs, rhs, "FCMP_OLT");
-                    error("[LLVMCodegen] Unsupported types {} and {} for binary operator {}.\n", node->children[0]->value.type, node->children[1]->value.type, node->token.type);
-                    return nullptr;
-                }
-                case Tokenizer::Token::Type::LesserOrEqual: {
-                    // TODO: More types
-                    if(node->children[0]->value.type == GenericValue::Type::Integer && node->children[1]->value.type == GenericValue::Type::Integer)
-                        return _llvm_ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_SLE, lhs, rhs, "ICMP_SLE");
-                    else if(node->children[0]->value.type == GenericValue::Type::Float && node->children[1]->value.type == GenericValue::Type::Float)
-                        return _llvm_ir_builder.CreateFCmp(llvm::CmpInst::Predicate::FCMP_OLE, lhs, rhs, "FCMP_OLE");
-                    error("[LLVMCodegen] Unsupported types {} and {} for binary operator {}.\n", node->children[0]->value.type, node->children[1]->value.type, node->token.type);
-                    return nullptr;
-                }
-                case Tokenizer::Token::Type::Greater: {
-                    // TODO: More types
-                    if(node->children[0]->value.type == GenericValue::Type::Integer && node->children[1]->value.type == GenericValue::Type::Integer)
-                        return _llvm_ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_SGT, lhs, rhs, "ICMP_SGT");
-                    else if(node->children[0]->value.type == GenericValue::Type::Float && node->children[1]->value.type == GenericValue::Type::Float)
-                        return _llvm_ir_builder.CreateFCmp(llvm::CmpInst::Predicate::FCMP_OGT, lhs, rhs, "FCMP_OGT");
-                    error("[LLVMCodegen] Unsupported types {} and {} for binary operator {}.\n", node->children[0]->value.type, node->children[1]->value.type, node->token.type);
-                    return nullptr;
-                }
+                case Tokenizer::Token::Type::Equal: [[fallthrough]];
+                case Tokenizer::Token::Type::Lesser: [[fallthrough]];
+                case Tokenizer::Token::Type::LesserOrEqual: [[fallthrough]];
+                case Tokenizer::Token::Type::Greater: [[fallthrough]];
                 case Tokenizer::Token::Type::GreaterOrEqual: {
-                    // TODO: More types
-                    if(node->children[0]->value.type == GenericValue::Type::Integer && node->children[1]->value.type == GenericValue::Type::Integer)
-                        return _llvm_ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_SGE, lhs, rhs, "ICMP_SGE");
-                    else if(node->children[0]->value.type == GenericValue::Type::Float && node->children[1]->value.type == GenericValue::Type::Float)
-                        return _llvm_ir_builder.CreateFCmp(llvm::CmpInst::Predicate::FCMP_OGE, lhs, rhs, "FCMP_OGE");
-                    error("[LLVMCodegen] Unsupported types {} and {} for binary operator {}.\n", node->children[0]->value.type, node->children[1]->value.type, node->token.type);
-                    return nullptr;
+                    assert(node->children[0]->value.type == node->children[1]->value.type);
+                    if(binary_ops[node->token.type].find(node->children[0]->value.type) == binary_ops[node->token.type].end()) {
+                        error("[LLVMCodegen] Unsupported types {} and {} for binary operator {}.\n", node->children[0]->value.type, node->children[1]->value.type,
+                              node->token.type);
+                        return nullptr;
+                    }
+                    return binary_ops[node->token.type][node->children[0]->value.type](_llvm_ir_builder, lhs, rhs);
                 }
                 case Tokenizer::Token::Type::And: {
                     return _llvm_ir_builder.CreateAnd(lhs, rhs, "and");
