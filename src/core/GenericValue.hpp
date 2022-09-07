@@ -90,8 +90,6 @@ struct GenericValue {
             return lhs;
         if(op == "==" || op == "!=" || op == "<" || op == ">" || op == "=>" || op == "<=" || op == "&&" || op == "||")
             return GenericValue::Type::Boolean;
-        else if(op == "/") // Special case for division: Always promote to Float.
-            return GenericValue::Type::Float;
         else if(lhs == GenericValue::Type::Integer && rhs == GenericValue::Type::Integer)
             return GenericValue::Type::Integer;
         else if(lhs == GenericValue::Type::Float && rhs == GenericValue::Type::Float)
