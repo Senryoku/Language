@@ -22,7 +22,7 @@ static std::unordered_map<Tokenizer::Token::Type, std::unordered_map<GenericValu
         {Tokenizer::Token::Type::Addition, {OP(Integer, return ir_builder.CreateAdd(lhs, rhs, "add");), OP(Float, return ir_builder.CreateFAdd(lhs, rhs, "fadd");)}},
         {Tokenizer::Token::Type::Substraction, {OP(Integer, return ir_builder.CreateSub(lhs, rhs, "sub");), OP(Float, return ir_builder.CreateFSub(lhs, rhs, "fsub");)}},
         {Tokenizer::Token::Type::Multiplication, {OP(Integer, return ir_builder.CreateMul(lhs, rhs, "mul");), OP(Float, return ir_builder.CreateFMul(lhs, rhs, "fmul");)}},
-        {Tokenizer::Token::Type::Division, {OP(Float, return ir_builder.CreateFDiv(lhs, rhs, "fdiv");)}},
+        {Tokenizer::Token::Type::Division, {OP(Integer, return ir_builder.CreateSDiv(lhs, rhs, "div");), OP(Float, return ir_builder.CreateFDiv(lhs, rhs, "fdiv");)}},
         {Tokenizer::Token::Type::Modulus, {OP(Integer, return ir_builder.CreateSRem(lhs, rhs, "srem");)}},
         // Comparisons
         {Tokenizer::Token::Type::Equal,
