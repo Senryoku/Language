@@ -36,12 +36,12 @@ jobs:
       run: 7z x llvm-msvc-x64.7z
       
     - name: Move LLVM to Program Files
-      run: mv LLVM "C:/Program Files/"
+      run: mv LLVM "C:/Program Files"
 
     - name: Configure CMake
       # Configure CMake in a 'build' subdirectory. `CMAKE_BUILD_TYPE` is only required if you are using a single-configuration generator such as make.
       # See https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html?highlight=cmake_build_type
-      run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DLLVM_DIR="./LLVM"
+      run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DLLVM_DIR="C:/Program Files/LLVM"
 
     - name: Build
       # Build your program with the given configuration
