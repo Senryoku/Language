@@ -29,6 +29,8 @@
 
 #include <jit/LLVMJIT.hpp>
 
+#include <string_utils.hpp>
+
 CLIArg args;
 
 bool handle_file(const std::string& filename) {
@@ -193,12 +195,12 @@ bool handle_file(const std::string& filename) {
 
 bool link() {
     try {
-        auto clang_start = std::chrono::high_resolution_clock::now();
+        auto        clang_start = std::chrono::high_resolution_clock::now();
         auto        final_outputfile = args['o'].set                         ? args['o'].value()
                                        : args.get_default_args().size() == 1 ? std::filesystem::path(args.get_default_arg()).filename().replace_extension(".exe").string()
                                                                              : "a.out";
         std::string input_files;
-        for (const auto& file : args.get_default_args())
+        for(const auto& file : args.get_default_args())
             input_files += " \"" + std::filesystem::path(file).filename().replace_extension(".o").string() + "\"";
         auto command = fmt::format("clang {} -o \"{}\"", input_files, final_outputfile);
         print("Running '{}'\n", command);
@@ -211,11 +213,11 @@ bool link() {
 
         // Run the generated program. FIXME: Handy, but dangerous.
         if(args['r'].set) {
-            auto command = final_outputfile;
+            auto run_command = final_outputfile;
             for(const auto& arg : args['r'].values)
-                command += " " + arg;
-            print("Running {}...\n", command);
-            auto retval = std::system(command.c_str());
+                run_command += " " + arg;
+            print("Running {}...\n", run_command);
+            auto retval = std::system(run_command.c_str());
             print(" > {} returned {}.\n", final_outputfile, retval);
         }
     } catch(const std::exception& e) {
@@ -258,24 +260,33 @@ int main(int argc, char* argv[]) {
 
     auto r = handle_all();
     if(args['w'].set) {
-        auto                              last_run = std::chrono::system_clock::now();
-        filewatch::FileWatch<std::string> watcher{args.get_default_arg(), [&](const std::string& path, const filewatch::Event) {
-                                                      if(std::chrono::system_clock::now() - last_run < std::chrono::seconds(1)) // Ignore double events
-                                                          return;
-                                                      fmt::print("[{:%T}] <insert lang name> compiler: {} changed, reprocessing...\n", std::chrono::system_clock::now(), path);
-                                                      // Wait a bit, at least on Windows it looks like the file read will fail if attempted right after the modification event.
-                                                      std::this_thread::sleep_for(std::chrono::milliseconds(100));
-                                                      r = handle_all();
-                                                      last_run = std::chrono::system_clock::now();
-                                                      success("\n[{:%T}] Watching for changes on {}... ", std::chrono::system_clock::now(), args.get_default_arg());
-                                                      fmt::print("(CTRL+C to exit)\n\n");
-                                                  }};
-        success("\n[{:%T}] Watching for changes on {}... ", std::chrono::system_clock::now(), args.get_default_arg());
+        auto last_run = std::chrono::system_clock::now();
+
+        auto rerun = [&](const std::string& path, const filewatch::Event) {
+            if(std::chrono::system_clock::now() - last_run < std::chrono::seconds(1)) // Ignore double events
+                return;
+            fmt::print("[{:%T}] <insert lang name> compiler: {} changed, reprocessing...\n", std::chrono::system_clock::now(), path);
+            // Wait a bit, at least on Windows it looks like the file read will fail if attempted right after the modification event.
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            r = handle_all(); // TODO: Recompile only modified files.
+            last_run = std::chrono::system_clock::now();
+            success("\n[{:%T}] Watching for changes... ", std::chrono::system_clock::now(), args.get_default_arg());
+            fmt::print("(CTRL+C to exit)\n\n");
+        };
+
+        auto file_to_watch = args.get_default_arg();
+        // Filewatch doesn't have a simple way to watch multiple files, we'll watch the parent directory for now.
+        if(args.get_default_args().size() > 1) {
+            file_to_watch = longest_common_prefix(args.get_default_args());
+            file_to_watch = std::filesystem::path(file_to_watch).parent_path().string();
+        }
+        filewatch::FileWatch<std::string> watchers(file_to_watch, rerun);
+
+        success("\n[{:%T}] Watching for changes... ", std::chrono::system_clock::now());
         fmt::print("(CTRL+C to exit)\n\n");
         // TODO: Provide a prompt?
-        while(true) {
+        while(true)
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        }
     }
     return r;
 }

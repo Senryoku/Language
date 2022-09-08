@@ -20,7 +20,7 @@ class Scope {
 
     Scope(const Scope& o) { *this = o; }
 
-    Scope(Scope&& s) {
+    Scope(Scope&& s) noexcept {
         _type_registry = std::move(s._type_registry);
         _functions = std::move(s._functions);
         _types = std::move(s._types);
@@ -184,12 +184,12 @@ class Scoped {
             _scopes.push_back(new Scope(*s));
         _type_registry = o._type_registry;
     }
-    Scoped(Scoped&& o) {
+    Scoped(Scoped&& o) noexcept {
         _scopes = o._scopes;
         o._scopes.clear();
         _type_registry = std::move(o._type_registry);
     }
-    Scoped& operator=(Scoped&& o) {
+    Scoped& operator=(Scoped&& o) noexcept {
         _scopes = o._scopes;
         o._scopes.clear();
         _type_registry = std::move(o._type_registry);
