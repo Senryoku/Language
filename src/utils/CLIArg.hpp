@@ -6,21 +6,28 @@
 class CLIArg {
   public:
     struct ArgumentDescription {
-        char        short_name;
-        std::string long_name;
-        bool        takes_value;
-        std::string description;
+        const char         short_name;
+        const std::string  long_name;
+        const unsigned int min_values;
+        const unsigned int max_values; // Note: Parsing will stop at the next option (string starting by '-')
+        const std::string  description;
 
-        bool        set;
-        std::string value;
+        bool                     set = false;
+        std::vector<std::string> values;
+
+        bool               has_value() const { return !values.empty(); }
+        const std::string& value() const {
+            assert(max_values == 1);
+            return values.front();
+        }
     };
 
-    CLIArg() { add('h', "help", false, "Display this help."); }
+    CLIArg() { add('h', "help", 0, 0, "Display this help."); }
 
-    void add(char short_name, const std::string& long_name, bool takes_value, const std::string& description) {
-        _arguments.push_back({.short_name = short_name, .long_name = long_name, .takes_value = takes_value, .description = description});
+    void add(char short_name, const std::string& long_name, unsigned int min_values, unsigned int max_values, const std::string& description) {
+        _arguments.push_back({.short_name = short_name, .long_name = long_name, .min_values = min_values, .max_values = max_values, .description = description});
     }
-    void parse(int argc, char* argv[]);
+    bool parse(int argc, char* argv[]);
 
     const ArgumentDescription& operator[](char c) { return *get_short(c); }
 
@@ -54,7 +61,7 @@ class CLIArg {
     }
 };
 
-void CLIArg::parse(int argc, char* argv[]) {
+bool CLIArg::parse(int argc, char* argv[]) {
     if(argc > 0)
         _program_name = argv[0];
 
@@ -67,38 +74,48 @@ void CLIArg::parse(int argc, char* argv[]) {
                     warn("[CLIArg] Unknown argument '{}'.\n", argv[idx] + 2);
                 } else {
                     a->set = true;
-                    if(a->takes_value && idx + 1 < argc && argv[idx + 1][0] != '-') {
+                    if(a->max_values > 0) {
                         ++idx;
-                        a->value = argv[idx];
+                        while(idx < argc && a->values.size() < a->max_values && argv[idx][0] != '-') {
+                            a->values.push_back(argv[idx]);
+                            ++idx;
+                        }
+                        if(a->values.size() < a->min_values) {
+                            error("[CLIArg] Option {} takes at least {} arguments, {} provided (Max: {}).\n", argv[idx] + 2, a->min_values, a->values.size(), a->max_values);
+                            return false;
+                        }
                     }
                 }
             } else {
                 size_t p = 1;
-                bool   skip_next = false; // Skip next argument if it was consumed
+                size_t next_arg = idx + 1;
+                // Each character is an option
                 while(argv[idx][p] != '\0') {
                     auto a = get_short(argv[idx][p]);
                     if(!a) {
                         warn("[CLIArg] Unknown argument '{}'.\n", argv[idx] + p);
                     } else {
                         a->set = true;
-                        if(a->takes_value && idx + 1 < argc && argv[idx + 1][0] != '-') {
-                            a->value = argv[idx + 1];
-                            skip_next = true;
+                        if(a->max_values > 0) {
+                            while(next_arg < argc && a->values.size() < a->max_values && argv[next_arg][0] != '-') {
+                                a->values.push_back(argv[next_arg]);
+                                ++next_arg;
+                            }
                         }
                     }
                     ++p;
                 }
-                if(skip_next)
-                    ++idx;
+                idx = next_arg; // Will be unconditionnaly incremented
             }
         } else {
             _default_arg = argv[idx];
+            ++idx;
         }
-        ++idx;
     }
 
     if(get_short('h')->set) {
         print_help();
         exit(0);
     }
+    return true;
 }

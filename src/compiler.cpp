@@ -35,14 +35,14 @@ int main(int argc, char* argv[]) {
                "└{0:─^{2}}┘\n",
                "", "<insert language name> compiler.", 80);
     CLIArg args;
-    args.add('o', "out", true, "Specify the output file.");
-    args.add('t', "tokens", false, "Dump the state after the tokenizing stage.");
-    args.add('a', "ast", false, "Dump the parsed AST to the command line.");
-    args.add('i', "ir", false, "Output LLVM Intermediate Representation.");
-    args.add('r', "run", false, "Run the resulting executable.");
-    args.add('b', "object", false, "Output an object file.");
-    args.add('j', "jit", false, "Run the module using JIT.");
-    args.add('w', "watch", false, "Watch the supplied file and re-run on changes.");
+    args.add('o', "out", 1, 1, "Specify the output file.");
+    args.add('t', "tokens", 0, 0, "Dump the state after the tokenizing stage.");
+    args.add('a', "ast", 0, 0, "Dump the parsed AST to the command line.");
+    args.add('i', "ir", 0, 0, "Output LLVM Intermediate Representation.");
+    args.add('r', "run", 0, 256, "Run the resulting executable.");
+    args.add('b', "object", 0, 0, "Output an object file.");
+    args.add('j', "jit", 0, 0, "Run the module using JIT.");
+    args.add('w', "watch", 0, 0, "Watch the supplied file and re-run on changes.");
     args.parse(argc, argv);
 
     if(args.get_default_arg() == "") {
@@ -94,11 +94,11 @@ int main(int argc, char* argv[]) {
         auto   parsing_end = std::chrono::high_resolution_clock::now();
         if(ast.has_value()) {
             if(args['a'].set) {
-                if(args['o'].set) {
-                    auto out = fmt::output_file(args['o'].value);
+                if(args['o'].set && args['o'].has_value()) {
+                    auto out = fmt::output_file(args['o'].value());
                     out.print("{}", *ast);
-                    fmt::print("AST written to '{}'.\n", args['o'].value);
-                    std::system(fmt::format("cat \"{}\"", args['o'].value).c_str());
+                    fmt::print("AST written to '{}'.\n", args['o'].value());
+                    std::system(fmt::format("cat \"{}\"", args['o'].value()).c_str());
                 } else
                     fmt::print("{}", *ast);
                 return 0;
@@ -106,7 +106,7 @@ int main(int argc, char* argv[]) {
 
             auto ir_filepath = std::filesystem::path(filename).stem().replace_extension(".ll");
             if(args['o'].set)
-                ir_filepath = args['o'].value;
+                ir_filepath = args['o'].value();
 
             try {
                 auto                               codegen_start = std::chrono::high_resolution_clock::now();
@@ -176,7 +176,7 @@ int main(int argc, char* argv[]) {
                     new_module.get_llvm_module().setTargetTriple(target_triple);
 
                     if(args['b'].set && args['o'].set)
-                        o_filepath = args['o'].value;
+                        o_filepath = args['o'].value();
                     std::error_code      error_code;
                     llvm::raw_fd_ostream dest(o_filepath.string(), error_code, llvm::sys::fs::OF_None);
 
@@ -219,7 +219,7 @@ int main(int argc, char* argv[]) {
                 auto llc_end = std::chrono::high_resolution_clock::now();
 
                 auto clang_start = std::chrono::high_resolution_clock::now();
-                auto final_outputfile = args['o'].set ? args['o'].value : ir_filepath.replace_extension(".exe").string();
+                auto final_outputfile = args['o'].set ? args['o'].value() : ir_filepath.replace_extension(".exe").string();
 #if USING_LLC
                 if(auto retval = std::system(fmt::format("clang -O3 \"{}\" -o \"{}\"", ir_filepath.replace_extension(".ll").string(), final_outputfile).c_str()); retval != 0)
 #else
@@ -243,8 +243,11 @@ int main(int argc, char* argv[]) {
 
                 // Run the generated program. FIXME: Handy, but dangerous.
                 if(args['r'].set) {
-                    print("Running {}...\n", final_outputfile);
-                    auto retval = std::system(final_outputfile.c_str());
+                    auto command = final_outputfile;
+                    for(const auto& arg : args['r'].values)
+                        command += " " + arg;
+                    print("Running {}...\n", command);
+                    auto retval = std::system(command.c_str());
                     print(" > {} returned {}.\n", final_outputfile, retval);
                 }
             } catch(const std::exception& e) {
