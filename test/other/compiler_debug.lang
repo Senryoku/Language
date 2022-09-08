@@ -1,7 +1,5 @@
+import amodule
+
 function main() {
-	if(1244857 > 124 * 2)
-		printf("Hello World\n");
-	else
-		printf("Fail\n");
-	return 0;
+	return afunction();
 }

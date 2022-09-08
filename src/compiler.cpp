@@ -33,11 +33,12 @@
 
 CLIArg args;
 
-bool handle_file(const std::string& filename) {
+bool handle_file(const std::string& path) {
+    auto           filename = std::filesystem::path(path).stem();
     auto           total_start = std::chrono::high_resolution_clock::now();
-    std ::ifstream input_file(filename);
+    std ::ifstream input_file(path);
     if(!input_file) {
-        error("Couldn't open file '{}' (Running from {}).\n", filename, std::filesystem::current_path().string());
+        error("Couldn't open file '{}' (Running from {}).\n", path, std::filesystem::current_path().string());
         return 1;
     }
     std::string source{(std::istreambuf_iterator<char>(input_file)), std::istreambuf_iterator<char>()};
@@ -71,6 +72,7 @@ bool handle_file(const std::string& filename) {
     auto   parsing_start = std::chrono::high_resolution_clock::now();
     Parser parser;
     auto   ast = parser.parse(tokens);
+    parser.write_export_interface(filename.replace_extension(".int"));
     auto   parsing_end = std::chrono::high_resolution_clock::now();
     if(ast.has_value()) {
         if(args['a'].set) {
@@ -84,14 +86,14 @@ bool handle_file(const std::string& filename) {
             return 0;
         }
 
-        auto ir_filepath = std::filesystem::path(filename).stem().replace_extension(".ll");
+        auto ir_filepath = filename.replace_extension(".ll");
         if(args['o'].set)
             ir_filepath = args['o'].value();
 
         try {
             auto                               codegen_start = std::chrono::high_resolution_clock::now();
             std::unique_ptr<llvm::LLVMContext> llvm_context(new llvm::LLVMContext());
-            Module                             new_module{filename, llvm_context.get()};
+            Module                             new_module{path, llvm_context.get()};
             auto                               result = new_module.codegen(*ast);
             if(!result) {
                 error("LLVM Codegen returned nullptr.\n");
@@ -124,7 +126,7 @@ bool handle_file(const std::string& filename) {
             auto object_gen_start = std::chrono::high_resolution_clock::now();
 
             // Generate Object file
-            auto o_filepath = std::filesystem::path(filename).stem().replace_extension(".o");
+            auto o_filepath = filename.replace_extension(".o");
             auto target_triple = llvm::sys::getDefaultTargetTriple();
             llvm::InitializeNativeTarget();
             llvm::InitializeNativeTargetAsmParser();
@@ -228,6 +230,10 @@ bool link() {
 };
 
 bool handle_all() {
+    // FIXME: We should generate a dependency tree to 
+    //  1. Pull all the required dependencies if they're not explicitly passed as argmument
+    //  2. Recompile only the necessary files.
+    //  3. Recompile in the correct order.
     for(const auto& file : args.get_default_args()) {
         if(!handle_file(file))
             return false;

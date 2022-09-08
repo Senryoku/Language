@@ -155,9 +155,10 @@ llvm::Value* Module::codegen(const AST::Node* node) {
 
             auto                     current_block = _llvm_ir_builder.GetInsertBlock();
             std::vector<llvm::Type*> param_types;
-            for(auto i = 0; i < node->children.size() - 1; ++i)
-                param_types.push_back(llvm::Type::getInt32Ty(*_llvm_context)); // TODO
-            auto return_type = llvm::Type::getInt32Ty(*_llvm_context);         // TODO
+            if(node->children.size() > 1)
+                for(auto i = 0; i < node->children.size() - 1; ++i)
+                    param_types.push_back(llvm::Type::getInt32Ty(*_llvm_context)); // TODO
+            auto return_type = llvm::Type::getInt32Ty(*_llvm_context);             // TODO
             auto function_types = llvm::FunctionType::get(return_type, param_types, false);
             auto function = llvm::Function::Create(function_types, llvm::Function::ExternalLinkage, function_name, _llvm_module.get()); // FIXME: Review Linkage
 

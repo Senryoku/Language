@@ -201,6 +201,7 @@ class Scoped {
             delete s;
     }
 
+    Scope&       get_root_scope() { return *_scopes.front(); }
     Scope&       get_scope() { return *_scopes.back(); }
     const Scope& get_scope() const { return *_scopes.back(); }
 

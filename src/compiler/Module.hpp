@@ -67,6 +67,10 @@ class Module {
             return _llvm_ir_builder.CreateAlloca(type, 0, name.c_str());
     }
 
+    void codegen_imports(const std::vector<AST::Node*>&) {
+        // TODO!
+    }
+
     llvm::Value* codegen(const AST& ast) {
         // TEMP: "Standard Library"
         // Make libc printf available

@@ -2,6 +2,7 @@
 
 #include <cassert>
 #include <charconv>
+#include <filesystem>
 #include <optional>
 #include <span>
 
@@ -112,7 +113,12 @@ class Parser : public Scoped {
         return it + 1 != tokens.end() && (it + 1)->type == type;
     }
 
+    bool write_export_interface(const std::filesystem::path&) const;
+
   private:
+    std::vector<AST::Node*>                  _exports;
+    std::vector<std::unique_ptr<AST::Node>> _imports;
+
     bool parse(const std::span<Tokenizer::Token>& tokens, AST::Node* curr_node);
 
     bool parse_next_scope(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* curr_node);
@@ -131,5 +137,6 @@ class Parser : public Scoped {
     bool parse_char(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* curr_node);
     bool parse_string(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* curr_node);
     bool parse_operator(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* curr_node);
+    bool parse_import(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* curr_node);
     bool parse_variable_declaration(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* curr_node, bool is_const = false);
 };

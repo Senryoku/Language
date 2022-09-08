@@ -473,6 +473,15 @@ inline GenericValue::Flags operator|(GenericValue::Flags a, GenericValue::Flags 
     return static_cast<GenericValue::Flags>(static_cast<int>(a) | static_cast<int>(b));
 }
 
+inline std::string serialize(GenericValue::Type type) {
+    switch(type) {
+        using enum GenericValue::Type;
+        case Integer: return "int";
+        default: assert(false);
+    }
+    return "";
+}
+
 template<>
 struct fmt::formatter<GenericValue::StringView> {
     constexpr auto parse(format_parse_context& ctx) -> decltype(ctx.begin()) {
@@ -500,15 +509,15 @@ struct fmt::formatter<GenericValue::Type> {
     auto format(const GenericValue::Type& t, FormatContext& ctx) -> decltype(ctx.out()) {
         switch(t) {
             using enum GenericValue::Type;
-            case Integer: return fmt::format_to(ctx.out(), fg(fmt::color::golden_rod), "{}", "Integer");
-            case Float: return fmt::format_to(ctx.out(), fg(fmt::color::golden_rod), "{}", "Float");
-            case Char: return fmt::format_to(ctx.out(), fg(fmt::color::burly_wood), "{}", "Char");
-            case String: return fmt::format_to(ctx.out(), fg(fmt::color::burly_wood), "{}", "String");
-            case Boolean: return fmt::format_to(ctx.out(), fg(fmt::color::royal_blue), "{}", "Boolean");
-            case Array: return fmt::format_to(ctx.out(), "{}", "Array");
-            case Composite: return fmt::format_to(ctx.out(), fg(fmt::color::light_green), "{}", "Composite");
-            case Reference: return fmt::format_to(ctx.out(), fg(fmt::color::blue), "{}", "Reference");
-            case Undefined: return fmt::format_to(ctx.out(), fg(fmt::color::gray), "{}", "Undefined");
+            case Integer: return fmt::format_to(ctx.out(), fg(fmt::color::golden_rod), "{}", "int");
+            case Float: return fmt::format_to(ctx.out(), fg(fmt::color::golden_rod), "{}", "float");
+            case Char: return fmt::format_to(ctx.out(), fg(fmt::color::burly_wood), "{}", "char");
+            case String: return fmt::format_to(ctx.out(), fg(fmt::color::burly_wood), "{}", "string");
+            case Boolean: return fmt::format_to(ctx.out(), fg(fmt::color::royal_blue), "{}", "bool");
+            case Array: return fmt::format_to(ctx.out(), "{}", "array");
+            case Composite: return fmt::format_to(ctx.out(), fg(fmt::color::light_green), "{}", "composite");
+            case Reference: return fmt::format_to(ctx.out(), fg(fmt::color::blue), "{}", "reference");
+            case Undefined: return fmt::format_to(ctx.out(), fg(fmt::color::gray), "{}", "undefined");
             default: return fmt::format_to(ctx.out(), fg(fmt::color::red), "{}: {}", "Unknown Generic Value Type [by the formatter]", static_cast<int>(t));
         }
     }
