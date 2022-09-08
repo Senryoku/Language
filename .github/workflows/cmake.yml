@@ -33,7 +33,7 @@ jobs:
       run: curl "http://176.145.241.248/llvm-msvc-x64.7z" -o llvm-msvc-x64.7z
         
     - name: Extract LLVM
-      run: 7z x llvm-msvc-x64.7z && ls -la
+      run: 7z x llvm-msvc-x64.7z && ls
       
     - name: Configure CMake
       # Configure CMake in a 'build' subdirectory. `CMAKE_BUILD_TYPE` is only required if you are using a single-configuration generator such as make.
