@@ -20,6 +20,9 @@ jobs:
     strategy:
         matrix:
             os: [windows-latest, ubuntu-latest]
+            include:
+              - os: ubuntu-latest
+                compiler: clang
 
     steps:
     - uses: actions/checkout@v3
