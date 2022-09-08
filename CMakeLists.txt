@@ -45,10 +45,11 @@ set_property(TARGET tester PROPERTY VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURC
 target_include_directories(repl PRIVATE "${CMAKE_SOURCE_DIR}/src/repl")
 
 # Use included version of FMT
-add_subdirectory("./ext/fmt-8.1.1")
-target_include_directories(langlib SYSTEM PRIVATE "ext/fmt-8.1.1/include")
-target_include_directories(repl SYSTEM PRIVATE "ext/fmt-8.1.1/include")
-target_include_directories(tester SYSTEM PRIVATE "ext/fmt-8.1.1/include")
+set(FMT_ROOT "./ext/fmt-9.1.0")
+add_subdirectory(${FMT_ROOT})
+target_include_directories(langlib SYSTEM PRIVATE "${FMT_ROOT}/include")
+target_include_directories(repl SYSTEM PRIVATE "${FMT_ROOT}/include")
+target_include_directories(tester SYSTEM PRIVATE "${FMT_ROOT}/include")
 target_link_libraries(repl fmt::fmt)
 target_link_libraries(tester fmt::fmt)
 
