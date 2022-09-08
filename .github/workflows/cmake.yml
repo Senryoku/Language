@@ -38,7 +38,7 @@ jobs:
         
     - name: Download LLVM
       if: steps.cache-llvm-14-0-6.outputs.cache-hit != 'true'
-      run: curl "http://176.145.241.248/llvm-14.0.6-msvc-x64-debug.7z" -o llvm.7z
+      run: curl "http://176.145.241.248/llvm-14.0.6-msvc-x64.7z" -o llvm.7z
         
     - name: Extract LLVM
       if: steps.cache-llvm-14-0-6.outputs.cache-hit != 'true'
