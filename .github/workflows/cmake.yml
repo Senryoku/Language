@@ -19,7 +19,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
         matrix:
-            os: [windows-latest, ubuntu-latest]
+            #os: [windows-latest, ubuntu-latest]
+            os: [ubuntu-latest]
             compiler: [clang]
 
     steps:
@@ -32,11 +33,11 @@ jobs:
         path: |
           C:/Program Files/LLVM
           ./llvm
-        key: llvm-14.0.6-${{ matrix.os }}
+        key: llvm-14.0-${{ matrix.os }}
     - name: Install LLVM and Clang
       uses: KyleMayes/install-llvm-action@v1.5.4
       with:
-        version: "14.0.6"
+        version: "14.0"
         cached: ${{ steps.cache-llvm.outputs.cache-hit }}
 
 # Get the correct version of GCC for Ubuntu (12 not available yet?)
