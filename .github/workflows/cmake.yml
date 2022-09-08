@@ -19,9 +19,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
         matrix:
-            #os: [windows-latest, ubuntu-latest]
-            os: [ubuntu-latest]
-            compiler: [clang]
+            os: [windows-latest]
 
     steps:
     - uses: actions/checkout@v3
@@ -33,11 +31,11 @@ jobs:
         path: |
           C:/Program Files/LLVM
           ./llvm
-        key: llvm-14.0-${{ matrix.os }}
+        key: llvm-14.0.6-${{ matrix.os }}
     - name: Install LLVM and Clang
       uses: KyleMayes/install-llvm-action@v1.5.4
       with:
-        version: "14.0"
+        version: "14.0.6"
         cached: ${{ steps.cache-llvm.outputs.cache-hit }}
 
 # Get the correct version of GCC for Ubuntu (12 not available yet?)
@@ -57,9 +55,6 @@ jobs:
     - name: Configure CMake
       # Configure CMake in a 'build' subdirectory. `CMAKE_BUILD_TYPE` is only required if you are using a single-configuration generator such as make.
       # See https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html?highlight=cmake_build_type
-      env:
-        CC: ${{ matrix.compiler }}
-        CXX: ${{ matrix.compiler }}
       run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DLLVM_DIR="${{ env.LLVM_PATH }}"
 
     - name: Build
