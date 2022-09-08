@@ -44,15 +44,17 @@ Toy Language
 ## Dependencies
  - C++20
  - fmt 8.1.1 (sources in ext/)
- - LLVM 14.0.0 (for the compiler only)
-   - Get the source tarball
-   - cd llvm-14.0.0.src
-   - mkdir build
-   - cd build
-   - cmake .. -DLLVM_INCLUDE_BENCHMARKS=OFF
-   - cmake --build . --target install
-   - CMake should now find LLVM automatically, otherwise set the LLVM_DIR variable (-DLLVM_DIR=path/to/llvm-14.0.0.src/build)
-   - Make sure llc and clang are available in PATH
+ - LLVM 14.0.6 (for the compiler only)
+   - On Windows we'll have to compile from source or CMake won't find it.
+	   - Get the [source tarball](https://github.com/llvm/llvm-project/releases/download/llvmorg-14.0.6/llvm-14.0.6.src.tar.xz)
+	   - `cd llvm-14.0.6.src`
+	   - `mkdir build`
+	   - `cd build`
+	   - `cmake .. -DCMAKE_BUILD_TYPE=RELEASE -DLLVM_INCLUDE_BENCHMARKS=OFF`
+	   - `cmake --build . --target install` (May necessitate a terminal with elevated privileges for installation)
+		 - Wait.
+	   - CMake should now find LLVM automatically, otherwise set the LLVM_DIR variable (-DLLVM_DIR=path/to/llvm-14.0.6.src/build)
+   - Also make sure clang is available in PATH for the final compilation pass
 
 ## Notes
 

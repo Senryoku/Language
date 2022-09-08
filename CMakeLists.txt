@@ -9,7 +9,6 @@ endif()
 if(CMAKE_BUILD_TYPE STREQUAL "")
   set(CMAKE_BUILD_TYPE Debug)
 endif()
-
 set(Lang_VERSION_MINOR 1)
 set(Lang_VERSION_MAJOR 0)
 include_directories("${CMAKE_SOURCE_DIR}/src")
@@ -37,9 +36,9 @@ add_executable(tester ${TEST_FILES} ${HEADERS} test/main.cpp)
 target_link_libraries(repl langlib)
 target_link_libraries(tester langlib)
 
-set_property(TARGET langlib PROPERTY CXX_STANDARD 20)
-set_property(TARGET repl PROPERTY CXX_STANDARD 20)
-set_property(TARGET tester PROPERTY CXX_STANDARD 20)
+set_property(TARGET langlib PROPERTY CXX_STANDARD ${CMAKE_CXX_STANDARD})
+set_property(TARGET repl PROPERTY CXX_STANDARD ${CMAKE_CXX_STANDARD})
+set_property(TARGET tester PROPERTY CXX_STANDARD ${CMAKE_CXX_STANDARD})
 
 set_property(TARGET tester PROPERTY VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/test")
 
@@ -73,7 +72,7 @@ if(DEFINED LLVM_PACKAGE_VERSION)
     target_link_libraries(compiler fmt::fmt)
     target_link_libraries(compiler ${llvm_libs} ${targets})
 else()
-    message(STATUS "Could not find LLVM, skipping compiler.")
+    message(WARNING "Could NOT find LLVM, skipping compiler.")
 endif()
 
 # Get GTest online
