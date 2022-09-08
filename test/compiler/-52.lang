@@ -1,0 +1,5 @@
+// RET : -52
+
+function main() {
+	return 2 * 9 + 6 / 3 - 9 * (2 + 6);
+}

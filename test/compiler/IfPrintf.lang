@@ -1,3 +1,6 @@
+// PASS: Hello World
+// FAIL: Fail
+
 function main() {
 	if(1244857 > 124 * 2)
 		printf("Hello World\n");

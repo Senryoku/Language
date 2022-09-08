@@ -16,11 +16,11 @@ class Module {
         // Creates an implicit main function
         //   Maybe we should turn this into an implicit "__init" function, for globals and module initialisation, and allow the declaration of an actual main function?
         //   One consideration is: How to handle repl and most importantly the return type?
-        std::vector<llvm::Type*> main_param_types; //(1, llvm::Type::getInt32Ty(*_llvm_context));
-        auto                     main_return_type = llvm::FunctionType::get(llvm::Type::getInt32Ty(*_llvm_context), main_param_types, false); // Returns void right now
-        auto                     main_function = llvm::Function::Create(main_return_type, llvm::Function::ExternalLinkage, "main", _llvm_module.get());
-        auto*                    mainblock = llvm::BasicBlock::Create(*_llvm_context, "entrypoint", main_function);
-        _llvm_ir_builder.SetInsertPoint(mainblock);
+        // std::vector<llvm::Type*> main_param_types; //(1, llvm::Type::getInt32Ty(*_llvm_context));
+        // auto                     main_return_type = llvm::FunctionType::get(llvm::Type::getInt32Ty(*_llvm_context), main_param_types, false); // Returns void right now
+        // auto                     main_function = llvm::Function::Create(main_return_type, llvm::Function::ExternalLinkage, "main", _llvm_module.get());
+        // auto*                    mainblock = llvm::BasicBlock::Create(*_llvm_context, "entrypoint", main_function);
+        //_llvm_ir_builder.SetInsertPoint(mainblock);
     }
 
     Scope& push_scope() {
@@ -77,8 +77,8 @@ class Module {
         // Actual codegen
         auto r = codegen(&ast.getRoot());
         // Add a return to our generated main (from constructor) if needed (FIXME?)
-        if(!_generated_return)
-            _llvm_ir_builder.CreateRet(llvm::ConstantInt::get(*_llvm_context, llvm::APInt(32, 0)));
+        // if(!_generated_return)
+        //    _llvm_ir_builder.CreateRet(llvm::ConstantInt::get(*_llvm_context, llvm::APInt(32, 0)));
         return r;
     }
 

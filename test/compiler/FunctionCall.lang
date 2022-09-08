@@ -1,0 +1,8 @@
+// PASS: 84
+function get_42() {
+	return 42;
+}
+
+function main() {
+	return 2 * get_42();
+}

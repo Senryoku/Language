@@ -2,6 +2,8 @@
 
 #include <vector>
 
+// FIXME: We should not use maps here actually. Find another way to manage the nested switch cases.
+
 #define OP(VALUETYPE, FUNC)                                                                         \
     {                                                                                               \
         GenericValue::Type::VALUETYPE, [](llvm::IRBuilder<>& ir_builder, llvm::Value* val) { FUNC } \

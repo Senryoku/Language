@@ -416,7 +416,8 @@ bool Parser::parse_identifier(const std::span<Tokenizer::Token>& tokens, std::sp
 }
 
 bool Parser::parse_statement(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* curr_node) {
-    // FIXME: Probably
+    // FIXME: There are probably a lot more tokens that should stop a single statement (first example would be an 'else' after an if without an open block).
+    //        Does the list of stopping keywords depend on the context?
     auto end = it;
     while(end != tokens.end() && end->type != Tokenizer::Token::Type::EndStatement)
         ++end;

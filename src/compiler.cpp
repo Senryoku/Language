@@ -221,13 +221,10 @@ int main(int argc, char* argv[]) {
                 auto clang_start = std::chrono::high_resolution_clock::now();
                 auto final_outputfile = args['o'].set ? args['o'].value : ir_filepath.replace_extension(".exe").string();
 #if USING_LLC
-                if(auto retval =
-                       std::system(fmt::format("clang -O3 \"{}\" -o \"{}\" -fuse-ld=lld-link -v", ir_filepath.replace_extension(".ll").string(), final_outputfile).c_str());
-                   retval != 0)
+                if(auto retval = std::system(fmt::format("clang -O3 \"{}\" -o \"{}\"", ir_filepath.replace_extension(".ll").string(), final_outputfile).c_str()); retval != 0)
 #else
                 // From object file
-                if(auto retval = std::system(fmt::format("clang \"{}\" -o \"{}\" -O0 -fuse-ld=lld", std::filesystem::absolute(o_filepath).string(), final_outputfile).c_str());
-                   retval != 0)
+                if(auto retval = std::system(fmt::format("clang \"{}\" -o \"{}\" -O3", std::filesystem::absolute(o_filepath).string(), final_outputfile).c_str()); retval != 0)
 #endif
                 {
                     error("Error running clang: {}.\n", retval);
