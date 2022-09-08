@@ -33,7 +33,7 @@ jobs:
       id: downloadllvm  # Remember to give an ID if you need the output filename
       name: Download LLVM
       with:
-        url: "https://drive.internxt.com/s/file/5eef10bae75ca3aa3022/68e12ab5c9c28d168bc06a67ee603185406bf83cf274def8794f5e505a0780fa"
+        url: "https://drive.google.com/uc?export=download&id=14lZK8rMETaLbAOTNd_V_0h-BfgJSgIJP"
         target: public/
         
     - name: Extract LLVM
