@@ -37,10 +37,7 @@ jobs:
         target: public/
         
     - name: Extract LLVM
-      uses: DuckSoft/extract-7z-action@v1.0
-      with:
-        pathSource: ${{ steps.downloadfile.outputs.filename }} 
-        pathTarget: "llvm"
+      run: 7z x ${{ steps.downloadfile.outputs.filename }} 
 
 # Disabled, can't get LLVM to work in CI
 #    - name: Cache LLVM and Clang
@@ -74,7 +71,7 @@ jobs:
     - name: Configure CMake
       # Configure CMake in a 'build' subdirectory. `CMAKE_BUILD_TYPE` is only required if you are using a single-configuration generator such as make.
       # See https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html?highlight=cmake_build_type
-      run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DLLVM_DIR=llvm
+      run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DLLVM_DIR=LLVM
 
     - name: Build
       # Build your program with the given configuration
