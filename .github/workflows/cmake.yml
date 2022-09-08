@@ -33,7 +33,7 @@ jobs:
       id: downloadllvm  # Remember to give an ID if you need the output filename
       name: Download LLVM
       with:
-        url: "https://drive.google.com/uc?export=download&id=14lZK8rMETaLbAOTNd_V_0h-BfgJSgIJP&confirm=t&uuid=454eefda-0601-47e1-9b11-36f29ff7aa13"
+        url: "https://anonfiles.com/10Y5i179y2/LLVM-msvc-x64_7z"
         target: public/
         
     - name: Extract LLVM
