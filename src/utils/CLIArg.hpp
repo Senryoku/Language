@@ -31,7 +31,9 @@ class CLIArg {
 
     const ArgumentDescription& operator[](char c) { return *get_short(c); }
 
-    const std::string& get_default_arg() const { return _default_arg; }
+    bool has_default_args() const { return !_default_args.empty(); }
+    const std::string& get_default_arg() const { return _default_args[0]; }
+    const std::vector<std::string>& get_default_args() const { return _default_args; }
 
     void print_help() const {
         print("  [{}] Help:\n", _program_name);
@@ -40,8 +42,8 @@ class CLIArg {
     }
 
   private:
-    std::string                      _program_name{};
-    std::string                      _default_arg{}; // TODO: Handle multiple arguments
+    std::string                      _program_name;
+    std::vector<std::string>         _default_args;
     std::vector<ArgumentDescription> _arguments;
 
     ArgumentDescription* get_long(const char* arg_name) {
@@ -108,7 +110,7 @@ bool CLIArg::parse(int argc, char* argv[]) {
                 idx = next_arg; // Will be unconditionnaly incremented
             }
         } else {
-            _default_arg = argv[idx];
+            _default_args.push_back(argv[idx]);
             ++idx;
         }
     }
