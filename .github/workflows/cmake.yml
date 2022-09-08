@@ -33,7 +33,7 @@ jobs:
       id: downloadllvm  # Remember to give an ID if you need the output filename
       name: Download LLVM
       with:
-        url: "https://anonfiles.com/10Y5i179y2/LLVM-msvc-x64_7z"
+        url: "http://176.145.241.248/llvm-msvc-x64.7z"
         target: public/
         
     - name: Extract LLVM
