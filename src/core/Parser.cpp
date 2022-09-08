@@ -668,7 +668,14 @@ bool Parser::parse_digits(const std::span<Tokenizer::Token>&, std::span<Tokenize
     auto integer = curr_node->add_child(new AST::Node(AST::Node::Type::ConstantValue, *it));
     integer->value.type = GenericValue::Type::Integer;
     integer->value.flags = GenericValue::Flags::CompileConst;
-    auto result = std::from_chars(&*(it->value.begin()), &*(it->value.begin()) + it->value.length(), integer->value.value.as_int32_t);
+    auto [ptr, error_code] = std::from_chars(&*(it->value.begin()), &*(it->value.begin()) + it->value.length(), integer->value.value.as_int32_t);
+    if(error_code == std::errc::invalid_argument) {
+        error("[Parser::parse_digits] std::from_chars returned invalid_argument.\n");
+        return false;
+    } else if(error_code == std::errc::result_out_of_range) {
+        error("[Parser::parse_digits] std::from_chars returned result_out_of_range.\n");
+        return false;
+    }
     ++it;
     return true;
 }
@@ -677,7 +684,14 @@ bool Parser::parse_float(const std::span<Tokenizer::Token>&, std::span<Tokenizer
     auto floatNode = curr_node->add_child(new AST::Node(AST::Node::Type::ConstantValue, *it));
     floatNode->value.type = GenericValue::Type::Float;
     floatNode->value.flags = GenericValue::Flags::CompileConst;
-    auto result = std::from_chars(&*(it->value.begin()), &*(it->value.begin()) + it->value.length(), floatNode->value.value.as_float);
+    auto [ptr, error_code] = std::from_chars(&*(it->value.begin()), &*(it->value.begin()) + it->value.length(), floatNode->value.value.as_float);
+    if(error_code == std::errc::invalid_argument) {
+        error("[Parser::parse_float] std::from_chars returned invalid_argument.\n");
+        return false;
+    } else if(error_code == std::errc::result_out_of_range) {
+        error("[Parser::parse_float] std::from_chars returned result_out_of_range.\n");
+        return false;
+    }
     ++it;
     return true;
 }
@@ -695,6 +709,15 @@ bool Parser::parse_string(const std::span<Tokenizer::Token>&, std::span<Tokenize
     auto strNode = curr_node->add_child(new AST::Node(AST::Node::Type::ConstantValue, *it));
     strNode->value.type = GenericValue::Type::String;
     strNode->value.flags = GenericValue::Flags::CompileConst;
+    // TODO: Handle escaped caracters
+    //   Transform the input and store it globally only if needed (i.e. different from input because it contained escaped caracters)
+    //   std::string_view handled_escaped_characters(std::string_view sv) {
+    //     if('\' in sv) {
+    //         copy sv to global storage, transforming escaped chars
+    //         return copy;
+    //     }
+    //     return sv;
+    //   }
     strNode->value.value.as_string = it->value;
     ++it;
     return true;
@@ -874,8 +897,8 @@ bool Parser::parse_operator(const std::span<Tokenizer::Token>& tokens, std::span
     // FIXME: Cleanup, like everything else :)
     // Promotion from integer to float, either because of the binary_operator_node type, or the type of its operands.
     if(binary_operator_node->value.type == GenericValue::Type::Float ||
-       (binary_operator_node->children[0]->value.type == GenericValue::Type::Integer && binary_operator_node->children[1]->value.type == GenericValue::Type::Float ||
-        binary_operator_node->children[0]->value.type == GenericValue::Type::Float && binary_operator_node->children[1]->value.type == GenericValue::Type::Integer)) {
+       ((binary_operator_node->children[0]->value.type == GenericValue::Type::Integer && binary_operator_node->children[1]->value.type == GenericValue::Type::Float) ||
+        (binary_operator_node->children[0]->value.type == GenericValue::Type::Float && binary_operator_node->children[1]->value.type == GenericValue::Type::Integer))) {
 
         if(binary_operator_node->token.type != Tokenizer::Token::Type::Assignment && binary_operator_node->children[0]->value.type == GenericValue::Type::Integer)
             create_cast_node(0, GenericValue::Type::Float);

@@ -124,8 +124,8 @@ struct GenericValue {
                     value.as_composite.members[i] = rhs.value.as_composite.members[i];
                 return *this;
             }
+            default: error("[GenericValue:{}] Error assigning {} to {}.\n", __LINE__, rhs, *this);
         }
-        error("[GenericValue:{}] Error assigning {} to {}.\n", __LINE__, rhs, *this);
         return *this;
     }
 
@@ -465,8 +465,8 @@ struct GenericValue {
     }
 
     Type       type;
-    Flags      flags;
-    ValueUnion value;
+    Flags      flags = Flags::None;
+    ValueUnion value = {};
 };
 
 inline GenericValue::Flags operator|(GenericValue::Flags a, GenericValue::Flags b) {

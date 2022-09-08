@@ -36,6 +36,7 @@ class Scope {
         _return_type = s._return_type;
         for(auto v : s._variables)
             _variables[v.first] = new Variable(*v.second);
+        return *this;
     }
 
     ~Scope() {

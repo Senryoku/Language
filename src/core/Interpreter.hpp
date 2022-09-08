@@ -293,7 +293,7 @@ class Interpreter : public Scoped {
                     assert(variable->type == GenericValue::Type::Composite);
                     auto        lhs_type = get_type(variable->value.as_composite.type_id);
                     const auto& member_name = node.children[1]->token.value;
-                    for(auto idx = 0; idx < lhs_type->children.size(); ++idx)
+                    for(auto idx = 0u; idx < lhs_type->children.size(); ++idx)
                         if(lhs_type->children[idx]->token.value == member_name) {
                             _return_value.type = GenericValue::Type::Reference;
                             _return_value.value.as_reference.value = &variable->value.as_composite.members[idx];

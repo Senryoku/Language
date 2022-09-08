@@ -220,7 +220,7 @@ std::string Prompt::get_line() {
                 CONSOLE_SCREEN_BUFFER_INFO console_info;
                 if(!GetConsoleScreenBufferInfo(_stdout_handle, &console_info))
                     win_error_exit("GetConsoleScreenBufferInfo");
-                COORD coords(static_cast<SHORT>(cursor + 3), console_info.dwCursorPosition.Y);
+                COORD coords{static_cast<SHORT>(cursor + 3), console_info.dwCursorPosition.Y};
                 if(SetConsoleCursorPosition(_stdout_handle, coords) == 0)
                     win_error_exit("SetConsoleCursorPosition");
             }
