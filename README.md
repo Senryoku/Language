@@ -51,7 +51,7 @@ Toy Language
 	   - `mkdir build`
 	   - `cd build`
 	   - `cmake .. -DCMAKE_BUILD_TYPE=RELEASE -DLLVM_INCLUDE_BENCHMARKS=OFF`
-	   - `cmake --build . --target install` (May necessitate a terminal with elevated privileges for installation)
+	   - `cmake --build . --target install --config Release` (May necessitate a terminal with elevated privileges for installation)
 		 - Wait.
 	   - CMake should now find LLVM automatically, otherwise set the LLVM_DIR variable (-DLLVM_DIR=path/to/llvm-14.0.6.src/build)
    - Also make sure clang is available in PATH for the final compilation pass
