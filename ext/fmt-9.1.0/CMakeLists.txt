@@ -102,6 +102,7 @@ if (FMT_SYSTEM_HEADERS)
   set(FMT_SYSTEM_HEADERS_ATTRIBUTE SYSTEM)
 endif ()
 
+
 # Get version from core.h
 file(READ include/fmt/core.h core_h)
 if (NOT core_h MATCHES "FMT_VERSION ([0-9]+)([0-9][0-9])([0-9][0-9])")
