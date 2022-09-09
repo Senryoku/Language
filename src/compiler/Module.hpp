@@ -67,6 +67,20 @@ class Module {
             return _llvm_ir_builder.CreateAlloca(type, 0, name.c_str());
     }
 
+    // Create declarations for imported external functions/variables
+    void codegen_imports(const std::vector<std::unique_ptr<AST::Node>>& nodes) {
+        print("[LLVMCodegen] codegen_imports {}.\n", nodes.size());
+        for (const auto& n : nodes) {
+            assert(n->type == AST::Node::Type::FunctionDeclaration);
+            auto                     name = n->token.value.data();
+            print("[LLVMCodegen] Importing {}.\n", name);
+            auto                     return_type = llvm::Type::getInt32Ty(*_llvm_context); // TODO
+            std::vector<llvm::Type*> func_args_types; //({llvm::Type::getInt32Ty(*_llvm_context)}); // TODO
+            llvm::FunctionType*      func_type = llvm::FunctionType::get(return_type, func_args_types, true);
+            auto                     func_func = _llvm_module->getOrInsertFunction(name, func_type);
+        }
+    }
+
     llvm::Value* codegen(const AST& ast) {
         // TEMP: "Standard Library"
         // Make libc printf available

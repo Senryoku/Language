@@ -2,6 +2,7 @@
 
 #include <cassert>
 #include <charconv>
+#include <filesystem>
 #include <optional>
 #include <span>
 
@@ -21,6 +22,8 @@ class Parser : public Scoped {
     Parser& operator=(const Parser&) = default;
     Parser& operator=(Parser&&) = default;
     virtual ~Parser() = default;
+
+    void set_cache_folder(const std::filesystem::path& path) { _cache_folder = path; }
 
     static const uint32_t max_precedence = static_cast<uint32_t>(-1);
     // FIXME: Pre and postfix versions of --/++ should have different precedences
@@ -112,7 +115,20 @@ class Parser : public Scoped {
         return it + 1 != tokens.end() && (it + 1)->type == type;
     }
 
+    const std::vector<std::unique_ptr<AST::Node>>& get_imports() const { return _imports; }
+
+    bool write_export_interface(const std::filesystem::path&) const;
+
+    // FIXME: Global interning? (Fly strings)
+    std::string* internalize_string(const std::string& str) { return _symbols.emplace_back(new std::string(str)).get(); }
+
   private:
+    std::filesystem::path _cache_folder{"./lang_cache/"};
+
+    std::vector<AST::Node*>                   _exports;
+    std::vector<std::unique_ptr<AST::Node>>   _imports;
+    std::vector<std::unique_ptr<std::string>> _symbols; // FIXME: Global interning? (Fly strings)
+
     bool parse(const std::span<Tokenizer::Token>& tokens, AST::Node* curr_node);
 
     bool parse_next_scope(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* curr_node);
@@ -131,5 +147,6 @@ class Parser : public Scoped {
     bool parse_char(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* curr_node);
     bool parse_string(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* curr_node);
     bool parse_operator(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* curr_node);
+    bool parse_import(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* curr_node);
     bool parse_variable_declaration(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* curr_node, bool is_const = false);
 };

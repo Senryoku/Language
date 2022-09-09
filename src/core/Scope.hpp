@@ -168,15 +168,16 @@ class Scoped {
     Scoped() {
         push_scope(); // TODO: Push an empty scope for now.
 
-        const auto register_builtin = [&](const std::string& name) {
+        const auto register_builtin = [&](const std::string& name, GenericValue::Type type) {
             if(!s_builtins[name]) {
                 s_builtins[name].reset(new AST::Node(AST::Node::Type::BuiltInFunctionDeclaration));
                 s_builtins[name]->token.value = name; // We have to provide a name via the token.
+                s_builtins[name]->value.type = type;
             }
             get_scope().declare_function(*s_builtins[name]);
         };
-        register_builtin("put");
-        register_builtin("printf");
+        register_builtin("put", GenericValue::Type::Integer);
+        register_builtin("printf", GenericValue::Type::Integer);
     }
 
     Scoped(const Scoped& o) {
@@ -201,6 +202,7 @@ class Scoped {
             delete s;
     }
 
+    Scope&       get_root_scope() { return *_scopes.front(); }
     Scope&       get_scope() { return *_scopes.back(); }
     const Scope& get_scope() const { return *_scopes.back(); }
 
