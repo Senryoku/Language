@@ -69,8 +69,18 @@ Tokenizer::Token Tokenizer::search_next() {
                 break;
             }
             case '"': {
-                while(!eof() && peek() != '"') // TODO: Handle escaped "
+                // For strings, the escape sequences will be handled by the Parser
+                while(!eof() && peek() != '"')
+                {
+                    if(peek() == '\\') {
+                        advance();
+                        if(eof())
+                            break;
+                        if(peek() == '"')
+                            advance();
+                    }
                     advance();
+                }
                 if(eof())
                     throw Exception(fmt::format("[Tokenizer] Error: Reached end of file without matching \" on line {}.", _current_line),
                                     point_error(begin, _current_line, begin, _source.length() - 1));

@@ -36,8 +36,10 @@ CLIArg args;
 const std::filesystem::path cache_folder("./lang_cache/");
 
 bool handle_file(const std::string& path) {
-    auto           filename = std::filesystem::path(path).stem(); // FIXME: Should be unique given the full path.
-    auto           total_start = std::chrono::high_resolution_clock::now();
+    print("Processing {}... \n", path);
+    auto           filename = std::filesystem::path(path).stem();
+    auto           cache_filename = filename; // FIXME: Should be unique given the full path.
+    const auto     total_start = std::chrono::high_resolution_clock::now();
     std ::ifstream input_file(path);
     if(!input_file) {
         error("Couldn't open file '{}' (Running from {}).\n", path, std::filesystem::current_path().string());
@@ -45,7 +47,7 @@ bool handle_file(const std::string& path) {
     }
     std::string source{(std::istreambuf_iterator<char>(input_file)), std::istreambuf_iterator<char>()};
 
-    auto tokenizing_start = std::chrono::high_resolution_clock::now();
+    const auto tokenizing_start = std::chrono::high_resolution_clock::now();
 
     std::vector<Tokenizer::Token> tokens;
     try {
@@ -57,7 +59,7 @@ bool handle_file(const std::string& path) {
         return false;
     }
 
-    auto tokenizing_end = std::chrono::high_resolution_clock::now();
+    const auto tokenizing_end = std::chrono::high_resolution_clock::now();
 
     // Print tokens
     if(args['t'].set) {
@@ -71,12 +73,12 @@ bool handle_file(const std::string& path) {
         return true;
     }
 
-    auto   parsing_start = std::chrono::high_resolution_clock::now();
+    const auto   parsing_start = std::chrono::high_resolution_clock::now();
     Parser parser;
     parser.set_cache_folder(cache_folder);
-    auto   ast = parser.parse(tokens);
-    parser.write_export_interface(filename.replace_extension(".int"));
-    auto parsing_end = std::chrono::high_resolution_clock::now();
+    auto ast = parser.parse(tokens);
+    parser.write_export_interface(cache_filename.replace_extension(".int"));
+    const auto parsing_end = std::chrono::high_resolution_clock::now();
     if(ast.has_value()) {
         if(args['a'].set) {
             if(args['o'].set && args['o'].has_value()) {
@@ -90,7 +92,7 @@ bool handle_file(const std::string& path) {
         }
 
         try {
-            auto                               codegen_start = std::chrono::high_resolution_clock::now();
+            const auto                         codegen_start = std::chrono::high_resolution_clock::now();
             std::unique_ptr<llvm::LLVMContext> llvm_context(new llvm::LLVMContext());
             Module                             new_module{path, llvm_context.get()};
             new_module.codegen_imports(parser.get_imports());
@@ -103,9 +105,9 @@ bool handle_file(const std::string& path) {
                 error("\nErrors in LLVM Module, exiting...\n");
                 return false;
             }
-            auto codegen_end = std::chrono::high_resolution_clock::now();
+            const auto codegen_end = std::chrono::high_resolution_clock::now();
 
-            auto write_ir_start = std::chrono::high_resolution_clock::now();
+            const auto write_ir_start = std::chrono::high_resolution_clock::now();
             if(args['i'].set) {
                 auto ir_filepath = filename.replace_extension(".ll");
                 if(args['o'].set)
@@ -124,13 +126,16 @@ bool handle_file(const std::string& path) {
                     return true;
             }
 
-            auto write_ir_end = std::chrono::high_resolution_clock::now();
+            const auto write_ir_end = std::chrono::high_resolution_clock::now();
 
-            auto object_gen_start = std::chrono::high_resolution_clock::now();
+            const auto object_gen_start = std::chrono::high_resolution_clock::now();
 
             // Generate Object file
             auto o_filepath = cache_folder;
-            o_filepath += filename.replace_extension(".o");
+            o_filepath += cache_filename.replace_extension(".o");
+            if(args['b'].set && args['o'].set)
+                o_filepath = args['o'].value();
+
             auto target_triple = llvm::sys::getDefaultTargetTriple();
             llvm::InitializeNativeTarget();
             llvm::InitializeNativeTargetAsmParser();
@@ -151,8 +156,6 @@ bool handle_file(const std::string& path) {
             new_module.get_llvm_module().setDataLayout(target_machine->createDataLayout());
             new_module.get_llvm_module().setTargetTriple(target_triple);
 
-            if(args['b'].set && args['o'].set)
-                o_filepath = args['o'].value();
             std::error_code      error_code;
             llvm::raw_fd_ostream dest(o_filepath.string(), error_code, llvm::sys::fs::OF_None);
 
@@ -182,8 +185,8 @@ bool handle_file(const std::string& path) {
                 success("JIT main function returned '{}'\n", return_value);
                 return 0;
             }
-            auto object_gen_end = std::chrono::high_resolution_clock::now();
-            auto total_end = std::chrono::high_resolution_clock::now();
+            const auto object_gen_end = std::chrono::high_resolution_clock::now();
+            const auto total_end = std::chrono::high_resolution_clock::now();
 
             print(" {:<12} | {:<12} | {:<12} | {:<12} | {:<12} | {:<12} \n", "Tokenizer", "Parser", "LLVMCodegen", "IR", "ObjectGen", "Total");
             print(" {:^12.2} | {:^12.2} | {:^12.2} | {:^12.2} | {:^12.2} | {:^12.2} \n", std::chrono::duration<double, std::milli>(tokenizing_end - tokenizing_start),

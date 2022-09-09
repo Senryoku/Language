@@ -725,16 +725,30 @@ bool Parser::parse_string(const std::span<Tokenizer::Token>&, std::span<Tokenize
     auto strNode = curr_node->add_child(new AST::Node(AST::Node::Type::ConstantValue, *it));
     strNode->value.type = GenericValue::Type::String;
     strNode->value.flags = GenericValue::Flags::CompileConst;
-    // TODO: Handle escaped caracters
-    //   Transform the input and store it globally only if needed (i.e. different from input because it contained escaped caracters)
-    //   std::string_view handled_escaped_characters(std::string_view sv) {
-    //     if('\' in sv) {
-    //         copy sv to global storage, transforming escaped chars
-    //         return copy;
-    //     }
-    //     return sv;
-    //   }
-    strNode->value.value.as_string = it->value;
+
+    if(it->value.find('\\')) {
+        std::string str;
+        for(auto idx = 0u; idx < it->value.size(); ++idx) {
+            auto ch = it->value[idx];
+            if(ch == '\\') {
+                assert(idx != it->value.size() - 1);
+                ch = it->value[++idx];
+                switch(ch) {
+                    case 'a': str += '\a'; break;
+                    case 'b': str += '\b'; break;
+                    case 'n': str += '\n'; break;
+                    case 'r': str += '\r'; break;
+                    case 't': str += '\t'; break;
+                    case '"': str += '"'; break;
+                    case '\\': str += '\\'; break;
+                    default: error("[Parser] Unknown escape sequence \\{} in string on line {}.\n", ch, it->line); str += '\\' + ch;
+                }
+            } else
+                str += ch;
+        }
+        strNode->value.value.as_string = *internalize_string(str);
+    } else
+        strNode->value.value.as_string = it->value;
     ++it;
     return true;
 }
@@ -1030,18 +1044,17 @@ bool Parser::parse_import(const std::span<Tokenizer::Token>& tokens, std::span<T
         return false;
     }
 
-    print("Imported Module {}\n", module_name);
+    print(" * Imported Module {}\n", module_name);
 
     // FIXME: File format not specified
     std::string name, type;
     while(module_file >> name >> type) {
         Tokenizer::Token token;
         token.type = Tokenizer::Token::Type::Identifier;
-        _symbols.push_back(name); // Keep this string around. TODO: Replace this by a global fly string?
-        token.value = _symbols.back();
+        token.value = *internalize_string(name);
         auto funcDecNode = _imports.emplace_back(new AST::Node(AST::Node::Type::FunctionDeclaration, token)).get(); // Keep it out of the AST
         funcDecNode->value.type = GenericValue::parse_type(type);
-        print("Imported {} : {}\n", name, type);
+        print("     Imported {} : {}\n", name, type);
         if(!get_root_scope().declare_function(*funcDecNode)) {
             return false;
         }
@@ -1053,7 +1066,7 @@ bool Parser::parse_import(const std::span<Tokenizer::Token>& tokens, std::span<T
 }
 
 bool Parser::write_export_interface(const std::filesystem::path& path) const {
-    auto          cached_interface_file = _cache_folder;
+    auto cached_interface_file = _cache_folder;
     cached_interface_file += path;
     std::ofstream interface_file(cached_interface_file);
     if(!interface_file) {

@@ -119,12 +119,15 @@ class Parser : public Scoped {
 
     bool write_export_interface(const std::filesystem::path&) const;
 
+    // FIXME: Global interning? (Fly strings)
+    std::string* internalize_string(const std::string& str) { return _symbols.emplace_back(new std::string(str)).get(); }
+
   private:
     std::filesystem::path _cache_folder{"./lang_cache/"};
 
-    std::vector<AST::Node*>                 _exports;
-    std::vector<std::unique_ptr<AST::Node>> _imports;
-    std::vector<std::string>                _symbols;
+    std::vector<AST::Node*>                   _exports;
+    std::vector<std::unique_ptr<AST::Node>>   _imports;
+    std::vector<std::unique_ptr<std::string>> _symbols; // FIXME: Global interning? (Fly strings)
 
     bool parse(const std::span<Tokenizer::Token>& tokens, AST::Node* curr_node);
 
