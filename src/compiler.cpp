@@ -36,7 +36,6 @@ CLIArg args;
 
 const std::filesystem::path cache_folder("./lang_cache/");
 
-
 bool handle_file(const std::string& path) {
     auto filename = std::filesystem::path(path).stem();
     auto cache_filename = filename; // FIXME: Should be unique given the full path.
