@@ -1,0 +1,7 @@
+export function double(int i) {
+	return 2 * i;
+}
+
+function not_exported() {
+	return 5;
+}

@@ -54,19 +54,10 @@ llvm::Constant* Module::codegen(const GenericValue& val) {
         case GenericValue::Type::Integer: return llvm::ConstantInt::get(*_llvm_context, llvm::APInt(32, val.value.as_int32_t));
         case GenericValue::Type::Array: {
             const auto& arr = val.value.as_array;
-            auto        itemType = llvm::IntegerType::get(*_llvm_context, 32);
-            // FIXME: Determine the item type:
-            /*
-            switch(arr.type) {
-                case GenericValue::Type::Integer:
-                    ...
-                    break;
-                ...
-            }
-            */
+            auto        itemType = get_llvm_type(arr.type);
             std::vector<llvm::Constant*> values(arr.capacity);
             for(unsigned int i = 0; i < arr.capacity; i++)
-                values[i] = llvm::ConstantInt::get(itemType, arr.items[i].value.as_int32_t); // FIXME: Depends on the item type
+                values[i] = codegen(arr.items[i]);
 
             auto arrayType = llvm::ArrayType::get(itemType, values.size());
             auto globalDeclaration = (llvm::GlobalVariable*)_llvm_module->getOrInsertGlobal("", arrayType);
@@ -157,10 +148,11 @@ llvm::Value* Module::codegen(const AST::Node* node) {
             std::vector<llvm::Type*> param_types;
             if(node->children.size() > 1)
                 for(auto i = 0; i < node->children.size() - 1; ++i)
-                    param_types.push_back(llvm::Type::getInt32Ty(*_llvm_context)); // TODO
-            auto return_type = llvm::Type::getInt32Ty(*_llvm_context);             // TODO
+                    param_types.push_back(get_llvm_type( node->children[i]->value.type));
+            auto return_type = get_llvm_type(node->value.type);          
             auto function_types = llvm::FunctionType::get(return_type, param_types, false);
-            auto function = llvm::Function::Create(function_types, llvm::Function::ExternalLinkage, function_name, _llvm_module.get()); // FIXME: Review Linkage
+            auto flags = node->value.value.as_int32_t;
+            auto function = llvm::Function::Create(function_types, flags & AST::Node::FunctionFlag::Exported ? llvm::Function::ExternalLinkage : llvm::Function::PrivateLinkage, function_name, _llvm_module.get());
 
             auto* block = llvm::BasicBlock::Create(*_llvm_context, "entrypoint", function);
             _llvm_ir_builder.SetInsertPoint(block);

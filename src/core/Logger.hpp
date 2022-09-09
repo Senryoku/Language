@@ -38,13 +38,18 @@ inline void success(Args&&... args) {
 }
 
 template<typename... Args>
+inline void print_subtle(Args&&... args) {
+    fmt::print(fg(fmt::color::gray), std::forward<Args>(args)...);
+}
+
+template<typename... Args>
 inline void print(Args&&... args) {
     fmt::print(std::forward<Args>(args)...);
 }
 
 template<typename Format, typename... Args>
 inline void print(Format&& format, Args&&... args) {
-    fmt::print(fmt::runtime(format), std::forward<Args>(args)...);
+    fmt::print(fmt::runtime(format), std::forward<Args>(args)...); // TODO: Find a way to get rid of this fmt::runtime.
 }
 
 struct Indenter {

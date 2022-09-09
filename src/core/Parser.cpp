@@ -174,7 +174,7 @@ bool Parser::parse(const std::span<Tokenizer::Token>& tokens, AST::Node* curr_no
                 ++it;
                 // Assume it's a function for now
                 // TODO: Handle exported variables too.
-                if(!parse_function_declaration(tokens, it, curr_node))
+                if(!parse_function_declaration(tokens, it, curr_node, true))
                     return false;
                 _module_interface.exports.push_back(curr_node->children.back());
                 break;
@@ -526,7 +526,7 @@ bool Parser::parse_for(const std::span<Tokenizer::Token>& tokens, std::span<Toke
     return true;
 }
 
-bool Parser::parse_function_declaration(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* curr_node) {
+bool Parser::parse_function_declaration(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* curr_node, bool exported) {
     auto functionNode = curr_node->add_child(new AST::Node(AST::Node::Type::FunctionDeclaration, *it));
     ++it;
     if(it->type != Tokenizer::Token::Type::Identifier) {
@@ -535,6 +535,9 @@ bool Parser::parse_function_declaration(const std::span<Tokenizer::Token>& token
     }
     functionNode->token = *it;                                // Store the function name using its token.
     functionNode->value.type = GenericValue::Type::Undefined; // TODO: Actually compute the return type (will probably just be part of the declation.)
+    functionNode->value.value.as_int32_t = AST::Node::FunctionFlag::None;
+    if(exported || it->value == "main")
+        functionNode->value.value.as_int32_t |= AST::Node::FunctionFlag::Exported;
     ++it;
     if(it->type != Tokenizer::Token::Type::OpenParenthesis) {
         error("Expected '(' in function declaration on line {}, got {}.\n", it->line, it->value);
@@ -1039,10 +1042,8 @@ bool Parser::parse_import(const std::span<Tokenizer::Token>& tokens, std::span<T
 
     std::string module_name = std::string(it->value);
     _module_interface.dependencies.push_back(module_name);
-    auto        cached_interface_file = _cache_folder;
+    auto cached_interface_file = _cache_folder;
     cached_interface_file += ModuleInterface::get_cache_filename(_module_interface.resolve_dependency(module_name)).replace_extension(".int");
-
-    print(" * Imported Module {}\n", module_name);
 
     auto [success, new_imports] = _module_interface.import_module(cached_interface_file);
     if(!success)

@@ -10,6 +10,7 @@
 
 #include <FileWatch.hpp>
 #include <fmt/chrono.h>
+#include <fmt/color.h>
 #include <fmt/format.h>
 #include <fmt/os.h>
 
@@ -38,7 +39,7 @@ const std::filesystem::path     cache_folder("./lang_cache/");
 std::set<std::filesystem::path> input_files;
 std::set<std::filesystem::path> object_files;
 
-std::set<std::filesystem::path> processed_files;
+std::set<std::filesystem::path> processed_files; // Cleared at the start of a run, makes sure we don't end up in a loop.
 
 bool handle_file(const std::filesystem::path& path);
 
@@ -48,7 +49,7 @@ bool handle_file_dependencies(const ModuleInterface& module_interface) {
     for(const auto& dep : module_interface.dependencies) {
         auto dep_path = std::filesystem::absolute(module_interface.resolve_dependency(dep));
         // Make sure the dependencies are up-to-date.
-        if(!input_files.contains(dep_path)) {
+        if(!input_files.contains(dep_path) && !processed_files.contains(dep_path)) {
             print("Found new dependency to {} (resolved to {}).\n", dep, dep_path.string());
             if(handle_file(dep_path))
                 r = true;
@@ -68,7 +69,7 @@ bool handle_file(const std::filesystem::path& path) {
     object_files.insert(o_filepath);
     if(!args['t'].set && !args['a'].set && !args['i'].set && !args['b'].set) {
         if(!args["bypass-cache"].set && std::filesystem::exists(o_filepath) && std::filesystem::last_write_time(o_filepath) > std::filesystem::last_write_time(path)) {
-            print(" * Using cached compilation result for {}.\n", path.string());
+            print_subtle(" * Using cached compilation result for {}.\n", path.string());
             // We still need to check dependencies.
             ModuleInterface module_interface;
             module_interface.working_directory = path.parent_path();
@@ -76,7 +77,7 @@ bool handle_file(const std::filesystem::path& path) {
             if(!handle_file_dependencies(module_interface))
                 return false;
             // Some dependencies were re-generated, continue processing anyway.
-            print(" * * Cache for {} is outdated, re-process.\n", path.string());
+            print_subtle(" * * Cache for {} is outdated, re-process.\n", path.string());
         }
     }
     print("Processing {}... \n", path.string());
@@ -118,7 +119,7 @@ bool handle_file(const std::filesystem::path& path) {
     Parser     parser;
     parser.get_module_interface().working_directory = path.parent_path();
     parser.set_cache_folder(cache_folder);
-    auto ast = parser.parse(tokens);
+    auto       ast = parser.parse(tokens);
     const auto parsing_end = std::chrono::high_resolution_clock::now();
     if(handle_file_dependencies(parser.get_module_interface())) {
         // Dependencies updated, re-process from the start.
@@ -303,10 +304,8 @@ bool handle_all() {
 }
 
 int main(int argc, char* argv[]) {
-    fmt::print("┌{0:─^{2}}┐\n"
-               "│{1: ^{2}}│\n"
-               "└{0:─^{2}}┘\n",
-               "", "<insert language name> compiler.", 80);
+    info("  █░░  <insert language name> compiler\n");
+    info("  █▄▄  v0.0.1\n");
 
     args.add('o', "out", 1, 1, "Specify the output file.");
     args.add('t', "tokens", 0, 0, "Dump the state after the tokenizing stage.");

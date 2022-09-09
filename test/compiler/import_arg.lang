@@ -1,0 +1,7 @@
+// RET : 42
+
+import "include/double"
+
+function main() {
+	return double(21);
+}

@@ -24,6 +24,7 @@ class ModuleInterface {
         std::ifstream module_file(path);
         if(!module_file) {
             error("[ModuleInterface] Could not find interface file {}.\n", path.string());
+            // TODO: Throw here, so we can actually directly address the issue? (i.e. 1/ Checking if the dependency exists, 2/ Compile it)
             return {false, std::span<AST::Node*>{}};
         }
         // FIXME: File format not specified
@@ -46,12 +47,14 @@ class ModuleInterface {
             imports.push_back(func_dec_node);
             func_dec_node->value.type = GenericValue::parse_type(type);
 
-            print("     Imported {} : {}\n", name, type);
-
             while(iss >> type) {
-                print("TODO: Exported function arguments {} !\n", type);
+                auto arg = func_dec_node->add_child(new AST::Node(AST::Node::Type::VariableDeclaration));
+                arg->value.type = GenericValue::parse_type(type);
             }
         }
+
+        if(begin == imports.size())
+            warn("[ModuleInterface] Imported module {} doesn't export any symbol.\n", path.string());
 
         return {true, std::span<AST::Node*>(imports.begin() + begin, imports.end())};
     }
@@ -68,7 +71,11 @@ class ModuleInterface {
         }
         interface_file << std::endl;
         for(const auto& n : exports) {
-            interface_file << n->token.value << " " << serialize(n->value.type) << std::endl;
+            interface_file << n->token.value << " " << serialize(n->value.type);
+            for (auto i = 0u; i < n->children.size() - 1; ++i) {
+                interface_file << " " << serialize(n->children[i]->value.type);
+            }
+            interface_file << std::endl;
         }
 
         return true;

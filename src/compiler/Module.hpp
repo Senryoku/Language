@@ -69,13 +69,16 @@ class Module {
 
     // Create declarations for imported external functions/variables
     void codegen_imports(const std::vector<AST::Node*>& nodes) {
-        print("[LLVMCodegen] codegen_imports {}.\n", nodes.size());
         for (const auto& n : nodes) {
             assert(n->type == AST::Node::Type::FunctionDeclaration);
             auto                     name = n->token.value.data();
-            print("[LLVMCodegen] Importing {}.\n", name);
-            auto                     return_type = llvm::Type::getInt32Ty(*_llvm_context); // TODO
-            std::vector<llvm::Type*> func_args_types; //({llvm::Type::getInt32Ty(*_llvm_context)}); // TODO
+            auto                     return_type = get_llvm_type(n->value.type);
+            std::vector<llvm::Type*> func_args_types;
+            // These function nodes should not have bodies
+            for(const auto& c : n->children) {
+                assert(c->type == AST::Node::Type::VariableDeclaration);
+                func_args_types.push_back(get_llvm_type(c->value.type));
+            }
             llvm::FunctionType*      func_type = llvm::FunctionType::get(return_type, func_args_types, true);
             auto                     func_func = _llvm_module->getOrInsertFunction(name, func_type);
         }
@@ -110,7 +113,7 @@ class Module {
     llvm::Constant* codegen(const GenericValue& val);
     llvm::Value*    codegen(const AST::Node* node);
 
-    llvm::Type* get_llvm_type(GenericValue::Type type) {
+    llvm::Type* get_llvm_type(GenericValue::Type type)  const {
         switch(type) {
             case GenericValue::Type::Integer: return llvm::Type::getInt32Ty(*_llvm_context);
             default: error("[Module::get_llvm_type] GenericValue Type '{}' not mapped to a LLVM Type.\n", type); assert(false);

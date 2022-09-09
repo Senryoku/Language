@@ -24,7 +24,7 @@ class AST {
             ReturnStatement,
             VariableDeclaration,
             Variable,
-            FunctionDeclaration,
+            FunctionDeclaration, // First n children : Arguments, Last child: Function Body, Name stored in token, Flags in value.as_int
             FunctionCall,
             BuiltInFunctionDeclaration,
             TypeDeclaration,
@@ -36,6 +36,11 @@ class AST {
             BinaryOperator,
 
             Undefined
+        };
+
+        enum FunctionFlag : int {
+            None = 0,
+            Exported = 1 << 0,
         };
 
         enum class SubType {
