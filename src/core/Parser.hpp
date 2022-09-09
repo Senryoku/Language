@@ -113,11 +113,14 @@ class Parser : public Scoped {
         return it + 1 != tokens.end() && (it + 1)->type == type;
     }
 
+    const std::vector<std::unique_ptr<AST::Node>>& get_imports() const { return _imports; }
+
     bool write_export_interface(const std::filesystem::path&) const;
 
   private:
-    std::vector<AST::Node*>                  _exports;
+    std::vector<AST::Node*>                 _exports;
     std::vector<std::unique_ptr<AST::Node>> _imports;
+    std::vector<std::string>                _symbols;
 
     bool parse(const std::span<Tokenizer::Token>& tokens, AST::Node* curr_node);
 

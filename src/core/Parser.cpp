@@ -1035,7 +1035,8 @@ bool Parser::parse_import(const std::span<Tokenizer::Token>& tokens, std::span<T
     while(module_file >> name >> type) {
         Tokenizer::Token token;
         token.type = Tokenizer::Token::Type::Identifier;
-        token.value = name; // FIXME: This won't work.
+        _symbols.push_back(name); // Keep this string around. TODO: Replace this by a global fly string?
+        token.value = _symbols.back();
         auto funcDecNode = _imports.emplace_back(new AST::Node(AST::Node::Type::FunctionDeclaration, token)).get(); // Keep it out of the AST
         funcDecNode->value.type = GenericValue::parse_type(type);
         print("Imported {} : {}\n", name, type);

@@ -94,6 +94,7 @@ bool handle_file(const std::string& path) {
             auto                               codegen_start = std::chrono::high_resolution_clock::now();
             std::unique_ptr<llvm::LLVMContext> llvm_context(new llvm::LLVMContext());
             Module                             new_module{path, llvm_context.get()};
+            new_module.codegen_imports(parser.get_imports());
             auto                               result = new_module.codegen(*ast);
             if(!result) {
                 error("LLVM Codegen returned nullptr.\n");
