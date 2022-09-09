@@ -1,5 +1,10 @@
-import amodule
+// PASS: Hello World
+// FAIL: Fail
 
 function main() {
-	return afunction();
+	if(1244857 > 124 * 2)
+		printf("Hello World\n");
+	else
+		printf("Fail\n");
+	return 0;
 }

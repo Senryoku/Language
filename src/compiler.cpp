@@ -23,10 +23,10 @@
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/LegacyPassManager.h>
-#include <llvm/Transforms/IPO/PassManagerBuilder.h>
 #include <llvm/IR/Verifier.h>
 #include <llvm/MC/TargetRegistry.h>
 #include <llvm/Support/Host.h>
+#include <llvm/Transforms/IPO/PassManagerBuilder.h>
 
 #include <jit/LLVMJIT.hpp>
 
@@ -36,10 +36,20 @@ CLIArg args;
 
 const std::filesystem::path cache_folder("./lang_cache/");
 
+
 bool handle_file(const std::string& path) {
+    auto filename = std::filesystem::path(path).stem();
+    auto cache_filename = filename; // FIXME: Should be unique given the full path.
+    auto o_filepath = cache_folder;
+    o_filepath += cache_filename.replace_extension(".o");
+    if(!args['t'].set && !args['a'].set && !args['i'].set && !args['b'].set) {
+        // FIXME: Also check dependencies.
+        if(std::filesystem::exists(o_filepath) && std::filesystem::last_write_time(o_filepath) > std::filesystem::last_write_time(path)) {
+            print(" * Using cached compilation result for {}.\n", path);
+            return true;
+        }
+    }
     print("Processing {}... \n", path);
-    auto           filename = std::filesystem::path(path).stem();
-    auto           cache_filename = filename; // FIXME: Should be unique given the full path.
     const auto     total_start = std::chrono::high_resolution_clock::now();
     std ::ifstream input_file(path);
     if(!input_file) {
@@ -74,8 +84,8 @@ bool handle_file(const std::string& path) {
         return true;
     }
 
-    const auto   parsing_start = std::chrono::high_resolution_clock::now();
-    Parser parser;
+    const auto parsing_start = std::chrono::high_resolution_clock::now();
+    Parser     parser;
     parser.set_cache_folder(cache_folder);
     auto ast = parser.parse(tokens);
     parser.write_export_interface(cache_filename.replace_extension(".int"));
@@ -132,8 +142,6 @@ bool handle_file(const std::string& path) {
             const auto object_gen_start = std::chrono::high_resolution_clock::now();
 
             // Generate Object file
-            auto o_filepath = cache_folder;
-            o_filepath += cache_filename.replace_extension(".o");
             if(args['b'].set && args['o'].set)
                 o_filepath = args['o'].value();
 
@@ -206,36 +214,21 @@ bool handle_file(const std::string& path) {
     return false;
 }
 
-bool link() {
+bool link(std::string final_outputfile) {
     try {
-        auto        clang_start = std::chrono::high_resolution_clock::now();
-        auto        final_outputfile = args['o'].set                         ? args['o'].value()
-                                       : args.get_default_args().size() == 1 ? std::filesystem::path(args.get_default_arg()).filename().replace_extension(".exe").string()
-                                                                             : "a.out";
         std::string input_files;
         for(const auto& file : args.get_default_args()) {
             auto cached_object = cache_folder;
             cached_object += std::filesystem::path(file).filename().replace_extension(".o");
             input_files += " \"" + cached_object.string() + "\"";
         }
-        auto command = fmt::format("clang {} -flto -o \"{}\"", input_files, final_outputfile);
+        const auto command = fmt::format("clang {} -flto -o \"{}\"", input_files, final_outputfile);
         print("Running '{}'\n", command);
         if(auto retval = std::system(command.c_str()); retval != 0) {
             error("Error running clang: {}.\n", retval);
             return false;
         }
-        auto clang_end = std::chrono::high_resolution_clock::now();
-        success("Compiled successfully to {} in {:^12.2}\n", final_outputfile, std::chrono::duration<double, std::milli>(clang_end - clang_start));
 
-        // Run the generated program. FIXME: Handy, but dangerous.
-        if(args['r'].set) {
-            auto run_command = final_outputfile;
-            for(const auto& arg : args['r'].values)
-                run_command += " " + arg;
-            print("Running {}...\n", run_command);
-            auto retval = std::system(run_command.c_str());
-            print(" > {} returned {}.\n", final_outputfile, retval);
-        }
     } catch(const std::exception& e) {
         error("Exception: {}", e.what());
         return false;
@@ -244,15 +237,34 @@ bool link() {
 };
 
 bool handle_all() {
+    const auto start = std::chrono::high_resolution_clock::now();
     // FIXME: We should generate a dependency tree to
     //  1. Pull all the required dependencies if they're not explicitly passed as argmument
     //  2. Recompile only the necessary files.
-    //  3. Recompile in the correct order.
+    //  3. Recompile in the correct order. (< Most important)
     for(const auto& file : args.get_default_args()) {
         if(!handle_file(file))
             return false;
     }
-    return link();
+    const auto clang_start = std::chrono::high_resolution_clock::now();
+    auto       final_outputfile = args['o'].set                         ? args['o'].value()
+                                  : args.get_default_args().size() == 1 ? std::filesystem::path(args.get_default_arg()).filename().replace_extension(".exe").string()
+                                                                        : "a.out";
+    if(!link(final_outputfile))
+        return false;
+    const auto clang_end = std::chrono::high_resolution_clock::now();
+    const auto end = std::chrono::high_resolution_clock::now();
+    success("Compiled successfully to {} in {:.2} (clang: {:.2}).\n", final_outputfile, std::chrono::duration<double, std::milli>(end - start),
+            std::chrono::duration<double, std::milli>(clang_end - clang_start));
+    // Run the generated program. FIXME: Handy, but dangerous.
+    if(args['r'].set) {
+        auto run_command = final_outputfile;
+        for(const auto& arg : args['r'].values)
+            run_command += " " + arg;
+        print("Running {}...\n", run_command);
+        auto retval = std::system(run_command.c_str());
+        print("\n > {} returned {}.\n", final_outputfile, retval);
+    }
 }
 
 int main(int argc, char* argv[]) {

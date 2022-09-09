@@ -1,10 +1,11 @@
 // RET : 666
 // FAIL: 444
 
-int main() {
+function main() {
 	int i = 54741;
 	if(i < 1248)
 		return 666;
 	else
 		return 444;
+	return 0;
 }
