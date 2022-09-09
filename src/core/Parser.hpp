@@ -23,6 +23,8 @@ class Parser : public Scoped {
     Parser& operator=(Parser&&) = default;
     virtual ~Parser() = default;
 
+    void set_cache_folder(const std::filesystem::path& path) { _cache_folder = path; }
+
     static const uint32_t max_precedence = static_cast<uint32_t>(-1);
     // FIXME: Pre and postfix versions of --/++ should have different precedences
     inline static const std::unordered_map<Tokenizer::Token::Type, uint32_t> operator_precedence{
@@ -118,6 +120,8 @@ class Parser : public Scoped {
     bool write_export_interface(const std::filesystem::path&) const;
 
   private:
+    std::filesystem::path _cache_folder{"./lang_cache/"};
+
     std::vector<AST::Node*>                 _exports;
     std::vector<std::unique_ptr<AST::Node>> _imports;
     std::vector<std::string>                _symbols;

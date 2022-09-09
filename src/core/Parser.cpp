@@ -1021,8 +1021,10 @@ bool Parser::parse_import(const std::span<Tokenizer::Token>& tokens, std::span<T
         return false;
     }
 
-    std::string   module_name = std::string(it->value);
-    std::ifstream module_file(module_name + ".int");
+    std::string module_name = std::string(it->value);
+    auto        cached_interface_file = _cache_folder;
+    cached_interface_file += module_name + ".int";
+    std::ifstream module_file(cached_interface_file);
     if(!module_file) {
         error("[Parser] Could not find interface file for module {}.\n", module_name);
         return false;
@@ -1051,7 +1053,9 @@ bool Parser::parse_import(const std::span<Tokenizer::Token>& tokens, std::span<T
 }
 
 bool Parser::write_export_interface(const std::filesystem::path& path) const {
-    std::ofstream interface_file(path);
+    auto          cached_interface_file = _cache_folder;
+    cached_interface_file += path;
+    std::ofstream interface_file(cached_interface_file);
     if(!interface_file) {
         error("[Parser] Could not open interface file {} for writing.\n", path.string());
         return false;
