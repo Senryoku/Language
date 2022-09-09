@@ -36,6 +36,7 @@ CLIArg args;
 
 const std::filesystem::path cache_folder("./lang_cache/");
 
+// Returns true on success
 bool handle_file(const std::string& path) {
     auto filename = std::filesystem::path(path).stem();
     auto cache_filename = filename; // FIXME: Should be unique given the full path.
@@ -53,7 +54,7 @@ bool handle_file(const std::string& path) {
     std ::ifstream input_file(path);
     if(!input_file) {
         error("Couldn't open file '{}' (Running from {}).\n", path, std::filesystem::current_path().string());
-        return 1;
+        return false;
     }
     std::string source{(std::istreambuf_iterator<char>(input_file)), std::istreambuf_iterator<char>()};
 
@@ -98,7 +99,7 @@ bool handle_file(const std::string& path) {
                 std::system(fmt::format("cat \"{}\"", args['o'].value()).c_str());
             } else
                 fmt::print("{}", *ast);
-            return 0;
+            return true;
         }
 
         try {
@@ -169,7 +170,7 @@ bool handle_file(const std::string& path) {
 
             if(error_code) {
                 error("Could not open file '{}': {}.\n", o_filepath.string(), error_code.message());
-                return 1;
+                return false;
             }
 
             llvm::legacy::PassManager passManager;
@@ -213,6 +214,7 @@ bool handle_file(const std::string& path) {
     return false;
 }
 
+// Returns true on success
 bool link(std::string final_outputfile) {
     try {
         std::string input_files;
@@ -235,6 +237,7 @@ bool link(std::string final_outputfile) {
     return true;
 };
 
+// Returns true on success
 bool handle_all() {
     const auto start = std::chrono::high_resolution_clock::now();
     // FIXME: We should generate a dependency tree to
@@ -264,6 +267,7 @@ bool handle_all() {
         auto retval = std::system(run_command.c_str());
         print("\n > {} returned {}.\n", final_outputfile, retval);
     }
+    return true;
 }
 
 int main(int argc, char* argv[]) {
@@ -322,5 +326,5 @@ int main(int argc, char* argv[]) {
         while(true)
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
-    return r;
+    return r ? 0 : 1;
 }
