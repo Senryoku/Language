@@ -93,7 +93,7 @@ include(GoogleTest)
 gtest_discover_tests(tester WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/test")
 
 # Compiler tests
-
+file(MAKE_DIRECTORY "ignore")
 function(CompilerTest filename)
     file(STRINGS "${CMAKE_SOURCE_DIR}/test/compiler/${filename}.lang" EXPECTED LIMIT_COUNT 4)
     foreach(LINE EXPECTED)
@@ -110,7 +110,7 @@ function(CompilerTest filename)
             string(SUBSTRING LINE 0 9 ARGS)
         endif()
     endforeach()
-    add_test(NAME "Compiler.${filename}" WORKING_DIRECTORY ${CMAKE_SOURCE_DIR} COMMAND compiler "${CMAKE_SOURCE_DIR}/test/compiler/${filename}.lang" -r ${ARGS})
+    add_test(NAME "Compiler.${filename}" WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/ignore" COMMAND compiler "${CMAKE_SOURCE_DIR}/test/compiler/${filename}.lang" -r ${ARGS})
     if(NOT RET STREQUAL "")
         set_property(TEST "Compiler.${filename}" PROPERTY PASS_REGULAR_EXPRESSION "returned ${RET}")
     endif()
