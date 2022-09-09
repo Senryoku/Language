@@ -34,26 +34,56 @@
 
 CLIArg args;
 
-const std::filesystem::path cache_folder("./lang_cache/");
+const std::filesystem::path     cache_folder("./lang_cache/");
+std::set<std::filesystem::path> input_files;
+std::set<std::filesystem::path> object_files;
 
-// Returns true on success
-bool handle_file(const std::string& path) {
-    auto filename = std::filesystem::path(path).stem();
-    auto cache_filename = filename; // FIXME: Should be unique given the full path.
-    auto o_filepath = cache_folder;
-    o_filepath += cache_filename.replace_extension(".o");
-    if(!args['t'].set && !args['a'].set && !args['i'].set && !args['b'].set) {
-        // FIXME: Also check dependencies.
-        if(std::filesystem::exists(o_filepath) && std::filesystem::last_write_time(o_filepath) > std::filesystem::last_write_time(path)) {
-            print(" * Using cached compilation result for {}.\n", path);
-            return true;
+std::set<std::filesystem::path> processed_files;
+
+bool handle_file(const std::filesystem::path& path);
+
+// Returns true if some new files were processed
+bool handle_file_dependencies(const ModuleInterface& module_interface) {
+    bool r = false;
+    for(const auto& dep : module_interface.dependencies) {
+        auto dep_path = std::filesystem::absolute(module_interface.resolve_dependency(dep));
+        // Make sure the dependencies are up-to-date.
+        if(!input_files.contains(dep_path)) {
+            print("Found new dependency to {} (resolved to {}).\n", dep, dep_path.string());
+            if(handle_file(dep_path))
+                r = true;
         }
     }
-    print("Processing {}... \n", path);
+    return r;
+}
+
+// Returns if new file were generated.
+bool handle_file(const std::filesystem::path& path) {
+    if(processed_files.contains(path))
+        return false;
+    auto filename = path.stem();
+    auto cache_filename = ModuleInterface::get_cache_filename(path);
+    auto o_filepath = cache_folder;
+    o_filepath += cache_filename.replace_extension(".o");
+    object_files.insert(o_filepath);
+    if(!args['t'].set && !args['a'].set && !args['i'].set && !args['b'].set) {
+        if(!args["bypass-cache"].set && std::filesystem::exists(o_filepath) && std::filesystem::last_write_time(o_filepath) > std::filesystem::last_write_time(path)) {
+            print(" * Using cached compilation result for {}.\n", path.string());
+            // We still need to check dependencies.
+            ModuleInterface module_interface;
+            module_interface.working_directory = path.parent_path();
+            module_interface.import_module(o_filepath.replace_extension(".int"));
+            if(!handle_file_dependencies(module_interface))
+                return false;
+            // Some dependencies were re-generated, continue processing anyway.
+            print(" * * Cache for {} is outdated, re-process.\n", path.string());
+        }
+    }
+    print("Processing {}... \n", path.string());
     const auto     total_start = std::chrono::high_resolution_clock::now();
     std ::ifstream input_file(path);
     if(!input_file) {
-        error("Couldn't open file '{}' (Running from {}).\n", path, std::filesystem::current_path().string());
+        error("[compiler::handle_file] Couldn't open file '{}' (Running from {}).\n", path.string(), std::filesystem::current_path().string());
         return false;
     }
     std::string source{(std::istreambuf_iterator<char>(input_file)), std::istreambuf_iterator<char>()};
@@ -86,11 +116,16 @@ bool handle_file(const std::string& path) {
 
     const auto parsing_start = std::chrono::high_resolution_clock::now();
     Parser     parser;
+    parser.get_module_interface().working_directory = path.parent_path();
     parser.set_cache_folder(cache_folder);
     auto ast = parser.parse(tokens);
-    parser.write_export_interface(cache_filename.replace_extension(".int"));
     const auto parsing_end = std::chrono::high_resolution_clock::now();
+    if(handle_file_dependencies(parser.get_module_interface())) {
+        // Dependencies updated, re-process from the start.
+        return handle_file(path);
+    }
     if(ast.has_value()) {
+        parser.write_export_interface(cache_filename.replace_extension(".int"));
         if(args['a'].set) {
             if(args['o'].set && args['o'].has_value()) {
                 auto out = fmt::output_file(args['o'].value());
@@ -105,8 +140,8 @@ bool handle_file(const std::string& path) {
         try {
             const auto                         codegen_start = std::chrono::high_resolution_clock::now();
             std::unique_ptr<llvm::LLVMContext> llvm_context(new llvm::LLVMContext());
-            Module                             new_module{path, llvm_context.get()};
-            new_module.codegen_imports(parser.get_imports());
+            Module                             new_module{path.string(), llvm_context.get()};
+            new_module.codegen_imports(parser.get_module_interface().imports);
             auto result = new_module.codegen(*ast);
             if(!result) {
                 error("LLVM Codegen returned nullptr.\n");
@@ -209,21 +244,20 @@ bool handle_file(const std::string& path) {
             error("Exception: {}", e.what());
             return false;
         }
+        processed_files.insert(path);
         return true;
     }
     return false;
 }
 
 // Returns true on success
-bool link(std::string final_outputfile) {
+bool link(const std::string& final_outputfile) {
     try {
-        std::string input_files;
-        for(const auto& file : args.get_default_args()) {
-            auto cached_object = cache_folder;
-            cached_object += std::filesystem::path(file).filename().replace_extension(".o");
-            input_files += " \"" + cached_object.string() + "\"";
+        std::string cmd_input_files;
+        for(const auto& file : object_files) {
+            cmd_input_files += " \"" + file.string() + "\"";
         }
-        const auto command = fmt::format("clang {} -flto -o \"{}\"", input_files, final_outputfile);
+        const auto command = fmt::format("clang {} -flto -o \"{}\"", cmd_input_files, final_outputfile);
         print("Running '{}'\n", command);
         if(auto retval = std::system(command.c_str()); retval != 0) {
             error("Error running clang: {}.\n", retval);
@@ -239,19 +273,17 @@ bool link(std::string final_outputfile) {
 
 // Returns true on success
 bool handle_all() {
+    processed_files = {};
     const auto start = std::chrono::high_resolution_clock::now();
     // FIXME: We should generate a dependency tree to
     //  1. Pull all the required dependencies if they're not explicitly passed as argmument
     //  2. Recompile only the necessary files.
     //  3. Recompile in the correct order. (< Most important)
-    for(const auto& file : args.get_default_args()) {
-        if(!handle_file(file))
-            return false;
+    for(const auto& file : input_files) {
+        handle_file(file);
     }
     const auto clang_start = std::chrono::high_resolution_clock::now();
-    auto       final_outputfile = args['o'].set                         ? args['o'].value()
-                                  : args.get_default_args().size() == 1 ? std::filesystem::path(args.get_default_arg()).filename().replace_extension(".exe").string()
-                                                                        : "a.out";
+    auto       final_outputfile = args['o'].set ? args['o'].value() : input_files.size() == 1 ? (*input_files.begin()).filename().replace_extension(".exe").string() : "a.out";
     if(!link(final_outputfile))
         return false;
     const auto clang_end = std::chrono::high_resolution_clock::now();
@@ -284,6 +316,7 @@ int main(int argc, char* argv[]) {
     args.add('b', "object", 0, 0, "Output an object file.");
     args.add('j', "jit", 0, 0, "Run the module using JIT.");
     args.add('w', "watch", 0, 0, "Watch the supplied file and re-run on changes.");
+    args.add('n', "bypass-cache", 0, 0, "Ignore the cache generated by previous invocations.");
     args.parse(argc, argv);
 
     if(!args.has_default_args()) {
@@ -295,6 +328,9 @@ int main(int argc, char* argv[]) {
 
     if(!std::filesystem::exists(cache_folder))
         std::filesystem::create_directory(cache_folder);
+
+    for(const auto& arg : args.get_default_args())
+        input_files.insert(std::filesystem::absolute(std::filesystem::path(arg)));
 
     auto r = handle_all();
     if(args['w'].set) {
@@ -308,14 +344,16 @@ int main(int argc, char* argv[]) {
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
             r = handle_all(); // TODO: Recompile only modified files.
             last_run = std::chrono::system_clock::now();
-            success("\n[{:%T}] Watching for changes... ", std::chrono::system_clock::now(), args.get_default_arg());
+            success("\n[{:%T}] Watching for changes... ", std::chrono::system_clock::now());
             fmt::print("(CTRL+C to exit)\n\n");
         };
 
-        auto file_to_watch = args.get_default_arg();
+        auto file_to_watch = (*input_files.begin()).string();
         // Filewatch doesn't have a simple way to watch multiple files, we'll watch the parent directory for now.
-        if(args.get_default_args().size() > 1) {
-            file_to_watch = longest_common_prefix(args.get_default_args());
+        if(input_files.size() > 1) {
+            std::vector<std::string> paths;
+            std::transform(input_files.begin(), input_files.end(), std::back_inserter(paths), [](const auto& p) { return p.string(); });
+            file_to_watch = longest_common_prefix(paths);
             file_to_watch = std::filesystem::path(file_to_watch).parent_path().string();
         }
         filewatch::FileWatch<std::string> watchers(file_to_watch, rerun);

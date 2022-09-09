@@ -6,6 +6,7 @@
 #include <VariableStore.hpp>
 #include <het_unordered_map.hpp>
 
+#include <FlyString.hpp>
 #include <AST.hpp>
 
 using TypeRegistry = std::unordered_map<TypeID, const AST::Node*>;
@@ -176,8 +177,8 @@ class Scoped {
             }
             get_scope().declare_function(*s_builtins[name]);
         };
-        register_builtin("put", GenericValue::Type::Integer);
-        register_builtin("printf", GenericValue::Type::Integer);
+        register_builtin(*internalize_string("put"), GenericValue::Type::Integer);
+        register_builtin(*internalize_string("printf"), GenericValue::Type::Integer);
     }
 
     Scoped(const Scoped& o) {

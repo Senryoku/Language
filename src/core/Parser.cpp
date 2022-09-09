@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <fstream>
 
+#include <ModuleInterface.hpp>
+
 bool Parser::parse(const std::span<Tokenizer::Token>& tokens, AST::Node* curr_node) {
     curr_node = curr_node->add_child(new AST::Node(AST::Node::Type::Statement));
     auto it = tokens.begin();
@@ -174,7 +176,7 @@ bool Parser::parse(const std::span<Tokenizer::Token>& tokens, AST::Node* curr_no
                 // TODO: Handle exported variables too.
                 if(!parse_function_declaration(tokens, it, curr_node))
                     return false;
-                _exports.push_back(curr_node->children.back());
+                _module_interface.exports.push_back(curr_node->children.back());
                 break;
             }
             case Tokenizer::Token::Type::Comment: ++it; break;
@@ -1025,7 +1027,7 @@ bool Parser::parse_variable_declaration(const std::span<Tokenizer::Token>& token
     return true;
 }
 
-bool Parser::parse_import(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* curr_node) {
+bool Parser::parse_import(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node*) {
     assert(it->type == Tokenizer::Token::Type::Import);
     ++it;
 
@@ -1036,26 +1038,18 @@ bool Parser::parse_import(const std::span<Tokenizer::Token>& tokens, std::span<T
     }
 
     std::string module_name = std::string(it->value);
+    _module_interface.dependencies.push_back(module_name);
     auto        cached_interface_file = _cache_folder;
-    cached_interface_file += module_name + ".int";
-    std::ifstream module_file(cached_interface_file);
-    if(!module_file) {
-        error("[Parser] Could not find interface file for module {}.\n", module_name);
-        return false;
-    }
+    cached_interface_file += ModuleInterface::get_cache_filename(_module_interface.resolve_dependency(module_name)).replace_extension(".int");
 
     print(" * Imported Module {}\n", module_name);
 
-    // FIXME: File format not specified
-    std::string name, type;
-    while(module_file >> name >> type) {
-        Tokenizer::Token token;
-        token.type = Tokenizer::Token::Type::Identifier;
-        token.value = *internalize_string(name);
-        auto funcDecNode = _imports.emplace_back(new AST::Node(AST::Node::Type::FunctionDeclaration, token)).get(); // Keep it out of the AST
-        funcDecNode->value.type = GenericValue::parse_type(type);
-        print("     Imported {} : {}\n", name, type);
-        if(!get_root_scope().declare_function(*funcDecNode)) {
+    auto [success, new_imports] = _module_interface.import_module(cached_interface_file);
+    if(!success)
+        return false;
+
+    for(const auto& e : new_imports) {
+        if(!get_root_scope().declare_function(*e)) {
             return false;
         }
     }
@@ -1068,14 +1062,6 @@ bool Parser::parse_import(const std::span<Tokenizer::Token>& tokens, std::span<T
 bool Parser::write_export_interface(const std::filesystem::path& path) const {
     auto cached_interface_file = _cache_folder;
     cached_interface_file += path;
-    std::ofstream interface_file(cached_interface_file);
-    if(!interface_file) {
-        error("[Parser] Could not open interface file {} for writing.\n", path.string());
-        return false;
-    }
-    // FIXME: Ultra TEMP, I didn't specify a file format for the module interface.
-    for(const auto& n : _exports) {
-        interface_file << n->token.value << " " << serialize(n->value.type) << std::endl;
-    }
+    _module_interface.save(cached_interface_file);
     return true;
 }

@@ -29,10 +29,11 @@ class CLIArg {
     }
     bool parse(int argc, char* argv[]);
 
-    const ArgumentDescription& operator[](char c) { return *get_short(c); }
+    const ArgumentDescription& operator[](char c) const { return *get_short(c); }
+    const ArgumentDescription& operator[](const std::string& c) const { return *get_long(c.c_str()); }
 
-    bool has_default_args() const { return !_default_args.empty(); }
-    const std::string& get_default_arg() const { return _default_args[0]; }
+    bool                            has_default_args() const { return !_default_args.empty(); }
+    const std::string&              get_default_arg() const { return _default_args[0]; }
     const std::vector<std::string>& get_default_args() const { return _default_args; }
 
     void print_help() const {
@@ -46,9 +47,25 @@ class CLIArg {
     std::vector<std::string>         _default_args;
     std::vector<ArgumentDescription> _arguments;
 
+    const ArgumentDescription* get_long(const char* arg_name) const {
+        for(const ArgumentDescription& d : _arguments) {
+            if(d.long_name == arg_name)
+                return &d;
+        }
+        return nullptr;
+    }
+
     ArgumentDescription* get_long(const char* arg_name) {
         for(ArgumentDescription& d : _arguments) {
             if(d.long_name == arg_name)
+                return &d;
+        }
+        return nullptr;
+    }
+
+    const ArgumentDescription* get_short(const char arg_name) const {
+        for(const ArgumentDescription& d : _arguments) {
+            if(d.short_name == arg_name)
                 return &d;
         }
         return nullptr;

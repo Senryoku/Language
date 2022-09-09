@@ -1,4 +1,6 @@
-import "../compiler/include/module"
+// RET : 42
+
+import "include/module"
 
 function main() {
 	printf("  import::main()\n");

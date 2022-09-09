@@ -68,7 +68,7 @@ class Module {
     }
 
     // Create declarations for imported external functions/variables
-    void codegen_imports(const std::vector<std::unique_ptr<AST::Node>>& nodes) {
+    void codegen_imports(const std::vector<AST::Node*>& nodes) {
         print("[LLVMCodegen] codegen_imports {}.\n", nodes.size());
         for (const auto& n : nodes) {
             assert(n->type == AST::Node::Type::FunctionDeclaration);

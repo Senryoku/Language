@@ -47,7 +47,7 @@ int main(int argc, char* argv[]) {
     auto load = [&](const auto& path) {
         std::ifstream file(path);
         if(!file) {
-            error("Couldn't open file '{}' (Running from {}).\n", path, std::filesystem::current_path().string());
+            error("[repl::load] Couldn't open file '{}' (Running from {}).\n", path, std::filesystem::current_path().string());
             return;
         }
         lines.push_back(std::string((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>()));

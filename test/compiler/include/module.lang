@@ -1,0 +1,4 @@
+export function get_42() {
+	printf("  module::get_42()\n");
+	return 42;
+}

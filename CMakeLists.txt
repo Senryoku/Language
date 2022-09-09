@@ -14,6 +14,7 @@ set(Lang_VERSION_MAJOR 0)
 include_directories("${CMAKE_SOURCE_DIR}/src")
 include_directories("${CMAKE_SOURCE_DIR}/src/core")
 include_directories("${CMAKE_SOURCE_DIR}/src/utils")
+include_directories("${CMAKE_SOURCE_DIR}/src/compiler")
 
 set(CMAKE_CXX_STANDARD 20)
 
