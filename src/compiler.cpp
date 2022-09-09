@@ -23,6 +23,7 @@
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/LegacyPassManager.h>
+#include <llvm/Transforms/IPO/PassManagerBuilder.h>
 #include <llvm/IR/Verifier.h>
 #include <llvm/MC/TargetRegistry.h>
 #include <llvm/Support/Host.h>
@@ -164,26 +165,29 @@ bool handle_file(const std::string& path) {
                 return 1;
             }
 
-            llvm::legacy::PassManager pass;
+            llvm::legacy::PassManager passManager;
+            llvm::PassManagerBuilder  passManagerBuilder;
             auto                      file_type = llvm::CGFT_ObjectFile;
+            passManagerBuilder.OptLevel = 3;
+            passManagerBuilder.populateModulePassManager(passManager);
 
-            if(target_machine->addPassesToEmitFile(pass, dest, nullptr, file_type)) {
+            if(target_machine->addPassesToEmitFile(passManager, dest, nullptr, file_type)) {
                 error("Target Machine (Target Triple: {}) can't emit a file of this type.\n", target_triple);
                 return false;
             }
 
-            pass.run(new_module.get_llvm_module());
+            passManager.run(new_module.get_llvm_module());
             dest.flush();
             success("Wrote object file '{}' (Target Triple: {}).\n", o_filepath.string(), target_triple);
             if(args['b'].set)
-                return 0;
+                return true;
 
             if(args['j'].set) {
                 // Quick Test JIT (TODO: Remove?)
                 lang::LLVMJIT jit;
                 auto          return_value = jit.run(std::move(new_module.get_llvm_module_ptr()), std::move(llvm_context));
                 success("JIT main function returned '{}'\n", return_value);
-                return 0;
+                return true;
             }
             const auto object_gen_end = std::chrono::high_resolution_clock::now();
             const auto total_end = std::chrono::high_resolution_clock::now();
@@ -214,7 +218,7 @@ bool link() {
             cached_object += std::filesystem::path(file).filename().replace_extension(".o");
             input_files += " \"" + cached_object.string() + "\"";
         }
-        auto command = fmt::format("clang {} -o \"{}\"", input_files, final_outputfile);
+        auto command = fmt::format("clang {} -flto -o \"{}\"", input_files, final_outputfile);
         print("Running '{}'\n", command);
         if(auto retval = std::system(command.c_str()); retval != 0) {
             error("Error running clang: {}.\n", retval);
