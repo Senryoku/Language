@@ -91,10 +91,11 @@ bool CLIArg::parse(int argc, char* argv[]) {
                 auto a = get_long(argv[idx] + 2);
                 if(!a) {
                     warn("[CLIArg] Unknown argument '{}'.\n", argv[idx] + 2);
+                    ++idx;
                 } else {
                     a->set = true;
+                    ++idx;
                     if(a->max_values > 0) {
-                        ++idx;
                         while(idx < argc && a->values.size() < a->max_values && argv[idx][0] != '-') {
                             a->values.push_back(argv[idx]);
                             ++idx;
@@ -124,7 +125,7 @@ bool CLIArg::parse(int argc, char* argv[]) {
                     }
                     ++p;
                 }
-                idx = next_arg; // Will be unconditionnaly incremented
+                idx = next_arg;
             }
         } else {
             _default_args.push_back(argv[idx]);
