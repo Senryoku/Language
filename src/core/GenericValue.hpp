@@ -61,6 +61,7 @@ struct GenericValue {
 
     struct Composite {
         TypeID        type_id;
+        StringView    type_name;
         GenericValue* members; // FIXME? Managed by the runtime.
         size_t        member_count;
     };

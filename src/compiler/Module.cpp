@@ -53,8 +53,8 @@ llvm::Constant* Module::codegen(const GenericValue& val) {
         case GenericValue::Type::Float: return llvm::ConstantFP::get(*_llvm_context, llvm::APFloat(val.value.as_float));
         case GenericValue::Type::Integer: return llvm::ConstantInt::get(*_llvm_context, llvm::APInt(32, val.value.as_int32_t));
         case GenericValue::Type::Array: {
-            const auto& arr = val.value.as_array;
-            auto        itemType = get_llvm_type(arr.type);
+            const auto&                  arr = val.value.as_array;
+            auto                         itemType = get_llvm_type(arr.type);
             std::vector<llvm::Constant*> values(arr.capacity);
             for(unsigned int i = 0; i < arr.capacity; i++)
                 values[i] = codegen(arr.items[i]);
@@ -68,6 +68,7 @@ llvm::Constant* Module::codegen(const GenericValue& val) {
             return llvm::ConstantExpr::getBitCast(globalDeclaration, arrayType->getPointerTo());
         }
         case GenericValue::Type::String: {
+            // FIXME: Take a look at llvm::StringRef and llvm::Twine
             const auto& str = val.value.as_string;
             auto        charType = llvm::IntegerType::get(*_llvm_context, 8);
 
@@ -136,6 +137,14 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                 default: error("[LLVMCodegen] LLVM::Codegen: Cast from {} to {} not supported.", node->children[0]->value.type, node->value.type); return nullptr;
             }
         }
+        case AST::Node::Type::TypeDeclaration: {
+            std::vector<llvm::Type*> members;
+            for(const auto c : node->children)
+                members.push_back(get_llvm_type(c->value.type));
+            std::string type_name(node->token.value);
+            auto        structType = llvm::StructType::create(*_llvm_context, members, type_name);
+            break;
+        }
         case AST::Node::Type::FunctionDeclaration: {
             auto function_name = std::string{node->token.value};
             auto prev_function = _llvm_module->getFunction(function_name);
@@ -148,11 +157,12 @@ llvm::Value* Module::codegen(const AST::Node* node) {
             std::vector<llvm::Type*> param_types;
             if(node->children.size() > 1)
                 for(auto i = 0; i < node->children.size() - 1; ++i)
-                    param_types.push_back(get_llvm_type( node->children[i]->value.type));
-            auto return_type = get_llvm_type(node->value.type);          
+                    param_types.push_back(get_llvm_type(node->children[i]->value.type));
+            auto return_type = get_llvm_type(node->value.type);
             auto function_types = llvm::FunctionType::get(return_type, param_types, false);
             auto flags = node->value.value.as_int32_t;
-            auto function = llvm::Function::Create(function_types, flags & AST::Node::FunctionFlag::Exported ? llvm::Function::ExternalLinkage : llvm::Function::PrivateLinkage, function_name, _llvm_module.get());
+            auto function = llvm::Function::Create(function_types, flags & AST::Node::FunctionFlag::Exported ? llvm::Function::ExternalLinkage : llvm::Function::PrivateLinkage,
+                                                   function_name, _llvm_module.get());
 
             auto* block = llvm::BasicBlock::Create(*_llvm_context, "entrypoint", function);
             _llvm_ir_builder.SetInsertPoint(block);
@@ -188,12 +198,13 @@ llvm::Value* Module::codegen(const AST::Node* node) {
             }
             // TODO: Handle default values.
             // TODO: Handle vargs functions (variable number of parameters, like printf :^) )
-            if(function->arg_size() != node->children.size() - 1) {
+            auto function_flags = node->value.value.as_int32_t;
+            if(!(function_flags & AST::Node::FunctionFlag::Variadic) && function->arg_size() != node->children.size() - 1) {
                 error("[LLVMCodegen] Unexpected number of parameters in function call '{}' (line {}): Expected {}, got {}.\n", function_name, node->token.line,
                       function->arg_size(), node->children.size() - 1);
                 for(auto i = 1u; i < node->children.size(); ++i)
                     print("\tArgument #{}: {}", i, *node->children[i]);
-                // return nullptr; // FIXME: Disabled to 'support' vargs, should return an error
+                return nullptr;
             }
             std::vector<llvm::Value*> parameters;
             // Skip the first one, it (will) holds the function name (FIXME: No used yet, we don't support function as result of expression yet)
@@ -224,6 +235,16 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                     auto charType = llvm::IntegerType::get(*_llvm_context, 8);
                     auto stringType = llvm::PointerType::get(charType, 0);
                     ret = create_entry_block_alloca(parent_function, stringType, std::string{node->token.value});
+                    break;
+                }
+                case GenericValue::Type::Composite: {
+                    std::string type_name(node->value.value.as_composite.type_name.to_std_string_view());
+                    auto structType = llvm::StructType::getTypeByName(*_llvm_context, type_name);
+                    if (!structType) {
+                        error("[LLVMCodegen] Type {} not found.\n", type_name);
+                        return nullptr;
+                    }
+                    ret = create_entry_block_alloca(parent_function, structType, std::string{node->token.value});
                     break;
                 }
                 default: warn("LLVM Codegen: Unsupported variable type '{}'.\n", node->value.type); break;

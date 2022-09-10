@@ -551,10 +551,10 @@ bool Parser::parse_function_declaration(const std::span<Tokenizer::Token>& token
     push_scope(); // FIXME: Restrict function parameters to this scope, do better.
 
     auto cleanup_on_error = [&]() {
-        delete curr_node->pop_child();
         pop_scope();
         // Cleanup the declared function.
         get_scope().remove_function(*functionNode);
+        delete curr_node->pop_child();
     };
 
     ++it;
@@ -815,6 +815,7 @@ bool Parser::parse_operator(const std::span<Tokenizer::Token>& tokens, std::span
             return false;
         }
         call_node->value.type = function->value.type;
+        call_node->value.value.as_int32_t = function->value.value.as_int32_t; // Copy FunctionFlags
 
         ++it;
         // Parse arguments
@@ -963,6 +964,7 @@ bool Parser::parse_variable_declaration(const std::span<Tokenizer::Token>& token
     if(varDecNode->value.type == GenericValue::Type::Undefined) {
         varDecNode->value.type = GenericValue::Type::Composite;
         varDecNode->value.value.as_composite.type_id = get_type(it->value).id;
+        varDecNode->value.value.as_composite.type_name = it->value;
     }
 
     if(is_const)

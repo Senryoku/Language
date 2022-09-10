@@ -41,6 +41,7 @@ class AST {
         enum FunctionFlag : int {
             None = 0,
             Exported = 1 << 0,
+            Variadic = 1 << 1,
         };
 
         enum class SubType {

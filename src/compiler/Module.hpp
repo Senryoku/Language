@@ -116,6 +116,7 @@ class Module {
     llvm::Type* get_llvm_type(GenericValue::Type type)  const {
         switch(type) {
             case GenericValue::Type::Integer: return llvm::Type::getInt32Ty(*_llvm_context);
+            case GenericValue::Type::Float: return llvm::Type::getFloatTy(*_llvm_context);
             default: error("[Module::get_llvm_type] GenericValue Type '{}' not mapped to a LLVM Type.\n", type); assert(false);
         }
         return nullptr;
