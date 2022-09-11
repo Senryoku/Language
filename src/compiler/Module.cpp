@@ -212,6 +212,9 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                 auto v = codegen(node->children[i]);
                 if(!v)
                     return nullptr;
+                // Variadic functions promotes float to double (see https://stackoverflow.com/questions/63144506/printf-doesnt-work-for-floats-in-llvm-ir)
+                if (function_flags & AST::Node::FunctionFlag::Variadic && v->getType()->isFloatTy())
+                    v = _llvm_ir_builder.CreateFPExt(v, llvm::Type::getDoubleTy(* _llvm_context));
                 parameters.push_back(v);
             }
             return _llvm_ir_builder.CreateCall(function, parameters, function_name);
