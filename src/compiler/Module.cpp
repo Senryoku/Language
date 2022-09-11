@@ -128,11 +128,11 @@ llvm::Value* Module::codegen(const AST::Node* node) {
             switch(node->value.type) {
                 case GenericValue::Type::Float: {
                     assert(node->children[0]->value.type == GenericValue::Type::Integer); // TEMP
-                    return _llvm_ir_builder.CreateSIToFP(child, llvm::Type::getFloatTy(*_llvm_context), "conv");
+                    return _llvm_ir_builder.CreateSIToFP(child, llvm::Type::getFloatTy(*_llvm_context), "castSIToFP");
                 }
                 case GenericValue::Type::Integer: {
                     assert(node->children[0]->value.type == GenericValue::Type::Float); // TEMP
-                    return _llvm_ir_builder.CreateFPToSI(child, llvm::Type::getInt32Ty(*_llvm_context), "conv");
+                    return _llvm_ir_builder.CreateFPToSI(child, llvm::Type::getInt32Ty(*_llvm_context), "castFPToSI");
                 }
                 default: error("[LLVMCodegen] LLVM::Codegen: Cast from {} to {} not supported.", node->children[0]->value.type, node->value.type); return nullptr;
             }
@@ -337,14 +337,6 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                                                       "ArrayGEP"); // FIXME: I don't know.
                 }
                 case Tokenizer::Token::Type::Assignment: {
-                    if(node->children[0]->type == AST::Node::Type::Variable) {
-                        // FIXME: Define rules for automatic conversion and implement them. (But not here?)
-                        std::string              rhs_type_str, lhs_type_str;
-                        llvm::raw_string_ostream rhs_type_rso(rhs_type_str), lhs_type_rso(lhs_type_str);
-                        rhs->getType()->print(rhs_type_rso);
-                        lhs->getType()->print(lhs_type_rso);
-                        error("LLVM::Codegen: No automatic conversion from {} to {} .\n", rhs_type_rso.str(), lhs_type_rso.str());
-                    }
                     _llvm_ir_builder.CreateStore(rhs, lhs);
                     return lhs;
                 }

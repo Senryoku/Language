@@ -135,7 +135,7 @@ bool handle_file(const std::filesystem::path& path) {
                 std::system(fmt::format("cat \"{}\"", args['o'].value()).c_str());
             } else
                 fmt::print("{}", *ast);
-            return true;
+            return false;
         }
 
         try {
@@ -281,7 +281,8 @@ bool handle_all() {
     //  2. Recompile only the necessary files.
     //  3. Recompile in the correct order. (< Most important)
     for(const auto& file : input_files) {
-        handle_file(file);
+        if(!handle_file(file))
+            return false;
     }
     const auto clang_start = std::chrono::high_resolution_clock::now();
     auto       final_outputfile = args['o'].set ? args['o'].value() : input_files.size() == 1 ? (*input_files.begin()).filename().replace_extension(".exe").string() : "a.out";

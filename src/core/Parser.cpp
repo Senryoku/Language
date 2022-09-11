@@ -72,11 +72,13 @@ bool Parser::parse(const std::span<Tokenizer::Token>& tokens, AST::Node* curr_no
                 break;
             case Tokenizer::Token::Type::Return: {
                 auto returnNode = curr_node->add_child(new AST::Node(AST::Node::Type::ReturnStatement, *it));
+                auto to_rvalue = returnNode->add_child(new AST::Node(AST::Node::Type::LValueToRValue));
                 ++it;
-                if(!parse_next_expression(tokens, it, returnNode)) {
+                if(!parse_next_expression(tokens, it, to_rvalue)) {
                     delete curr_node->pop_child();
                     return false;
                 }
+                to_rvalue->value.type = to_rvalue->children[0]->value.type;
                 returnNode->value.type = returnNode->children[0]->value.type;
                 auto scope_return_type = get_scope().get_return_type();
                 if(scope_return_type == GenericValue::Type::Undefined) {
@@ -912,6 +914,32 @@ bool Parser::parse_operator(const std::span<Tokenizer::Token>& tokens, std::span
 
     // TODO: Test if types are compatible (with the operator and between each other)
 
+    if(operator_type == Tokenizer::Token::Type::Assignment) {
+        // Assignment: if variable is const and value is constexpr, mark the variable as constexpr.
+        // FIXME: Workaround to allow more constant propagation. Should be done in a later stage.
+        binary_operator_node->children[1] = AST::optimize(binary_operator_node->children[1]);
+        if(binary_operator_node->children[0]->type == AST::Node::Type::Variable && binary_operator_node->children[0]->subtype == AST::Node::SubType::Const &&
+           binary_operator_node->children[1]->type == AST::Node::Type::ConstantValue) {
+            auto maybe_variable = get(binary_operator_node->children[0]->token.value);
+            assert(maybe_variable);
+            *maybe_variable = binary_operator_node->children[1]->value;
+            maybe_variable->flags = maybe_variable->flags | GenericValue::Flags::CompileConst;
+        }
+    }
+
+    // Convert l-values to r-values when necessary (will generate a Load on the LLVM backend)
+    // Left side of Assignement and MemberAcces should always be a l-value.
+    if(operator_type != Tokenizer::Token::Type::Assignment && operator_type != Tokenizer::Token::Type::MemberAccess) {
+        if(binary_operator_node->children[0]->type != AST::Node::Type::MemberIdentifier && binary_operator_node->children[0]->type != AST::Node::Type::ConstantValue) {
+            auto ltor = binary_operator_node->insert_between(0, new AST::Node(AST::Node::Type::LValueToRValue));
+            ltor->value.type = ltor->children.front()->value.type; // Propagate type
+        }
+    }
+    if(binary_operator_node->children[1]->type != AST::Node::Type::MemberIdentifier && binary_operator_node->children[1]->type != AST::Node::Type::ConstantValue) {
+        auto ltor = binary_operator_node->insert_between(1, new AST::Node(AST::Node::Type::LValueToRValue));
+        ltor->value.type = ltor->children.front()->value.type;
+    }
+
     resolve_operator_type(binary_operator_node);
     // Implicit casts
     auto create_cast_node = [&](int index, GenericValue::Type type) {
@@ -940,32 +968,6 @@ bool Parser::parse_operator(const std::span<Tokenizer::Token>& tokens, std::span
             create_cast_node(0, GenericValue::Type::Integer);
         if(binary_operator_node->children[1]->value.type == GenericValue::Type::Float)
             create_cast_node(1, GenericValue::Type::Integer);
-    }
-
-    if(operator_type == Tokenizer::Token::Type::Assignment) {
-        // Assignment: if variable is const and value is constexpr, mark the variable as constexpr.
-        // FIXME: Workaround to allow more constant propagation. Should be done in a later stage.
-        binary_operator_node->children[1] = AST::optimize(binary_operator_node->children[1]);
-        if(binary_operator_node->children[0]->type == AST::Node::Type::Variable && binary_operator_node->children[0]->subtype == AST::Node::SubType::Const &&
-           binary_operator_node->children[1]->type == AST::Node::Type::ConstantValue) {
-            auto maybe_variable = get(binary_operator_node->children[0]->token.value);
-            assert(maybe_variable);
-            *maybe_variable = binary_operator_node->children[1]->value;
-            maybe_variable->flags = maybe_variable->flags | GenericValue::Flags::CompileConst;
-        }
-    }
-
-    // Convert l-values to r-values when necessary (will generate a Load on the LLVM backend)
-    // Left side of Assignement and MemberAcces should always be a l-value.
-    if(operator_type != Tokenizer::Token::Type::Assignment && operator_type != Tokenizer::Token::Type::MemberAccess) {
-        if(binary_operator_node->children[0]->type != AST::Node::Type::MemberIdentifier && binary_operator_node->children[0]->type != AST::Node::Type::ConstantValue) {
-            auto ltor = binary_operator_node->insert_between(0, new AST::Node(AST::Node::Type::LValueToRValue));
-            ltor->value.type = ltor->children.front()->value.type; // Propagate type
-        }
-    }
-    if(binary_operator_node->children[1]->type != AST::Node::Type::MemberIdentifier && binary_operator_node->children[1]->type != AST::Node::Type::ConstantValue) {
-        auto ltor = binary_operator_node->insert_between(1, new AST::Node(AST::Node::Type::LValueToRValue));
-        ltor->value.type = ltor->children.front()->value.type;
     }
 
     return true;
