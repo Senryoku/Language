@@ -820,10 +820,12 @@ bool Parser::parse_operator(const std::span<Tokenizer::Token>& tokens, std::span
         ++it;
         // Parse arguments
         while(it != tokens.end() && it->type != Tokenizer::Token::Type::CloseParenthesis) {
-            if(!parse_next_expression(tokens, it, call_node)) {
+            auto to_rvalue = call_node->add_child(new AST::Node(AST::Node::Type::LValueToRValue, function_node->token));
+            if(!parse_next_expression(tokens, it, to_rvalue)) {
                 delete curr_node->pop_child();
                 return false;
             }
+            to_rvalue->value.type = to_rvalue->children[0]->value.type;
             // Skip ","
             if(it != tokens.end() && it->type == Tokenizer::Token::Type::Comma)
                 ++it;
@@ -882,19 +884,23 @@ bool Parser::parse_operator(const std::span<Tokenizer::Token>& tokens, std::span
         const auto       identifier_name = it->value;
         const auto       type = get_type(prev_expr->value.value.as_composite.type_id);
         bool             member_exists = false;
+        int32_t          member_index = 0;
         const AST::Node* member_node = nullptr;
-        for(const auto& c : type->children)
+        for(const auto& c : type->children) {
             if(c->token.value == identifier_name) {
                 member_exists = true;
                 member_node = c;
                 break;
             }
+            ++member_index;
+        }
         if(!member_exists) {
             error("[Parser] Syntax error: Member '{}' does not exists on type {}.\n", identifier_name, type->token.value);
             delete curr_node->pop_child();
             return false;
         }
-        binary_operator_node->add_child(new AST::Node(AST::Node::Type::MemberIdentifier, *it));
+        auto member_identifier_node = binary_operator_node->add_child(new AST::Node(AST::Node::Type::MemberIdentifier, *it));
+        member_identifier_node->value.value.as_int32_t = member_index;
         ++it;
     } else {
         // Lookahead for rhs
@@ -905,19 +911,6 @@ bool Parser::parse_operator(const std::span<Tokenizer::Token>& tokens, std::span
     }
 
     // TODO: Test if types are compatible (with the operator and between each other)
-
-    // Assignment: if variable is const and value is constexpr, mark the variable as constexpr.
-    if(operator_type == Tokenizer::Token::Type::Assignment) {
-        // FIXME: Workaround to allow more constant propagation. Should be done in a later stage.
-        binary_operator_node->children[1] = AST::optimize(binary_operator_node->children[1]);
-        if(binary_operator_node->children[0]->type == AST::Node::Type::Variable && binary_operator_node->children[0]->subtype == AST::Node::SubType::Const &&
-           binary_operator_node->children[1]->type == AST::Node::Type::ConstantValue) {
-            auto maybe_variable = get(binary_operator_node->children[0]->token.value);
-            assert(maybe_variable);
-            *maybe_variable = binary_operator_node->children[1]->value;
-            maybe_variable->flags = maybe_variable->flags | GenericValue::Flags::CompileConst;
-        }
-    }
 
     resolve_operator_type(binary_operator_node);
     // Implicit casts
@@ -947,6 +940,32 @@ bool Parser::parse_operator(const std::span<Tokenizer::Token>& tokens, std::span
             create_cast_node(0, GenericValue::Type::Integer);
         if(binary_operator_node->children[1]->value.type == GenericValue::Type::Float)
             create_cast_node(1, GenericValue::Type::Integer);
+    }
+
+    if(operator_type == Tokenizer::Token::Type::Assignment) {
+        // Assignment: if variable is const and value is constexpr, mark the variable as constexpr.
+        // FIXME: Workaround to allow more constant propagation. Should be done in a later stage.
+        binary_operator_node->children[1] = AST::optimize(binary_operator_node->children[1]);
+        if(binary_operator_node->children[0]->type == AST::Node::Type::Variable && binary_operator_node->children[0]->subtype == AST::Node::SubType::Const &&
+           binary_operator_node->children[1]->type == AST::Node::Type::ConstantValue) {
+            auto maybe_variable = get(binary_operator_node->children[0]->token.value);
+            assert(maybe_variable);
+            *maybe_variable = binary_operator_node->children[1]->value;
+            maybe_variable->flags = maybe_variable->flags | GenericValue::Flags::CompileConst;
+        }
+    }
+
+    // Convert l-values to r-values when necessary (will generate a Load on the LLVM backend)
+    // Left side of Assignement and MemberAcces should always be a l-value.
+    if(operator_type != Tokenizer::Token::Type::Assignment && operator_type != Tokenizer::Token::Type::MemberAccess) {
+        if(binary_operator_node->children[0]->type != AST::Node::Type::MemberIdentifier && binary_operator_node->children[0]->type != AST::Node::Type::ConstantValue) {
+            auto ltor = binary_operator_node->insert_between(0, new AST::Node(AST::Node::Type::LValueToRValue));
+            ltor->value.type = ltor->children.front()->value.type; // Propagate type
+        }
+    }
+    if(binary_operator_node->children[1]->type != AST::Node::Type::MemberIdentifier && binary_operator_node->children[1]->type != AST::Node::Type::ConstantValue) {
+        auto ltor = binary_operator_node->insert_between(1, new AST::Node(AST::Node::Type::LValueToRValue));
+        ltor->value.type = ltor->children.front()->value.type;
     }
 
     return true;

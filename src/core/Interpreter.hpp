@@ -72,6 +72,7 @@ class Interpreter : public Scoped {
                         break;
                 }
                 break;
+            case LValueToRValue: _return_value = execute(*node.children[0]); break;
             case Scope: {
                 push_scope();
                 for(const auto& child : node.children) {
@@ -288,11 +289,12 @@ class Interpreter : public Scoped {
                     }
                 } else if(node.token.type == Tokenizer::Token::Type::MemberAccess) {
                     assert(lhs.type == GenericValue::Type::Reference);
-                    auto variable = lhs.value.as_reference.value;
-                    assert(node.children[1]->type == AST::Node::Type::MemberIdentifier);
+                    const auto variable = lhs.value.as_reference.value;
+                    const auto member_identifer = node.children[1];
+                    assert(member_identifer->type == AST::Node::Type::MemberIdentifier);
                     assert(variable->type == GenericValue::Type::Composite);
-                    auto        lhs_type = get_type(variable->value.as_composite.type_id);
-                    const auto& member_name = node.children[1]->token.value;
+                    const auto        lhs_type = get_type(variable->value.as_composite.type_id);
+                    const auto& member_name = member_identifer->token.value;
                     for(auto idx = 0u; idx < lhs_type->children.size(); ++idx)
                         if(lhs_type->children[idx]->token.value == member_name) {
                             _return_value.type = GenericValue::Type::Reference;

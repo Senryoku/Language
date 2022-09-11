@@ -239,18 +239,18 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                 }
                 case GenericValue::Type::Composite: {
                     std::string type_name(node->value.value.as_composite.type_name.to_std_string_view());
-                    auto structType = llvm::StructType::getTypeByName(*_llvm_context, type_name);
-                    if (!structType) {
+                    auto        structType = llvm::StructType::getTypeByName(*_llvm_context, type_name);
+                    if(!structType) {
                         error("[LLVMCodegen] Type {} not found.\n", type_name);
                         return nullptr;
                     }
                     ret = create_entry_block_alloca(parent_function, structType, std::string{node->token.value});
                     break;
                 }
-                default: warn("LLVM Codegen: Unsupported variable type '{}'.\n", node->value.type); break;
+                default: warn("[LLVMCodegen] Unsupported variable type '{}'.\n", node->value.type); break;
             }
             if(!set(node->token.value, ret)) {
-                error("Variable '{}' already declared (line {}).\n", node->token.value, node->token.line);
+                error("[LLVMCodegen] Variable '{}' already declared (line {}).\n", node->token.value, node->token.line);
                 return nullptr;
             }
             return ret;
@@ -258,10 +258,24 @@ llvm::Value* Module::codegen(const AST::Node* node) {
         case AST::Node::Type::Variable: {
             auto var = get(node->token.value);
             if(!var) {
-                error("LLVM Codegen: Undeclared variable '{}'.\n", node->token.value);
+                error("[LLVMCodegen] Undeclared variable '{}'.\n", node->token.value);
                 return nullptr;
             }
-            return _llvm_ir_builder.CreateLoad(var->getAllocatedType(), var, node->token.value.data());
+            return var;
+        }
+        case AST::Node::Type::LValueToRValue: {
+            assert(node->children.size() == 1);
+            auto child = node->children[0];
+            auto value = codegen(child);
+            if(child->type == AST::Node::Type::Variable) {
+                auto allocaInst = static_cast<llvm::AllocaInst*>(value);
+                return _llvm_ir_builder.CreateLoad(allocaInst->getAllocatedType(), allocaInst, "l-to-rvalue");
+            }
+            if(child->type == AST::Node::Type::BinaryOperator && child->token.type == Tokenizer::Token::Type::MemberAccess) {
+                assert(value->getType()->isPointerTy());
+                return _llvm_ir_builder.CreateLoad(get_llvm_type(node->value.type), value, "l-to-rvalue");
+            }
+            return value;
         }
         case AST::Node::Type::UnaryOperator: {
             auto val = codegen(node->children[0]);
@@ -282,6 +296,9 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                     return unary_ops[node->token.type][node->children[0]->value.type](_llvm_ir_builder, val);
                 }
             }
+        }
+        case AST::Node::Type::MemberIdentifier: {
+            return llvm::ConstantInt::get(*_llvm_context, llvm::APInt(32, node->value.value.as_int32_t)); // Returns member index
         }
         case AST::Node::Type::BinaryOperator: {
             auto lhs = codegen(node->children[0]);
@@ -316,27 +333,26 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                     assert(node->children[0]->type == AST::Node::Type::Variable);
                     assert(node->children[0]->value.type == GenericValue::Type::Array);
                     auto element_type = node->children[0]->value.value.as_array.type;
-                    return _llvm_ir_builder.CreateGEP(get_llvm_type(element_type), lhs, {0, rhs}, "ArrayGEP"); // FIXME: I don't know.
+                    return _llvm_ir_builder.CreateGEP(get_llvm_type(element_type), lhs, {llvm::ConstantInt::get(*_llvm_context, llvm::APInt(32, 0)), rhs},
+                                                      "ArrayGEP"); // FIXME: I don't know.
                 }
                 case Tokenizer::Token::Type::Assignment: {
-                    assert(node->children[0]->type == AST::Node::Type::Variable); // FIXME
-                    auto variable = get(node->children[0]->token.value);
-                    if(!variable) {
-                        error("LLVM Codegen: Undeclared variable '{}'.\n", node->children[0]->token.value);
-                        return nullptr;
-                    }
-                    // FIXME: Define rules for automatic conversion and implement them. (But not here?)
-                    if(variable->getAllocatedType() != rhs->getType()) {
+                    if(node->children[0]->type == AST::Node::Type::Variable) {
+                        // FIXME: Define rules for automatic conversion and implement them. (But not here?)
                         std::string              rhs_type_str, lhs_type_str;
                         llvm::raw_string_ostream rhs_type_rso(rhs_type_str), lhs_type_rso(lhs_type_str);
                         rhs->getType()->print(rhs_type_rso);
-                        variable->getAllocatedType()->print(lhs_type_rso);
+                        lhs->getType()->print(lhs_type_rso);
                         error("LLVM::Codegen: No automatic conversion from {} to {} .\n", rhs_type_rso.str(), lhs_type_rso.str());
                     }
-                    _llvm_ir_builder.CreateStore(rhs, variable);
-                    return variable;
+                    _llvm_ir_builder.CreateStore(rhs, lhs);
+                    return lhs;
                 }
-                default: warn("LLVM Codegen: Unimplemented Binary Operator '{}'.\n", node->token.value); break;
+                case Tokenizer::Token::Type::MemberAccess: {
+                    auto allocaInst = static_cast<llvm::AllocaInst*>(lhs);
+                    return _llvm_ir_builder.CreateGEP(allocaInst->getAllocatedType(), lhs, {llvm::ConstantInt::get(*_llvm_context, llvm::APInt(32, 0)), rhs}, "memberptr");
+                }
+                default: warn("[LLVMCodegen] Unimplemented Binary Operator '{}'.\n", node->token.value); break;
             }
             break;
         }

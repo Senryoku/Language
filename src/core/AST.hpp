@@ -30,7 +30,7 @@ class AST {
             TypeDeclaration,
             MemberIdentifier,
             Cast,
-            // BuiltInFunctionCall,
+            LValueToRValue,
             ConstantValue,
             UnaryOperator,
             BinaryOperator,
@@ -87,6 +87,15 @@ class AST {
             children.pop_back();
             c->parent = nullptr;
             return c;
+        }
+
+        // Insert a node between this and its nth child
+        Node* insert_between(size_t n, Node* node) {
+            assert(node->children.size() == 0);
+            children[n]->parent = nullptr;
+            node->add_child(children[n]);
+            children[n] = node;
+            return node;
         }
 
         ~Node() {
@@ -220,6 +229,7 @@ struct fmt::formatter<AST::Node::Type> {
             case AST::Node::Type::MemberIdentifier: return fmt::format_to(ctx.out(), fg(fmt::color::light_yellow), "{}", "MemberIdentifier");
             case AST::Node::Type::Variable: return fmt::format_to(ctx.out(), fg(fmt::color::light_blue), "{}", "Variable");
             case AST::Node::Type::Cast: return fmt::format_to(ctx.out(), "{}", "Cast");
+            case AST::Node::Type::LValueToRValue: return fmt::format_to(ctx.out(), "{}", "LValueToRValueCast");
             case AST::Node::Type::ConstantValue: return fmt::format_to(ctx.out(), "{}", "ConstantValue");
             case AST::Node::Type::UnaryOperator: return fmt::format_to(ctx.out(), "{}", "UnaryOperator");
             case AST::Node::Type::BinaryOperator: return fmt::format_to(ctx.out(), "{}", "BinaryOperator");

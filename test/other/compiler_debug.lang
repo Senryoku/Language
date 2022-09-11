@@ -8,5 +8,5 @@ function main() {
 	value.i = 1234;
 	value.f = 666.0;
 	printf("  i:%d, f:%f\n", value.i, value.f);
-	return value.f;
+	return 0;
 }
