@@ -10,10 +10,11 @@
 
 #include <AST.hpp>
 #include <Logger.hpp>
+#include <ModuleInterface.hpp>
 #include <Scope.hpp>
+#include <Source.hpp>
 #include <Tokenizer.hpp>
 #include <VariableStore.hpp>
-#include <ModuleInterface.hpp>
 
 class Parser : public Scoped {
   public:
@@ -24,6 +25,7 @@ class Parser : public Scoped {
     Parser& operator=(Parser&&) = default;
     virtual ~Parser() = default;
 
+    void set_source(const std::string& src) { _source = &src; }
     void set_cache_folder(const std::filesystem::path& path) { _cache_folder = path; }
 
     static const uint32_t max_precedence = static_cast<uint32_t>(-1);
@@ -83,14 +85,18 @@ class Parser : public Scoped {
 
     std::optional<AST> parse(const std::span<Tokenizer::Token>& tokens, bool optimize = true) {
         std::optional<AST> ast(AST{});
-        bool               r = parse(tokens, &(*ast).getRoot());
-        if(!r) {
-            error("Error while parsing!\n");
+        try {
+            bool r = parse(tokens, &(*ast).getRoot());
+            if(!r) {
+                error("Error while parsing!\n");
+                ast.reset();
+            } else if(optimize) {
+                ast->optimize();
+            }
+        } catch(const Exception& e) {
+            e.display();
             ast.reset();
-        } else if(optimize) {
-            ast->optimize();
         }
-
         return ast;
     }
 
@@ -116,12 +122,12 @@ class Parser : public Scoped {
         return it + 1 != tokens.end() && (it + 1)->type == type;
     }
 
-
-    const ModuleInterface& get_module_interface() const { return _module_interface;  }
-    ModuleInterface& get_module_interface() { return _module_interface;  }
-    bool write_export_interface(const std::filesystem::path&) const;
+    const ModuleInterface& get_module_interface() const { return _module_interface; }
+    ModuleInterface&       get_module_interface() { return _module_interface; }
+    bool                   write_export_interface(const std::filesystem::path&) const;
 
   private:
+    const std::string*    _source = nullptr;
     std::filesystem::path _cache_folder{"./lang_cache/"};
 
     ModuleInterface _module_interface;
@@ -136,7 +142,9 @@ class Parser : public Scoped {
     bool parse_scope_or_single_statement(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* curr_node);
     bool parse_while(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* curr_node);
     bool parse_for(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* curr_node);
+    bool parse_method_declaration(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* curr_node);
     bool parse_function_declaration(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* curr_node, bool exported = false);
+    bool parse_function_arguments(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* curr_node);
     bool parse_type_declaration(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* curr_node);
     bool parse_boolean(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* curr_node);
     bool parse_digits(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* curr_node);
@@ -146,4 +154,15 @@ class Parser : public Scoped {
     bool parse_operator(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* curr_node);
     bool parse_import(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* curr_node);
     bool parse_variable_declaration(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* curr_node, bool is_const = false);
+
+    void skip(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, Tokenizer::Token::Type token_type) {
+        if(it != tokens.end() && it->type == token_type)
+            ++it;
+    }
+
+    std::string point_error(size_t at, size_t line, size_t from = (std::numeric_limits<size_t>::max)(), size_t to = (std::numeric_limits<size_t>::max)()) {
+        if(_source)
+            return ::point_error(*_source, at, line, from, to);
+        return "";
+    }
 };

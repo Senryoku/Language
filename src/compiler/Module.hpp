@@ -69,7 +69,7 @@ class Module {
 
     // Create declarations for imported external functions/variables
     void codegen_imports(const std::vector<AST::Node*>& nodes) {
-        for (const auto& n : nodes) {
+        for(const auto& n : nodes) {
             assert(n->type == AST::Node::Type::FunctionDeclaration);
             auto                     name = n->token.value.data();
             auto                     return_type = get_llvm_type(n->value.type);
@@ -79,8 +79,8 @@ class Module {
                 assert(c->type == AST::Node::Type::VariableDeclaration);
                 func_args_types.push_back(get_llvm_type(c->value.type));
             }
-            llvm::FunctionType*      func_type = llvm::FunctionType::get(return_type, func_args_types, true);
-            auto                     func_func = _llvm_module->getOrInsertFunction(name, func_type);
+            llvm::FunctionType* func_type = llvm::FunctionType::get(return_type, func_args_types, true);
+            auto                func_func = _llvm_module->getOrInsertFunction(name, func_type);
         }
     }
 
@@ -113,11 +113,22 @@ class Module {
     llvm::Constant* codegen(const GenericValue& val);
     llvm::Value*    codegen(const AST::Node* node);
 
-    llvm::Type* get_llvm_type(GenericValue::Type type)  const {
+    llvm::Type* get_llvm_type(GenericValue::Type type) const {
         switch(type) {
             case GenericValue::Type::Integer: return llvm::Type::getInt32Ty(*_llvm_context);
             case GenericValue::Type::Float: return llvm::Type::getFloatTy(*_llvm_context);
             default: error("[Module::get_llvm_type] GenericValue Type '{}' not mapped to a LLVM Type.\n", type); assert(false);
+        }
+        return nullptr;
+    }
+
+    llvm::Type* get_llvm_type(const AST::Node* node) const {
+        switch(node->value.type) {
+            case GenericValue::Type::Composite: {
+                std::string type_name(node->value.value.as_composite.type_name.to_std_string_view()); // FIXME
+                return llvm::StructType::getTypeByName(*_llvm_context, type_name);
+            }
+            default: return get_llvm_type(node->value.type);
         }
         return nullptr;
     }

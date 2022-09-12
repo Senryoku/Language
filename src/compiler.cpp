@@ -118,6 +118,7 @@ bool handle_file(const std::filesystem::path& path) {
     const auto parsing_start = std::chrono::high_resolution_clock::now();
     Parser     parser;
     parser.get_module_interface().working_directory = path.parent_path();
+    parser.set_source(source);
     parser.set_cache_folder(cache_folder);
     auto       ast = parser.parse(tokens);
     const auto parsing_end = std::chrono::high_resolution_clock::now();

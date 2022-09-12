@@ -3,11 +3,11 @@
 #include <array>
 #include <cassert>
 #include <het_unordered_map.hpp>
-#include <limits>
 #include <stdexcept>
 #include <string>
 #include <string_view>
 
+#include <Source.hpp>
 #include <Logger.hpp>
 
 // FIXME: Move, specialize
@@ -124,7 +124,9 @@ class Tokenizer {
     Token search_next();
 
     // Display a hint to the origin of an error.
-    std::string point_error(size_t at, size_t line, size_t from = (std::numeric_limits<size_t>::max)(), size_t to = (std::numeric_limits<size_t>::max)()) const noexcept;
+    std::string point_error(size_t at, size_t line, size_t from = (std::numeric_limits<size_t>::max)(), size_t to = (std::numeric_limits<size_t>::max)()) const noexcept {
+        return ::point_error(_source, at, line, from, to);
+    }
 
     static constexpr std::string_view control_chars = ";{}";
     static constexpr std::string_view operators_chars = ".=*/+-^!<>&|%()[]";

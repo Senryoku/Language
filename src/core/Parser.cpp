@@ -22,7 +22,8 @@ bool Parser::parse(const std::span<Tokenizer::Token>& tokens, AST::Node* curr_no
                 while(curr_node->type != AST::Node::Type::Scope && curr_node->parent != nullptr)
                     curr_node = curr_node->parent;
                 if(curr_node->type != AST::Node::Type::Scope) {
-                    error("[Parser] Syntax error: Unmatched '}' one line {}.\n", it->line);
+                    throw Exception(fmt::format("[Parser] Syntax error: Unmatched '}}' on line {}.\n", it->line),
+                                    point_error(it->column, it->line));
                     return false;
                 }
                 curr_node->value.type = get_scope().get_return_type();
@@ -528,6 +529,10 @@ bool Parser::parse_for(const std::span<Tokenizer::Token>& tokens, std::span<Toke
     return true;
 }
 
+bool Parser::parse_method_declaration(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* curr_node) {
+    return parse_function_declaration(tokens, it, curr_node);
+}
+
 bool Parser::parse_function_declaration(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* curr_node, bool exported) {
     auto functionNode = curr_node->add_child(new AST::Node(AST::Node::Type::FunctionDeclaration, *it));
     ++it;
@@ -634,7 +639,7 @@ bool Parser::parse_type_declaration(const std::span<Tokenizer::Token>& tokens, s
     }
 
     ++it;
-    if(!(it->type == Tokenizer::Token::Type::OpenScope)) {
+    if(it->type != Tokenizer::Token::Type::OpenScope) {
         error("Expected '{{' after type declaration on line {}, got {}.\n", it->line, it->value);
         delete curr_node->pop_child();
         return false;
@@ -644,14 +649,23 @@ bool Parser::parse_type_declaration(const std::span<Tokenizer::Token>& tokens, s
     ++it;
 
     while(it != tokens.end() && !(it->type == Tokenizer::Token::Type::CloseScope)) {
+        if(it->type == Tokenizer::Token::Type::Function) {
+            if(!parse_method_declaration(tokens, it, curr_node)) { // Note: Added to curr_node, not type_not. Right now methods are not special.
+                delete curr_node->pop_child();
+                pop_scope();
+                return false;
+            }
+            continue;
+        }
+
         if(!parse_variable_declaration(tokens, it, type_node)) {
             delete curr_node->pop_child();
             pop_scope();
             return false;
         }
-        // Skip ';'
-        if(it != tokens.end() && it->type == Tokenizer::Token::Type::EndStatement)
-            ++it;
+        
+        skip(tokens, it, Tokenizer::Token::Type::EndStatement);
+
         // parse_variable_declaration may add an initialisation node, we'll make this a special case and add the default value as a child.
         if(type_node->children.back()->type == AST::Node::Type::BinaryOperator) {
             auto assignment_node = type_node->pop_child();
@@ -673,6 +687,7 @@ bool Parser::parse_type_declaration(const std::span<Tokenizer::Token>& tokens, s
         return false;
     }
 
+    assert(it->type == Tokenizer::Token::Type::CloseScope);
     ++it; // Skip '}'
 
     return true;
@@ -760,6 +775,30 @@ bool Parser::parse_string(const std::span<Tokenizer::Token>&, std::span<Tokenize
     return true;
 }
 
+bool Parser::parse_function_arguments(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* curr_node) {
+    assert(it->type == Tokenizer::Token::Type::OpenParenthesis);
+    it++;
+    assert(curr_node->type == AST::Node::Type::FunctionCall);
+    const auto start = (it + 1);
+    // Parse arguments
+    while(it != tokens.end() && it->type != Tokenizer::Token::Type::CloseParenthesis) {
+        auto to_rvalue = curr_node->add_child(new AST::Node(AST::Node::Type::LValueToRValue, curr_node->token));
+        if(!parse_next_expression(tokens, it, to_rvalue))
+            return false;
+        to_rvalue->value.type = to_rvalue->children[0]->value.type;
+        // Skip ","
+        if(it != tokens.end() && it->type == Tokenizer::Token::Type::Comma)
+            ++it;
+    }
+    if(it == tokens.end()) {
+        error("[Parser::parse_operator] Syntax error: Unmatched '(' on line {}, got to end-of-file.\n", start->line);
+        return false;
+    }
+    assert(it->type == Tokenizer::Token::Type::CloseParenthesis);
+    it++;
+    return true;
+}
+
 bool Parser::parse_operator(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* curr_node) {
     auto operator_type = it->type;
     // Unary operators
@@ -792,18 +831,17 @@ bool Parser::parse_operator(const std::span<Tokenizer::Token>& tokens, std::span
 
     if(operator_type == Tokenizer::Token::Type::CloseParenthesis) {
         // Should have been handled by others parsing functions.
-        error("[Parser::parse_operator] Unmatched ')' on line {}.\n", it->line);
+        throw Exception(fmt::format("[Parser::parse_operator] Unmatched ')' on line {}.\n", it->line), point_error(it->column, it->line));
         return false;
     }
 
     // Function call
     if(operator_type == Tokenizer::Token::Type::OpenParenthesis) {
-        const auto start = (it + 1);
         auto       function_node = curr_node->pop_child();
         auto       call_node = curr_node->add_child(new AST::Node(AST::Node::Type::FunctionCall, function_node->token));
         call_node->add_child(function_node);
 
-        // TODO: Check type of functionNode (is it actually callable?)
+        // TODO: Check type of function_node (is it actually callable?)
         if(function_node->type != AST::Node::Type::Variable) {
             error("[Parser] '{}' doesn't seem to be callable (may be a missing implementation).\n", function_node->token.value);
             return false;
@@ -819,25 +857,9 @@ bool Parser::parse_operator(const std::span<Tokenizer::Token>& tokens, std::span
         call_node->value.type = function->value.type;
         call_node->value.value.as_int32_t = function->value.value.as_int32_t; // Copy FunctionFlags
 
-        ++it;
-        // Parse arguments
-        while(it != tokens.end() && it->type != Tokenizer::Token::Type::CloseParenthesis) {
-            auto to_rvalue = call_node->add_child(new AST::Node(AST::Node::Type::LValueToRValue, function_node->token));
-            if(!parse_next_expression(tokens, it, to_rvalue)) {
-                delete curr_node->pop_child();
-                return false;
-            }
-            to_rvalue->value.type = to_rvalue->children[0]->value.type;
-            // Skip ","
-            if(it != tokens.end() && it->type == Tokenizer::Token::Type::Comma)
-                ++it;
-        }
-        if(it == tokens.end()) {
-            error("[Parser::parse_operator] Syntax error: Unmatched '(' on line {}, got to end-of-file.\n", start->line);
-            delete curr_node->pop_child();
+        if(!parse_function_arguments(tokens, it, call_node)) {
             return false;
         }
-        ++it;
         return true;
     }
 
@@ -884,7 +906,8 @@ bool Parser::parse_operator(const std::span<Tokenizer::Token>& tokens, std::span
             return false;
         }
         const auto       identifier_name = it->value;
-        const auto       type = get_type(prev_expr->value.value.as_composite.type_id);
+        const auto       type_id = prev_expr->value.value.as_composite.type_id;
+        const auto       type = get_type(type_id);
         bool             member_exists = false;
         int32_t          member_index = 0;
         const AST::Node* member_node = nullptr;
@@ -896,14 +919,44 @@ bool Parser::parse_operator(const std::span<Tokenizer::Token>& tokens, std::span
             }
             ++member_index;
         }
-        if(!member_exists) {
-            error("[Parser] Syntax error: Member '{}' does not exists on type {}.\n", identifier_name, type->token.value);
+        if(member_exists) {
+            auto member_identifier_node = binary_operator_node->add_child(new AST::Node(AST::Node::Type::MemberIdentifier, *it));
+            member_identifier_node->value.value.as_int32_t = member_index;
+            ++it;
+        } else if(peek(tokens, it, Tokenizer::Token::Type::OpenParenthesis)) {
+            // Search for a corresponding method
+            const auto method = get_function(identifier_name);
+            if(method && method->children.size() > 0 && method->children[0]->value.type == GenericValue::Type::Composite &&
+               method->children[0]->value.value.as_composite.type_id == type_id) {
+                auto binary_node = curr_node->pop_child();
+                auto first_argument = binary_node->pop_child();
+                delete binary_node;
+                auto call_node = curr_node->add_child(new AST::Node(AST::Node::Type::FunctionCall, *it));
+                auto function_node = call_node->add_child(new AST::Node(AST::Node::Type::Variable, *it));
+                ++it;
+
+                call_node->value.type = method->value.type;
+                call_node->value.value.as_int32_t = method->value.value.as_int32_t; // Copy FunctionFlags
+
+                auto to_rvalue = call_node->add_child(new AST::Node(AST::Node::Type::LValueToRValue, curr_node->token));
+                to_rvalue->add_child(first_argument);
+
+                if(!parse_function_arguments(tokens, it, call_node)) {
+                    delete curr_node->pop_child();
+                    throw Exception(fmt::format("[Parser] Error parsing '{}' method arguments on line {}.\n", call_node->token.value, it->line),
+                                    point_error(type->token.column, type->token.line));
+                }
+                return true;
+            } else {
+                delete curr_node->pop_child();
+                throw Exception(fmt::format("[Parser] Syntax error: Method '{}' does not exists on type {}.\n", identifier_name, type->token.value),
+                                point_error(type->token.column, type->token.line));
+            }
+        } else {
+            error("[Parser] Syntax error: Member '{}' does not exists on type {} on line {}.\n", identifier_name, type->token.value, it->line);
             delete curr_node->pop_child();
             return false;
         }
-        auto member_identifier_node = binary_operator_node->add_child(new AST::Node(AST::Node::Type::MemberIdentifier, *it));
-        member_identifier_node->value.value.as_int32_t = member_index;
-        ++it;
     } else {
         // Lookahead for rhs
         if(!parse_next_expression(tokens, it, binary_operator_node, precedence)) {

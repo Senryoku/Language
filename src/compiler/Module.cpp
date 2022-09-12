@@ -157,7 +157,7 @@ llvm::Value* Module::codegen(const AST::Node* node) {
             std::vector<llvm::Type*> param_types;
             if(node->children.size() > 1)
                 for(auto i = 0; i < node->children.size() - 1; ++i)
-                    param_types.push_back(get_llvm_type(node->children[i]->value.type));
+                    param_types.push_back(get_llvm_type(node->children[i]));
             auto return_type = get_llvm_type(node->value.type);
             auto function_types = llvm::FunctionType::get(return_type, param_types, false);
             auto flags = node->value.value.as_int32_t;
@@ -212,7 +212,7 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                 auto v = codegen(node->children[i]);
                 if(!v)
                     return nullptr;
-                // Variadic functions promotes float to double (see https://stackoverflow.com/questions/63144506/printf-doesnt-work-for-floats-in-llvm-ir)
+                // C Variadic functions promotes float to double (see https://stackoverflow.com/questions/63144506/printf-doesnt-work-for-floats-in-llvm-ir)
                 if (function_flags & AST::Node::FunctionFlag::Variadic && v->getType()->isFloatTy())
                     v = _llvm_ir_builder.CreateFPExt(v, llvm::Type::getDoubleTy(* _llvm_context));
                 parameters.push_back(v);
