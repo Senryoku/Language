@@ -204,13 +204,13 @@ class Interpreter : public Scoped {
             }
             case UnaryOperator: {
                 assert(node.children.size() == 1);
-                if(node.token.type == Tokenizer::Token::Type::Substraction) {
+                if(node.token.type == Token::Type::Substraction) {
                     auto rhs = execute(*node.children[0]);
                     _return_value = -rhs;
-                } else if(node.token.type == Tokenizer::Token::Type::Addition) {
+                } else if(node.token.type == Token::Type::Addition) {
                     auto rhs = execute(*node.children[0]);
                     _return_value = rhs;
-                } else if(node.token.type == Tokenizer::Token::Type::Increment) {
+                } else if(node.token.type == Token::Type::Increment) {
                     assert(node.children.size() == 1);
                     assert(node.children[0]->type == Variable);
                     auto* v = get(node.children[0]->token.value);
@@ -218,7 +218,7 @@ class Interpreter : public Scoped {
                         _return_value = ++(*v);
                     else
                         _return_value = (*v)++;
-                } else if(node.token.type == Tokenizer::Token::Type::Decrement) {
+                } else if(node.token.type == Token::Type::Decrement) {
                     assert(node.children.size() == 1);
                     assert(node.children[0]->type == Variable);
                     auto* v = get(node.children[0]->token.value);
@@ -239,7 +239,7 @@ class Interpreter : public Scoped {
                 if(rhs.type == GenericValue::Type::Reference)
                     rhs = *rhs.value.as_reference.value;
 
-                if(node.token.type == Tokenizer::Token::Type::Assignment) {
+                if(node.token.type == Token::Type::Assignment) {
                     assert(lhs.type == GenericValue::Type::Reference);
 
                     if(is_assignable(*lhs.value.as_reference.value, rhs)) {
@@ -253,10 +253,10 @@ class Interpreter : public Scoped {
                     }
                 }
 
-                if(node.token.type == Tokenizer::Token::Type::OpenParenthesis) {
+                if(node.token.type == Token::Type::OpenParenthesis) {
                     // FIXME
                     error("[Interpreter:{}] Operator '(' not implemented.\n", __LINE__);
-                } else if(node.token.type == Tokenizer::Token::Type::OpenSubscript) {
+                } else if(node.token.type == Token::Type::OpenSubscript) {
                     auto index = rhs;
                     // Automatically convert float indices to integer, because we don't have in-language easy conversion (yet?)
                     // FIXME: I don't think this should be handled here, or at least not in this way.
@@ -287,7 +287,7 @@ class Interpreter : public Scoped {
                             return _return_value;
                         }
                     }
-                } else if(node.token.type == Tokenizer::Token::Type::MemberAccess) {
+                } else if(node.token.type == Token::Type::MemberAccess) {
                     assert(lhs.type == GenericValue::Type::Reference);
                     const auto variable = lhs.value.as_reference.value;
                     const auto member_identifer = node.children[1];

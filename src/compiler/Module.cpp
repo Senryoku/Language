@@ -8,9 +8,9 @@
     {                                                                                               \
         GenericValue::Type::VALUETYPE, [](llvm::IRBuilder<>& ir_builder, llvm::Value* val) { FUNC } \
     }
-static std::unordered_map<Tokenizer::Token::Type, std::unordered_map<GenericValue::Type, std::function<llvm::Value*(llvm::IRBuilder<>&, llvm::Value*)>>> unary_ops = {
-    {Tokenizer::Token::Type::Addition, {OP(Integer, (void)ir_builder; return val;), OP(Float, (void)ir_builder; return val;)}},
-    {Tokenizer::Token::Type::Substraction, {OP(Integer, return ir_builder.CreateNeg(val, "neg");), OP(Float, return ir_builder.CreateFNeg(val, "fneg");)}},
+static std::unordered_map<Token::Type, std::unordered_map<GenericValue::Type, std::function<llvm::Value*(llvm::IRBuilder<>&, llvm::Value*)>>> unary_ops = {
+    {Token::Type::Addition, {OP(Integer, (void)ir_builder; return val;), OP(Float, (void)ir_builder; return val;)}},
+    {Token::Type::Substraction, {OP(Integer, return ir_builder.CreateNeg(val, "neg");), OP(Float, return ir_builder.CreateFNeg(val, "fneg");)}},
 };
 #undef OP
 
@@ -19,27 +19,27 @@ static std::unordered_map<Tokenizer::Token::Type, std::unordered_map<GenericValu
         GenericValue::Type::VALUETYPE, [](llvm::IRBuilder<>& ir_builder, llvm::Value* lhs, llvm::Value* rhs) { FUNC } \
     }
 
-static std::unordered_map<Tokenizer::Token::Type, std::unordered_map<GenericValue::Type, std::function<llvm::Value*(llvm::IRBuilder<>&, llvm::Value*, llvm::Value*)>>> binary_ops =
+static std::unordered_map<Token::Type, std::unordered_map<GenericValue::Type, std::function<llvm::Value*(llvm::IRBuilder<>&, llvm::Value*, llvm::Value*)>>> binary_ops =
     {
-        {Tokenizer::Token::Type::Addition, {OP(Integer, return ir_builder.CreateAdd(lhs, rhs, "add");), OP(Float, return ir_builder.CreateFAdd(lhs, rhs, "fadd");)}},
-        {Tokenizer::Token::Type::Substraction, {OP(Integer, return ir_builder.CreateSub(lhs, rhs, "sub");), OP(Float, return ir_builder.CreateFSub(lhs, rhs, "fsub");)}},
-        {Tokenizer::Token::Type::Multiplication, {OP(Integer, return ir_builder.CreateMul(lhs, rhs, "mul");), OP(Float, return ir_builder.CreateFMul(lhs, rhs, "fmul");)}},
-        {Tokenizer::Token::Type::Division, {OP(Integer, return ir_builder.CreateSDiv(lhs, rhs, "div");), OP(Float, return ir_builder.CreateFDiv(lhs, rhs, "fdiv");)}},
-        {Tokenizer::Token::Type::Modulus, {OP(Integer, return ir_builder.CreateSRem(lhs, rhs, "srem");)}},
+        {Token::Type::Addition, {OP(Integer, return ir_builder.CreateAdd(lhs, rhs, "add");), OP(Float, return ir_builder.CreateFAdd(lhs, rhs, "fadd");)}},
+        {Token::Type::Substraction, {OP(Integer, return ir_builder.CreateSub(lhs, rhs, "sub");), OP(Float, return ir_builder.CreateFSub(lhs, rhs, "fsub");)}},
+        {Token::Type::Multiplication, {OP(Integer, return ir_builder.CreateMul(lhs, rhs, "mul");), OP(Float, return ir_builder.CreateFMul(lhs, rhs, "fmul");)}},
+        {Token::Type::Division, {OP(Integer, return ir_builder.CreateSDiv(lhs, rhs, "div");), OP(Float, return ir_builder.CreateFDiv(lhs, rhs, "fdiv");)}},
+        {Token::Type::Modulus, {OP(Integer, return ir_builder.CreateSRem(lhs, rhs, "srem");)}},
         // Comparisons
-        {Tokenizer::Token::Type::Equal,
+        {Token::Type::Equal,
          {OP(Integer, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_EQ, lhs, rhs, "ICMP_EQ");),
           OP(Float, return ir_builder.CreateFCmp(llvm::CmpInst::Predicate::FCMP_OEQ, lhs, rhs, "FCMP_OEQ");)}},
-        {Tokenizer::Token::Type::Lesser,
+        {Token::Type::Lesser,
          {OP(Integer, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_SLT, lhs, rhs, "ICMP_SLT");),
           OP(Float, return ir_builder.CreateFCmp(llvm::CmpInst::Predicate::FCMP_OLT, lhs, rhs, "FCMP_OLT");)}},
-        {Tokenizer::Token::Type::LesserOrEqual,
+        {Token::Type::LesserOrEqual,
          {OP(Integer, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_SLE, lhs, rhs, "ICMP_SLE");),
           OP(Float, return ir_builder.CreateFCmp(llvm::CmpInst::Predicate::FCMP_OLE, lhs, rhs, "FCMP_OLE");)}},
-        {Tokenizer::Token::Type::Greater,
+        {Token::Type::Greater,
          {OP(Integer, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_SGT, lhs, rhs, "ICMP_SGT");),
           OP(Float, return ir_builder.CreateFCmp(llvm::CmpInst::Predicate::FCMP_OGT, lhs, rhs, "FCMP_OGT");)}},
-        {Tokenizer::Token::Type::GreaterOrEqual,
+        {Token::Type::GreaterOrEqual,
          {OP(Integer, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_SGE, lhs, rhs, "ICMP_SGE");),
           OP(Float, return ir_builder.CreateFCmp(llvm::CmpInst::Predicate::FCMP_OGE, lhs, rhs, "FCMP_OGE");)}},
 };
@@ -274,7 +274,7 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                 auto allocaInst = static_cast<llvm::AllocaInst*>(value);
                 return _llvm_ir_builder.CreateLoad(allocaInst->getAllocatedType(), allocaInst, "l-to-rvalue");
             }
-            if(child->type == AST::Node::Type::BinaryOperator && child->token.type == Tokenizer::Token::Type::MemberAccess) {
+            if(child->type == AST::Node::Type::BinaryOperator && child->token.type == Token::Type::MemberAccess) {
                 assert(value->getType()->isPointerTy());
                 return _llvm_ir_builder.CreateLoad(get_llvm_type(node->value.type), value, "l-to-rvalue");
             }
@@ -283,7 +283,7 @@ llvm::Value* Module::codegen(const AST::Node* node) {
         case AST::Node::Type::UnaryOperator: {
             auto val = codegen(node->children[0]);
             switch(node->token.type) {
-                case Tokenizer::Token::Type::Increment: {
+                case Token::Type::Increment: {
                     assert(node->children[0]->type == AST::Node::Type::Variable);
                     // FIXME: Doesn't work
                     auto var = get(node->children[0]->token.value);
@@ -310,16 +310,16 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                 return nullptr;
             // TODO: Overloads.
             switch(node->token.type) {
-                case Tokenizer::Token::Type::Addition: [[fallthrough]];
-                case Tokenizer::Token::Type::Substraction: [[fallthrough]];
-                case Tokenizer::Token::Type::Multiplication: [[fallthrough]];
-                case Tokenizer::Token::Type::Division: [[fallthrough]];
-                case Tokenizer::Token::Type::Modulus: [[fallthrough]];
-                case Tokenizer::Token::Type::Equal: [[fallthrough]];
-                case Tokenizer::Token::Type::Lesser: [[fallthrough]];
-                case Tokenizer::Token::Type::LesserOrEqual: [[fallthrough]];
-                case Tokenizer::Token::Type::Greater: [[fallthrough]];
-                case Tokenizer::Token::Type::GreaterOrEqual: {
+                case Token::Type::Addition: [[fallthrough]];
+                case Token::Type::Substraction: [[fallthrough]];
+                case Token::Type::Multiplication: [[fallthrough]];
+                case Token::Type::Division: [[fallthrough]];
+                case Token::Type::Modulus: [[fallthrough]];
+                case Token::Type::Equal: [[fallthrough]];
+                case Token::Type::Lesser: [[fallthrough]];
+                case Token::Type::LesserOrEqual: [[fallthrough]];
+                case Token::Type::Greater: [[fallthrough]];
+                case Token::Type::GreaterOrEqual: {
                     assert(node->children[0]->value.type == node->children[1]->value.type);
                     if(binary_ops[node->token.type].find(node->children[0]->value.type) == binary_ops[node->token.type].end()) {
                         error("[LLVMCodegen] Unsupported types {} and {} for binary operator {}.\n", node->children[0]->value.type, node->children[1]->value.type,
@@ -328,10 +328,10 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                     }
                     return binary_ops[node->token.type][node->children[0]->value.type](_llvm_ir_builder, lhs, rhs);
                 }
-                case Tokenizer::Token::Type::And: {
+                case Token::Type::And: {
                     return _llvm_ir_builder.CreateAnd(lhs, rhs, "and");
                 }
-                case Tokenizer::Token::Type::OpenSubscript: {
+                case Token::Type::OpenSubscript: {
                     // FIXME: Remove these checks
                     assert(node->children[0]->type == AST::Node::Type::Variable);
                     assert(node->children[0]->value.type == GenericValue::Type::Array);
@@ -339,11 +339,11 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                     return _llvm_ir_builder.CreateGEP(get_llvm_type(element_type), lhs, {llvm::ConstantInt::get(*_llvm_context, llvm::APInt(32, 0)), rhs},
                                                       "ArrayGEP"); // FIXME: I don't know.
                 }
-                case Tokenizer::Token::Type::Assignment: {
+                case Token::Type::Assignment: {
                     _llvm_ir_builder.CreateStore(rhs, lhs);
                     return lhs;
                 }
-                case Tokenizer::Token::Type::MemberAccess: {
+                case Token::Type::MemberAccess: {
                     auto allocaInst = static_cast<llvm::AllocaInst*>(lhs);
                     return _llvm_ir_builder.CreateGEP(allocaInst->getAllocatedType(), lhs, {llvm::ConstantInt::get(*_llvm_context, llvm::APInt(32, 0)), rhs}, "memberptr");
                 }

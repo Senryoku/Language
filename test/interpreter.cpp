@@ -13,7 +13,7 @@
 #include <Parser.hpp>
 #include <Tokenizer.hpp>
 
-void tokenize(const char* filepath, std::vector<Tokenizer::Token>& tokens, std::string& source) {
+void tokenize(const char* filepath, std::vector<Token>& tokens, std::string& source) {
     std::ifstream file(filepath);
     ASSERT_TRUE(file) << "Couldn't open test file '" << filepath << "' (Run from " << std::filesystem::current_path() << ")";
     source = std::string((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
@@ -27,7 +27,7 @@ void tokenize(const char* filepath, std::vector<Tokenizer::Token>& tokens, std::
 
 #define PARSE_INTERP(code)                           \
     std::string                   source{code};      \
-    std::vector<Tokenizer::Token> tokens;            \
+    std::vector<Token> tokens;            \
     Tokenizer                     tokenizer(source); \
     while(tokenizer.has_more())                      \
         tokens.push_back(tokenizer.consume());       \
@@ -40,7 +40,7 @@ void tokenize(const char* filepath, std::vector<Tokenizer::Token>& tokens, std::
 
 #define LOAD_PARSE_INTERP(path)           \
     std::string                   source; \
-    std::vector<Tokenizer::Token> tokens; \
+    std::vector<Token> tokens; \
     tokenize(path, tokens, source);       \
     Parser parser;                        \
     auto   ast = parser.parse(tokens);    \
@@ -262,7 +262,7 @@ TEST(Function, isPrime) {
         while(next_tokens.has_more())
             tokens.push_back(next_tokens.consume());
         EXPECT_GT(tokens.size(), first);
-        auto newNode = parser.parse(std::span<Tokenizer::Token>{tokens.begin() + first, tokens.end()}, *ast);
+        auto newNode = parser.parse(std::span<Token>{tokens.begin() + first, tokens.end()}, *ast);
         ASSERT_TRUE(newNode);
         interpreter.execute(*newNode);
         EXPECT_EQ(interpreter.get_return_value().value.as_bool, is_prime(i));
@@ -289,7 +289,7 @@ TEST(Function, RecursionFibonacci) {
         while(next_tokens.has_more())
             tokens.push_back(next_tokens.consume());
         EXPECT_GT(tokens.size(), first);
-        auto newNode = parser.parse(std::span<Tokenizer::Token>{tokens.begin() + first, tokens.end()}, *ast);
+        auto newNode = parser.parse(std::span<Token>{tokens.begin() + first, tokens.end()}, *ast);
         ASSERT_TRUE(newNode);
         interpreter.execute(*newNode);
         EXPECT_EQ(interpreter.get_return_value().value.as_int32_t, fib(i));
@@ -308,7 +308,7 @@ TEST(Function, ArrayFibonacci) {
         while(next_tokens.has_more())
             tokens.push_back(next_tokens.consume());
         EXPECT_GT(tokens.size(), first);
-        auto newNode = parser.parse(std::span<Tokenizer::Token>{tokens.begin() + first, tokens.end()}, *ast);
+        auto newNode = parser.parse(std::span<Token>{tokens.begin() + first, tokens.end()}, *ast);
         ASSERT_TRUE(newNode);
         interpreter.execute(*newNode);
         EXPECT_EQ(interpreter.get_return_value().value.as_int32_t, fib(i));

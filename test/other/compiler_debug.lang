@@ -1,14 +1,21 @@
 type NewType {
 	int   i;
+	float f;
+	
+	function get_i() {
+		return .i;
+	}
 }
 
-function get_i(NewType t) {
-	return t.i;
+function get_f(NewType t) : float {
+	return t.f;
 }
 
 function main() {
 	NewType value;
-	value.i = 666;
-	int i = value.get_i();
-	return i;
+	value.i = 1234;
+	value.f = 666.0;
+	printf("  i:%d, f:%f\n", value.i, value.f);
+	int r = value.get_f();
+	return r;
 }

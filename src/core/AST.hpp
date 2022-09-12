@@ -55,7 +55,7 @@ class AST {
 
         Node(Type type) noexcept : type(type) {}
         Node(Type type, Node& parent) noexcept : type(type), parent(&parent) {}
-        Node(Type type, Tokenizer::Token token, SubType subtype = SubType::Undefined) noexcept : type(type), subtype(subtype), token(token) {}
+        Node(Type type, Token token, SubType subtype = SubType::Undefined) noexcept : type(type), subtype(subtype), token(token) {}
         Node(Node&& o) noexcept : type(o.type), subtype(o.subtype), parent(o.parent), token(std::move(o.token)), children(std::move(o.children)), value(o.value) {}
         Node& operator=(Node&& o) noexcept {
             type = o.type;
@@ -69,7 +69,7 @@ class AST {
         Type               type = Type::Undefined;
         SubType            subtype = SubType::Undefined;
         Node*              parent = nullptr;
-        Tokenizer::Token   token;
+        Token   token;
         std::vector<Node*> children;
 
         // ConstantValue & Variable
@@ -186,7 +186,7 @@ struct fmt::formatter<AST::Node> {
             default: r = fmt::format_to(ctx.out(), "{}", t.type);
         }
 
-        auto token_str = t.token.type == Tokenizer::Token::Type::Unknown ? "None" : fmt::format("{}", t.token);
+        auto token_str = t.token.type == Token::Type::Unknown ? "None" : fmt::format("{}", t.token);
         // FIXME: This would be cool to use the actual token_str length here, but computing the printed length (stripping style/control characters) isn't trivial.
         // const auto length = 60;
         // Forward then backward

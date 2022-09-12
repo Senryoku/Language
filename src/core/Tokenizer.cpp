@@ -18,7 +18,7 @@ void Tokenizer::skip_whitespace() noexcept {
         advance();
 }
 
-Tokenizer::Token Tokenizer::search_next() {
+Token Tokenizer::search_next() {
     auto type = Token::Type::Unknown;
     auto begin = _current_pos;
     auto first_char = peek();

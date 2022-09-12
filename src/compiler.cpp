@@ -91,7 +91,7 @@ bool handle_file(const std::filesystem::path& path) {
 
     const auto tokenizing_start = std::chrono::high_resolution_clock::now();
 
-    std::vector<Tokenizer::Token> tokens;
+    std::vector<Token> tokens;
     try {
         Tokenizer tokenizer(source);
         while(tokenizer.has_more())

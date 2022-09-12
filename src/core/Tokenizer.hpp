@@ -3,100 +3,83 @@
 #include <array>
 #include <cassert>
 #include <het_unordered_map.hpp>
-#include <stdexcept>
 #include <string>
 #include <string_view>
 
-#include <Source.hpp>
+#include <Exception.hpp>
 #include <Logger.hpp>
+#include <Source.hpp>
 
-// FIXME: Move, specialize
-class Exception : public std::logic_error {
-  public:
-    Exception(const std::string& what, const std::string& hint) : std::logic_error(what.c_str()), _hint(hint) {}
+struct Token {
+    enum class Type {
+        EndStatement,
+        Comma,
+        OpenScope,
+        CloseScope,
+        Colon,
 
-    const std::string& hint() const { return _hint; }
+        // Constants
+        Digits,
+        Float,
+        CharLiteral,
+        StringLiteral,
+        Boolean,
+        // Operators
+        Assignment,
+        Xor,
+        Or,
+        And,
+        Equal,
+        Different,
+        Lesser,
+        LesserOrEqual,
+        Greater,
+        GreaterOrEqual,
+        Addition,
+        Substraction,
+        Multiplication,
+        Division,
+        Modulus,
+        Increment,
+        Decrement,
+        OpenParenthesis,
+        CloseParenthesis,
+        OpenSubscript,
+        CloseSubscript,
+        MemberAccess,
 
-    void display() const {
-        error(what());
-        print("\n");
-        info(hint());
-    }
+        Identifier,
+        // Keywords
+        Import,
+        Export,
+        If,
+        Else,
+        While,
+        For,
+        Type,
+        Function,
+        Return,
+        Const,
 
-  private:
-    std::string _hint;
+        Comment,
+
+        Unknown
+    };
+
+    Token() = default;
+
+    Token(Type type, const std::string_view val, size_t line, size_t column) : type(type), value(val), line(line), column(column) {}
+
+    Type             type = Type::Unknown;
+    std::string_view value;
+
+    // Debug Info
+    size_t line = 0;
+    size_t column = 0; // FIXME: TODO
 };
 
 class Tokenizer {
   public:
-    struct Token {
-        enum class Type {
-            EndStatement,
-            Comma,
-            OpenScope,
-            CloseScope,
-            Colon,
-
-            // Constants
-            Digits,
-            Float,
-            CharLiteral,
-            StringLiteral,
-            Boolean,
-            // Operators
-            Assignment,
-            Xor,
-            Or,
-            And,
-            Equal,
-            Different,
-            Lesser,
-            LesserOrEqual,
-            Greater,
-            GreaterOrEqual,
-            Addition,
-            Substraction,
-            Multiplication,
-            Division,
-            Modulus,
-            Increment,
-            Decrement,
-            OpenParenthesis,
-            CloseParenthesis,
-            OpenSubscript,
-            CloseSubscript,
-            MemberAccess,
-
-            Identifier,
-            // Keywords
-            Import,
-            Export,
-            If,
-            Else,
-            While,
-            For,
-            Type,
-            Function,
-            Return,
-            Const,
-
-            Comment,
-
-            Unknown
-        };
-
-        Token() = default;
-
-        Token(Type type, const std::string_view val, size_t line, size_t column) : type(type), value(val), line(line), column(column) {}
-
-        Type             type = Type::Unknown;
-        std::string_view value;
-
-        // Debug Info
-        size_t line = 0;
-        size_t column = 0; // FIXME: TODO
-    };
-
     Tokenizer(const std::string& source) : _source(source) { skip_whitespace(); }
 
     Token consume() {
@@ -194,33 +177,33 @@ class Tokenizer {
 #include <fmt/format.h>
 
 template<>
-struct fmt::formatter<Tokenizer::Token> {
+struct fmt::formatter<Token> {
     constexpr auto parse(format_parse_context& ctx) -> decltype(ctx.begin()) {
         auto it = ctx.begin(), end = ctx.end();
         if(it != end && *it != '}')
-            throw format_error("Invalid format for Tokenizer::Token");
+            throw format_error("Invalid format for Token");
         return it;
     }
 
     template<typename FormatContext>
-    auto format(const Tokenizer::Token& t, FormatContext& ctx) const -> decltype(ctx.out()) {
+    auto format(const Token& t, FormatContext& ctx) const -> decltype(ctx.out()) {
         return fmt::format_to(ctx.out(), fg(fmt::color::gray), "T({} {:12} {:3})", t.type, t.value, t.line);
     }
 };
 
 template<>
-struct fmt::formatter<Tokenizer::Token::Type> {
+struct fmt::formatter<Token::Type> {
     constexpr auto parse(format_parse_context& ctx) -> decltype(ctx.begin()) {
         auto it = ctx.begin(), end = ctx.end();
         if(it != end && *it != '}')
-            throw format_error("Invalid format for Tokenizer::Token::Type");
+            throw format_error("Invalid format for Token::Type");
         return it;
     }
     template<typename FormatContext>
-    auto format(const Tokenizer::Token::Type& t, FormatContext& ctx) const -> decltype(ctx.out()) {
+    auto format(const Token::Type& t, FormatContext& ctx) const -> decltype(ctx.out()) {
         switch(t) {
 #define OP(name) \
-    case Tokenizer::Token::Type::name: return fmt::format_to(ctx.out(), "{:12}", #name);
+    case Token::Type::name: return fmt::format_to(ctx.out(), "{:12}", #name);
             OP(Comma);
             OP(EndStatement);
             OP(OpenScope);
@@ -249,14 +232,14 @@ struct fmt::formatter<Tokenizer::Token::Type> {
             OP(OpenSubscript);
             OP(CloseSubscript);
             OP(MemberAccess);
-            case Tokenizer::Token::Type::Function: return fmt::format_to(ctx.out(), fg(fmt::color::orchid), "{:12}", "Function");
-            case Tokenizer::Token::Type::While: return fmt::format_to(ctx.out(), fg(fmt::color::orchid), "{:12}", "While");
-            case Tokenizer::Token::Type::If: return fmt::format_to(ctx.out(), fg(fmt::color::orchid), "{:12}", "If");
-            case Tokenizer::Token::Type::Else: return fmt::format_to(ctx.out(), fg(fmt::color::orchid), "{:12}", "Else");
-            case Tokenizer::Token::Type::Identifier: return fmt::format_to(ctx.out(), fg(fmt::color::light_blue), "{:12}", "Identifier");
+            case Token::Type::Function: return fmt::format_to(ctx.out(), fg(fmt::color::orchid), "{:12}", "Function");
+            case Token::Type::While: return fmt::format_to(ctx.out(), fg(fmt::color::orchid), "{:12}", "While");
+            case Token::Type::If: return fmt::format_to(ctx.out(), fg(fmt::color::orchid), "{:12}", "If");
+            case Token::Type::Else: return fmt::format_to(ctx.out(), fg(fmt::color::orchid), "{:12}", "Else");
+            case Token::Type::Identifier: return fmt::format_to(ctx.out(), fg(fmt::color::light_blue), "{:12}", "Identifier");
 #undef OP
             default:
-            case Tokenizer::Token::Type::Unknown: return fmt::format_to(ctx.out(), "{:12}", "Unknown");
+            case Token::Type::Unknown: return fmt::format_to(ctx.out(), "{:12}", "Unknown");
         }
     }
 };

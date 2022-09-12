@@ -227,7 +227,7 @@ std::string Prompt::get_line() {
 std::string Prompt::syntax_highlight(const std::string& str) {
     try {
         Tokenizer                     tokenizer(str);
-        std::vector<Tokenizer::Token> tokens;
+        std::vector<Token> tokens;
         while(tokenizer.has_more())
             tokens.push_back(tokenizer.consume());
         std::string r = "";

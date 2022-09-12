@@ -34,7 +34,7 @@ int main(int argc, char* argv[]) {
     Indenter log;
 
     std::vector<std::string>      lines;
-    std::vector<Tokenizer::Token> tokens;
+    std::vector<Token> tokens;
     AST                           ast;
     Parser                        parser;
     Interpreter                   interpreter;
@@ -59,7 +59,7 @@ int main(int argc, char* argv[]) {
         while(tokenizer.has_more())
             tokens.push_back(tokenizer.consume());
 
-        auto newNode = parser.parse(std::span<Tokenizer::Token>{tokens.begin() + first, tokens.end()}, ast);
+        auto newNode = parser.parse(std::span<Token>{tokens.begin() + first, tokens.end()}, ast);
         ast.optimize();
         if(newNode) {
             log.group();
@@ -131,7 +131,7 @@ int main(int argc, char* argv[]) {
                     tokens.push_back(t);
                 }
 
-                auto newNode = parser.parse(std::span<Tokenizer::Token>{tokens.begin() + first, tokens.end()}, ast);
+                auto newNode = parser.parse(std::span<Token>{tokens.begin() + first, tokens.end()}, ast);
                 if(newNode) {
                     log.group();
                     log.print("Executing ({}) using Interpreter...\n", newNode->type);

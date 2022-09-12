@@ -40,8 +40,8 @@ class ModuleInterface {
             std::istringstream iss(line);
             iss >> name >> type;
 
-            Tokenizer::Token token;
-            token.type = Tokenizer::Token::Type::Identifier;
+            Token token;
+            token.type = Token::Type::Identifier;
             token.value = *internalize_string(name);
             auto func_dec_node = external_nodes.emplace_back(new AST::Node(AST::Node::Type::FunctionDeclaration, token)).get(); // Keep it out of the AST
             imports.push_back(func_dec_node);

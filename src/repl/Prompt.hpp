@@ -36,22 +36,22 @@ class Prompt {
     std::deque<std::string> _history;
 
     // FIXME: Come up with a better theme. Make it configurable? Also, clearly, rework the token types.
-    inline static std::unordered_map<Tokenizer::Token::Type, fmt::color> s_token_colors = {
-        {Tokenizer::Token::Type::Unknown, fmt::color::red},
-        {Tokenizer::Token::Type::Boolean, fmt::color::royal_blue},
-        {Tokenizer::Token::Type::CharLiteral, fmt::color::burly_wood},
-        {Tokenizer::Token::Type::Comment, fmt::color::dark_green},
-        {Tokenizer::Token::Type::Const, fmt::color::royal_blue},
-        {Tokenizer::Token::Type::EndStatement, fmt::color::light_gray},
-        {Tokenizer::Token::Type::Digits, fmt::color::golden_rod},
-        {Tokenizer::Token::Type::If, fmt::color::royal_blue},
-        {Tokenizer::Token::Type::Else, fmt::color::royal_blue},
-        {Tokenizer::Token::Type::While, fmt::color::royal_blue},
-        {Tokenizer::Token::Type::Float, fmt::color::golden_rod},
-        {Tokenizer::Token::Type::Function, fmt::color::royal_blue},
-        {Tokenizer::Token::Type::Import, fmt::color::royal_blue},
-        {Tokenizer::Token::Type::StringLiteral, fmt::color::burly_wood},
-        {Tokenizer::Token::Type::Identifier, fmt::color::light_blue},
+    inline static std::unordered_map<Token::Type, fmt::color> s_token_colors = {
+        {Token::Type::Unknown, fmt::color::red},
+        {Token::Type::Boolean, fmt::color::royal_blue},
+        {Token::Type::CharLiteral, fmt::color::burly_wood},
+        {Token::Type::Comment, fmt::color::dark_green},
+        {Token::Type::Const, fmt::color::royal_blue},
+        {Token::Type::EndStatement, fmt::color::light_gray},
+        {Token::Type::Digits, fmt::color::golden_rod},
+        {Token::Type::If, fmt::color::royal_blue},
+        {Token::Type::Else, fmt::color::royal_blue},
+        {Token::Type::While, fmt::color::royal_blue},
+        {Token::Type::Float, fmt::color::golden_rod},
+        {Token::Type::Function, fmt::color::royal_blue},
+        {Token::Type::Import, fmt::color::royal_blue},
+        {Token::Type::StringLiteral, fmt::color::burly_wood},
+        {Token::Type::Identifier, fmt::color::light_blue},
     };
 
 #ifdef WIN32

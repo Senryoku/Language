@@ -5,19 +5,19 @@
 
 #include <ModuleInterface.hpp>
 
-bool Parser::parse(const std::span<Tokenizer::Token>& tokens, AST::Node* curr_node) {
+bool Parser::parse(const std::span<Token>& tokens, AST::Node* curr_node) {
     curr_node = curr_node->add_child(new AST::Node(AST::Node::Type::Statement));
     auto it = tokens.begin();
     while(it != tokens.end()) {
         const auto& token = *it;
         switch(token.type) {
-            case Tokenizer::Token::Type::OpenScope: {
+            case Token::Type::OpenScope: {
                 curr_node = curr_node->add_child(new AST::Node(AST::Node::Type::Scope, *it));
                 push_scope();
                 ++it;
                 break;
             }
-            case Tokenizer::Token::Type::CloseScope: {
+            case Token::Type::CloseScope: {
                 assert(false); // FIXME: I don't think this case is needed, it should already be taken care of and always return an error.
                 while(curr_node->type != AST::Node::Type::Scope && curr_node->parent != nullptr)
                     curr_node = curr_node->parent;
@@ -32,14 +32,14 @@ bool Parser::parse(const std::span<Tokenizer::Token>& tokens, AST::Node* curr_no
                 ++it;
                 break;
             }
-            case Tokenizer::Token::Type::EndStatement: {
+            case Token::Type::EndStatement: {
                 curr_node = curr_node->parent;
                 curr_node = curr_node->add_child(new AST::Node(AST::Node::Type::Statement, *it));
                 ++it;
                 break;
             }
-            case Tokenizer::Token::Type::If: {
-                if(!peek(tokens, it, Tokenizer::Token::Type::OpenParenthesis)) {
+            case Token::Type::If: {
+                if(!peek(tokens, it, Token::Type::OpenParenthesis)) {
                     error("[Parser] Syntax error: expected '(' after 'if'.\n");
                     return false;
                 }
@@ -55,7 +55,7 @@ bool Parser::parse(const std::span<Tokenizer::Token>& tokens, AST::Node* curr_no
                     return false;
                 }
 
-                if(it->type == Tokenizer::Token::Type::Else) {
+                if(it->type == Token::Type::Else) {
                     ++it;
                     if(!parse_scope_or_single_statement(tokens, it, ifNode)) {
                         error("[Parser] Syntax error: Expected 'new scope' or single statement after 'else'.\n");
@@ -65,13 +65,13 @@ bool Parser::parse(const std::span<Tokenizer::Token>& tokens, AST::Node* curr_no
                 }
                 break;
             }
-            case Tokenizer::Token::Type::Const:
+            case Token::Type::Const:
                 ++it;
-                assert(it->type == Tokenizer::Token::Type::Identifier);
+                assert(it->type == Token::Type::Identifier);
                 if(!parse_variable_declaration(tokens, it, curr_node, true))
                     return false;
                 break;
-            case Tokenizer::Token::Type::Return: {
+            case Token::Type::Return: {
                 auto returnNode = curr_node->add_child(new AST::Node(AST::Node::Type::ReturnStatement, *it));
                 auto to_rvalue = returnNode->add_child(new AST::Node(AST::Node::Type::LValueToRValue));
                 ++it;
@@ -92,88 +92,88 @@ bool Parser::parse(const std::span<Tokenizer::Token>& tokens, AST::Node* curr_no
             }
 
             // Constants
-            case Tokenizer::Token::Type::Boolean: {
+            case Token::Type::Boolean: {
                 if(!parse_boolean(tokens, it, curr_node))
                     return false;
                 break;
             }
-            case Tokenizer::Token::Type::Digits: {
+            case Token::Type::Digits: {
                 if(!parse_digits(tokens, it, curr_node))
                     return false;
                 break;
             }
-            case Tokenizer::Token::Type::Float: {
+            case Token::Type::Float: {
                 if(!parse_float(tokens, it, curr_node))
                     return false;
                 break;
             }
-            case Tokenizer::Token::Type::CharLiteral: {
+            case Token::Type::CharLiteral: {
                 if(!parse_char(tokens, it, curr_node))
                     return false;
                 break;
             }
-            case Tokenizer::Token::Type::StringLiteral: {
+            case Token::Type::StringLiteral: {
                 if(!parse_string(tokens, it, curr_node))
                     return false;
                 break;
             }
-            case Tokenizer::Token::Type::Assignment: [[fallthrough]];
-            case Tokenizer::Token::Type::Xor: [[fallthrough]];
-            case Tokenizer::Token::Type::Or: [[fallthrough]];
-            case Tokenizer::Token::Type::And: [[fallthrough]];
-            case Tokenizer::Token::Type::Equal: [[fallthrough]];
-            case Tokenizer::Token::Type::Different: [[fallthrough]];
-            case Tokenizer::Token::Type::Lesser: [[fallthrough]];
-            case Tokenizer::Token::Type::LesserOrEqual: [[fallthrough]];
-            case Tokenizer::Token::Type::Greater: [[fallthrough]];
-            case Tokenizer::Token::Type::GreaterOrEqual: [[fallthrough]];
-            case Tokenizer::Token::Type::Addition: [[fallthrough]];
-            case Tokenizer::Token::Type::Substraction: [[fallthrough]];
-            case Tokenizer::Token::Type::Multiplication: [[fallthrough]];
-            case Tokenizer::Token::Type::Division: [[fallthrough]];
-            case Tokenizer::Token::Type::Modulus: [[fallthrough]];
-            case Tokenizer::Token::Type::Increment: [[fallthrough]];
-            case Tokenizer::Token::Type::Decrement: [[fallthrough]];
-            case Tokenizer::Token::Type::OpenParenthesis: [[fallthrough]];
-            case Tokenizer::Token::Type::CloseParenthesis: [[fallthrough]];
-            case Tokenizer::Token::Type::OpenSubscript: [[fallthrough]];
-            case Tokenizer::Token::Type::CloseSubscript: [[fallthrough]];
-            case Tokenizer::Token::Type::MemberAccess: {
+            case Token::Type::Assignment: [[fallthrough]];
+            case Token::Type::Xor: [[fallthrough]];
+            case Token::Type::Or: [[fallthrough]];
+            case Token::Type::And: [[fallthrough]];
+            case Token::Type::Equal: [[fallthrough]];
+            case Token::Type::Different: [[fallthrough]];
+            case Token::Type::Lesser: [[fallthrough]];
+            case Token::Type::LesserOrEqual: [[fallthrough]];
+            case Token::Type::Greater: [[fallthrough]];
+            case Token::Type::GreaterOrEqual: [[fallthrough]];
+            case Token::Type::Addition: [[fallthrough]];
+            case Token::Type::Substraction: [[fallthrough]];
+            case Token::Type::Multiplication: [[fallthrough]];
+            case Token::Type::Division: [[fallthrough]];
+            case Token::Type::Modulus: [[fallthrough]];
+            case Token::Type::Increment: [[fallthrough]];
+            case Token::Type::Decrement: [[fallthrough]];
+            case Token::Type::OpenParenthesis: [[fallthrough]];
+            case Token::Type::CloseParenthesis: [[fallthrough]];
+            case Token::Type::OpenSubscript: [[fallthrough]];
+            case Token::Type::CloseSubscript: [[fallthrough]];
+            case Token::Type::MemberAccess: {
                 if(!parse_operator(tokens, it, curr_node))
                     return false;
                 break;
             }
-            case Tokenizer::Token::Type::Identifier: {
+            case Token::Type::Identifier: {
                 if(!parse_identifier(tokens, it, curr_node))
                     return false;
                 break;
             }
-            case Tokenizer::Token::Type::While: {
+            case Token::Type::While: {
                 if(!parse_while(tokens, it, curr_node))
                     return false;
                 break;
             }
-            case Tokenizer::Token::Type::For: {
+            case Token::Type::For: {
                 if(!parse_for(tokens, it, curr_node))
                     return false;
                 break;
             }
-            case Tokenizer::Token::Type::Function: {
+            case Token::Type::Function: {
                 if(!parse_function_declaration(tokens, it, curr_node))
                     return false;
                 break;
             }
-            case Tokenizer::Token::Type::Type: {
+            case Token::Type::Type: {
                 if(!parse_type_declaration(tokens, it, curr_node))
                     return false;
                 break;
             }
-            case Tokenizer::Token::Type::Import: {
+            case Token::Type::Import: {
                 if(!parse_import(tokens, it, curr_node))
                     return false;
                 break;
             }
-            case Tokenizer::Token::Type::Export: {
+            case Token::Type::Export: {
                 ++it;
                 // Assume it's a function for now
                 // TODO: Handle exported variables too.
@@ -182,7 +182,7 @@ bool Parser::parse(const std::span<Tokenizer::Token>& tokens, AST::Node* curr_no
                 _module_interface.exports.push_back(curr_node->children.back());
                 break;
             }
-            case Tokenizer::Token::Type::Comment: ++it; break;
+            case Token::Type::Comment: ++it; break;
             default:
                 warn("[Parser] Unused token: {}.\n", *it);
                 ++it;
@@ -199,8 +199,8 @@ bool Parser::parse(const std::span<Tokenizer::Token>& tokens, AST::Node* curr_no
     return true;
 }
 
-bool Parser::parse_next_scope(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* curr_node) {
-    if(it == tokens.end() || it->type != Tokenizer::Token::Type::OpenScope) {
+bool Parser::parse_next_scope(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node) {
+    if(it == tokens.end() || it->type != Token::Type::OpenScope) {
         if(it == tokens.end())
             error("[Parser] Syntax error: Expected scope opening, got end-of-document.\n");
         else
@@ -211,9 +211,9 @@ bool Parser::parse_next_scope(const std::span<Tokenizer::Token>& tokens, std::sp
     auto   end = it;
     size_t opened_scopes = 0;
     while(end != tokens.end()) {
-        if(end->type == Tokenizer::Token::Type::OpenScope)
+        if(end->type == Token::Type::OpenScope)
             ++opened_scopes;
-        if(end->type == Tokenizer::Token::Type::CloseScope) {
+        if(end->type == Token::Type::CloseScope) {
             --opened_scopes;
             if(opened_scopes == 0)
                 break;
@@ -235,7 +235,7 @@ bool Parser::parse_next_scope(const std::span<Tokenizer::Token>& tokens, std::sp
 }
 
 // TODO: Formely define wtf is an expression :)
-bool Parser::parse_next_expression(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* curr_node, uint32_t precedence,
+bool Parser::parse_next_expression(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node, uint32_t precedence,
                                    bool search_for_matching_bracket) {
     if(it == tokens.end()) {
         error("[Parser] Expected expression, got end-of-file.\n");
@@ -245,7 +245,7 @@ bool Parser::parse_next_expression(const std::span<Tokenizer::Token>& tokens, st
     // Temporary expression node. Will be replace by its child when we're done parsing it.
     auto exprNode = curr_node->add_child(new AST::Node(AST::Node::Type::Expression));
 
-    if(it->type == Tokenizer::Token::Type::OpenParenthesis) {
+    if(it->type == Token::Type::OpenParenthesis) {
         ++it;
         if(!parse_next_expression(tokens, it, exprNode, max_precedence, true)) {
             delete curr_node->pop_child();
@@ -255,10 +255,10 @@ bool Parser::parse_next_expression(const std::span<Tokenizer::Token>& tokens, st
 
     bool stop = false;
 
-    while(it != tokens.end() && !(it->type == Tokenizer::Token::Type::EndStatement || it->type == Tokenizer::Token::Type::Comma) && !stop) {
+    while(it != tokens.end() && !(it->type == Token::Type::EndStatement || it->type == Token::Type::Comma) && !stop) {
         // TODO: Check other types!
         switch(it->type) {
-            using enum Tokenizer::Token::Type;
+            using enum Token::Type;
             case Boolean: {
                 if(!parse_boolean(tokens, it, exprNode)) {
                     delete curr_node->pop_child();
@@ -343,7 +343,7 @@ bool Parser::parse_next_expression(const std::span<Tokenizer::Token>& tokens, st
         }
     }
 
-    if(search_for_matching_bracket && (it == tokens.end() || it->type != Tokenizer::Token::Type::CloseParenthesis)) {
+    if(search_for_matching_bracket && (it == tokens.end() || it->type != Token::Type::CloseParenthesis)) {
         if(it == tokens.end())
             error("[Parser] Unmatched '(' after reaching end-of-document.\n");
         else
@@ -365,8 +365,8 @@ bool Parser::parse_next_expression(const std::span<Tokenizer::Token>& tokens, st
     return true;
 }
 
-bool Parser::parse_identifier(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* curr_node) {
-    assert(it->type == Tokenizer::Token::Type::Identifier);
+bool Parser::parse_identifier(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node) {
+    assert(it->type == Token::Type::Identifier);
 
     if(is_type(it->value)) {
         return parse_variable_declaration(tokens, it, curr_node);
@@ -375,7 +375,7 @@ bool Parser::parse_identifier(const std::span<Tokenizer::Token>& tokens, std::sp
     // Function Call
     // FIXME: Should be handled by parse_operator for () to be a generic operator!
     //        Or realise that this is a function, somehow (keep track of declaration).
-    if(peek(tokens, it, Tokenizer::Token::Type::OpenParenthesis)) {
+    if(peek(tokens, it, Token::Type::OpenParenthesis)) {
         // TODO: Check if the function has been declared (or is a built-in?) & Fetch corresponding FunctionDeclaration Node.
         curr_node->add_child(new AST::Node(AST::Node::Type::Variable, *it)); // FIXME: Use another node type
         ++it;
@@ -402,7 +402,7 @@ bool Parser::parse_identifier(const std::span<Tokenizer::Token>& tokens, std::sp
     if(variable.type == GenericValue::Type::Composite)
         variable_node->value.value.as_composite.type_id = variable.value.as_composite.type_id;
 
-    if(peek(tokens, it, Tokenizer::Token::Type::OpenSubscript)) { // Array accessor
+    if(peek(tokens, it, Token::Type::OpenSubscript)) { // Array accessor
         if(variable.type != GenericValue::Type::Array && variable.type != GenericValue::Type::String) {
             error("[Parser] Syntax Error: Subscript operator on variable '{}' on line {} which neither an array nor a string.\n", it->value, it->line);
             delete curr_node->pop_child();
@@ -427,7 +427,7 @@ bool Parser::parse_identifier(const std::span<Tokenizer::Token>& tokens, std::sp
         }
 
         // TODO: Make sure this is an integer? And compile-time constant?
-        assert(it->type == Tokenizer::Token::Type::CloseSubscript);
+        assert(it->type == Token::Type::CloseSubscript);
         ++it; // Skip ']'
     } else {
         ++it;
@@ -435,11 +435,11 @@ bool Parser::parse_identifier(const std::span<Tokenizer::Token>& tokens, std::sp
     return true;
 }
 
-bool Parser::parse_statement(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* curr_node) {
+bool Parser::parse_statement(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node) {
     // FIXME: There are probably a lot more tokens that should stop a single statement (first example would be an 'else' after an if without an open block).
     //        Does the list of stopping keywords depend on the context?
     auto end = it;
-    while(end != tokens.end() && end->type != Tokenizer::Token::Type::EndStatement)
+    while(end != tokens.end() && end->type != Token::Type::EndStatement)
         ++end;
     // Include ',' in the sub-parsing
     if(end != tokens.end())
@@ -450,8 +450,8 @@ bool Parser::parse_statement(const std::span<Tokenizer::Token>& tokens, std::spa
     return true;
 }
 
-bool Parser::parse_scope_or_single_statement(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* curr_node) {
-    if(it->type == Tokenizer::Token::Type::OpenScope) {
+bool Parser::parse_scope_or_single_statement(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node) {
+    if(it->type == Token::Type::OpenScope) {
         if(!parse_next_scope(tokens, it, curr_node))
             return false;
     } else {
@@ -461,10 +461,10 @@ bool Parser::parse_scope_or_single_statement(const std::span<Tokenizer::Token>& 
     return true;
 }
 
-bool Parser::parse_while(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* curr_node) {
+bool Parser::parse_while(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node) {
     auto whileNode = curr_node->add_child(new AST::Node(AST::Node::Type::WhileStatement, *it));
     ++it;
-    if(it->type != Tokenizer::Token::Type::OpenParenthesis) {
+    if(it->type != Token::Type::OpenParenthesis) {
         error("Expected '(' after while on line {}, got {}.\n", it->line, it->value);
         delete curr_node->pop_child();
         return false;
@@ -489,10 +489,10 @@ bool Parser::parse_while(const std::span<Tokenizer::Token>& tokens, std::span<To
     return true;
 }
 
-bool Parser::parse_for(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* curr_node) {
+bool Parser::parse_for(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node) {
     auto forNode = curr_node->add_child(new AST::Node(AST::Node::Type::ForStatement, *it));
     ++it;
-    if(it->type != Tokenizer::Token::Type::OpenParenthesis) {
+    if(it->type != Token::Type::OpenParenthesis) {
         error("Expected '(' after for on line {}, got {}.\n", it->line, it->value);
         delete curr_node->pop_child();
         return false;
@@ -529,14 +529,14 @@ bool Parser::parse_for(const std::span<Tokenizer::Token>& tokens, std::span<Toke
     return true;
 }
 
-bool Parser::parse_method_declaration(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* curr_node) {
+bool Parser::parse_method_declaration(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node) {
     return parse_function_declaration(tokens, it, curr_node);
 }
 
-bool Parser::parse_function_declaration(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* curr_node, bool exported) {
+bool Parser::parse_function_declaration(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node, bool exported) {
     auto functionNode = curr_node->add_child(new AST::Node(AST::Node::Type::FunctionDeclaration, *it));
     ++it;
-    if(it->type != Tokenizer::Token::Type::Identifier) {
+    if(it->type != Token::Type::Identifier) {
         error("Expected identifier in function declaration on line {}, got {}.\n", it->line, it->value);
         return false;
     }
@@ -546,7 +546,7 @@ bool Parser::parse_function_declaration(const std::span<Tokenizer::Token>& token
     if(exported || it->value == "main")
         functionNode->value.value.as_int32_t |= AST::Node::FunctionFlag::Exported;
     ++it;
-    if(it->type != Tokenizer::Token::Type::OpenParenthesis) {
+    if(it->type != Token::Type::OpenParenthesis) {
         error("Expected '(' in function declaration on line {}, got {}.\n", it->line, it->value);
         delete curr_node->pop_child();
         return false;
@@ -566,20 +566,20 @@ bool Parser::parse_function_declaration(const std::span<Tokenizer::Token>& token
 
     ++it;
     // Parse parameters
-    while(it != tokens.end() && it->type != Tokenizer::Token::Type::CloseParenthesis) {
+    while(it != tokens.end() && it->type != Token::Type::CloseParenthesis) {
         if(!parse_variable_declaration(tokens, it, functionNode)) {
             cleanup_on_error();
             return false;
         }
-        if(it->type == Tokenizer::Token::Type::Comma)
+        if(it->type == Token::Type::Comma)
             ++it;
-        else if(it->type != Tokenizer::Token::Type::CloseParenthesis) {
+        else if(it->type != Token::Type::CloseParenthesis) {
             error("[Parser] Expected ',' in function declaration argument list on line {}, got {}.\n", it->line, it->value);
             cleanup_on_error();
             return false;
         }
     }
-    if(it == tokens.end() || it->type != Tokenizer::Token::Type::CloseParenthesis) {
+    if(it == tokens.end() || it->type != Token::Type::CloseParenthesis) {
         error("[Parser] Unmatched '(' in function declaration on line {}.\n", it->line);
         cleanup_on_error();
         return false;
@@ -592,9 +592,9 @@ bool Parser::parse_function_declaration(const std::span<Tokenizer::Token>& token
         return false;
     }
 
-    if(it->type == Tokenizer::Token::Type::Colon) {
+    if(it->type == Token::Type::Colon) {
         ++it;
-        if(it->type != Tokenizer::Token::Type::Identifier || !is_type(it->value)) {
+        if(it->type != Token::Type::Identifier || !is_type(it->value)) {
             error("[Parser] Expected type identifier after function '{}' declaration body on line {}, got '{}'.\n", functionNode->token.value, it->line, it->value);
             cleanup_on_error();
             return false;
@@ -623,10 +623,10 @@ bool Parser::parse_function_declaration(const std::span<Tokenizer::Token>& token
     return true;
 }
 
-bool Parser::parse_type_declaration(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* curr_node) {
+bool Parser::parse_type_declaration(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node) {
     auto type_node = curr_node->add_child(new AST::Node(AST::Node::Type::TypeDeclaration, *it));
     ++it;
-    if(it->type != Tokenizer::Token::Type::Identifier) {
+    if(it->type != Token::Type::Identifier) {
         error("Expected identifier in type declaration on line {}, got {}.\n", it->line, it->value);
         delete curr_node->pop_child();
         return false;
@@ -639,7 +639,7 @@ bool Parser::parse_type_declaration(const std::span<Tokenizer::Token>& tokens, s
     }
 
     ++it;
-    if(it->type != Tokenizer::Token::Type::OpenScope) {
+    if(it->type != Token::Type::OpenScope) {
         error("Expected '{{' after type declaration on line {}, got {}.\n", it->line, it->value);
         delete curr_node->pop_child();
         return false;
@@ -648,8 +648,8 @@ bool Parser::parse_type_declaration(const std::span<Tokenizer::Token>& tokens, s
     push_scope();
     ++it;
 
-    while(it != tokens.end() && !(it->type == Tokenizer::Token::Type::CloseScope)) {
-        if(it->type == Tokenizer::Token::Type::Function) {
+    while(it != tokens.end() && !(it->type == Token::Type::CloseScope)) {
+        if(it->type == Token::Type::Function) {
             if(!parse_method_declaration(tokens, it, curr_node)) { // Note: Added to curr_node, not type_not. Right now methods are not special.
                 delete curr_node->pop_child();
                 pop_scope();
@@ -664,7 +664,7 @@ bool Parser::parse_type_declaration(const std::span<Tokenizer::Token>& tokens, s
             return false;
         }
         
-        skip(tokens, it, Tokenizer::Token::Type::EndStatement);
+        skip(tokens, it, Token::Type::EndStatement);
 
         // parse_variable_declaration may add an initialisation node, we'll make this a special case and add the default value as a child.
         if(type_node->children.back()->type == AST::Node::Type::BinaryOperator) {
@@ -687,13 +687,13 @@ bool Parser::parse_type_declaration(const std::span<Tokenizer::Token>& tokens, s
         return false;
     }
 
-    assert(it->type == Tokenizer::Token::Type::CloseScope);
+    assert(it->type == Token::Type::CloseScope);
     ++it; // Skip '}'
 
     return true;
 }
 
-bool Parser::parse_boolean(const std::span<Tokenizer::Token>&, std::span<Tokenizer::Token>::iterator& it, AST::Node* curr_node) {
+bool Parser::parse_boolean(const std::span<Token>&, std::span<Token>::iterator& it, AST::Node* curr_node) {
     auto boolNode = curr_node->add_child(new AST::Node(AST::Node::Type::ConstantValue, *it));
     boolNode->value.type = GenericValue::Type::Boolean;
     boolNode->value.flags = GenericValue::Flags::CompileConst;
@@ -702,7 +702,7 @@ bool Parser::parse_boolean(const std::span<Tokenizer::Token>&, std::span<Tokeniz
     return true;
 }
 
-bool Parser::parse_digits(const std::span<Tokenizer::Token>&, std::span<Tokenizer::Token>::iterator& it, AST::Node* curr_node) {
+bool Parser::parse_digits(const std::span<Token>&, std::span<Token>::iterator& it, AST::Node* curr_node) {
     auto integer = curr_node->add_child(new AST::Node(AST::Node::Type::ConstantValue, *it));
     integer->value.type = GenericValue::Type::Integer;
     integer->value.flags = GenericValue::Flags::CompileConst;
@@ -718,7 +718,7 @@ bool Parser::parse_digits(const std::span<Tokenizer::Token>&, std::span<Tokenize
     return true;
 }
 
-bool Parser::parse_float(const std::span<Tokenizer::Token>&, std::span<Tokenizer::Token>::iterator& it, AST::Node* curr_node) {
+bool Parser::parse_float(const std::span<Token>&, std::span<Token>::iterator& it, AST::Node* curr_node) {
     auto floatNode = curr_node->add_child(new AST::Node(AST::Node::Type::ConstantValue, *it));
     floatNode->value.type = GenericValue::Type::Float;
     floatNode->value.flags = GenericValue::Flags::CompileConst;
@@ -734,7 +734,7 @@ bool Parser::parse_float(const std::span<Tokenizer::Token>&, std::span<Tokenizer
     return true;
 }
 
-bool Parser::parse_char(const std::span<Tokenizer::Token>&, std::span<Tokenizer::Token>::iterator& it, AST::Node* curr_node) {
+bool Parser::parse_char(const std::span<Token>&, std::span<Token>::iterator& it, AST::Node* curr_node) {
     auto strNode = curr_node->add_child(new AST::Node(AST::Node::Type::ConstantValue, *it));
     strNode->value.type = GenericValue::Type::Char;
     strNode->value.flags = GenericValue::Flags::CompileConst;
@@ -743,7 +743,7 @@ bool Parser::parse_char(const std::span<Tokenizer::Token>&, std::span<Tokenizer:
     return true;
 }
 
-bool Parser::parse_string(const std::span<Tokenizer::Token>&, std::span<Tokenizer::Token>::iterator& it, AST::Node* curr_node) {
+bool Parser::parse_string(const std::span<Token>&, std::span<Token>::iterator& it, AST::Node* curr_node) {
     auto strNode = curr_node->add_child(new AST::Node(AST::Node::Type::ConstantValue, *it));
     strNode->value.type = GenericValue::Type::String;
     strNode->value.flags = GenericValue::Flags::CompileConst;
@@ -775,31 +775,31 @@ bool Parser::parse_string(const std::span<Tokenizer::Token>&, std::span<Tokenize
     return true;
 }
 
-bool Parser::parse_function_arguments(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* curr_node) {
-    assert(it->type == Tokenizer::Token::Type::OpenParenthesis);
+bool Parser::parse_function_arguments(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node) {
+    assert(it->type == Token::Type::OpenParenthesis);
     it++;
     assert(curr_node->type == AST::Node::Type::FunctionCall);
     const auto start = (it + 1);
     // Parse arguments
-    while(it != tokens.end() && it->type != Tokenizer::Token::Type::CloseParenthesis) {
+    while(it != tokens.end() && it->type != Token::Type::CloseParenthesis) {
         auto to_rvalue = curr_node->add_child(new AST::Node(AST::Node::Type::LValueToRValue, curr_node->token));
         if(!parse_next_expression(tokens, it, to_rvalue))
             return false;
         to_rvalue->value.type = to_rvalue->children[0]->value.type;
         // Skip ","
-        if(it != tokens.end() && it->type == Tokenizer::Token::Type::Comma)
+        if(it != tokens.end() && it->type == Token::Type::Comma)
             ++it;
     }
     if(it == tokens.end()) {
         error("[Parser::parse_operator] Syntax error: Unmatched '(' on line {}, got to end-of-file.\n", start->line);
         return false;
     }
-    assert(it->type == Tokenizer::Token::Type::CloseParenthesis);
+    assert(it->type == Token::Type::CloseParenthesis);
     it++;
     return true;
 }
 
-bool Parser::parse_operator(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* curr_node) {
+bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node) {
     auto operator_type = it->type;
     // Unary operators
     if(is_unary_operator(operator_type) && curr_node->children.empty()) {
@@ -814,7 +814,7 @@ bool Parser::parse_operator(const std::span<Tokenizer::Token>& tokens, std::span
         return true;
     }
 
-    if((operator_type == Tokenizer::Token::Type::Increment || operator_type == Tokenizer::Token::Type::Decrement) && !curr_node->children.empty()) {
+    if((operator_type == Token::Type::Increment || operator_type == Token::Type::Decrement) && !curr_node->children.empty()) {
         auto       prev_node = curr_node->pop_child();
         AST::Node* unary_operator_node = curr_node->add_child(new AST::Node(AST::Node::Type::UnaryOperator, *it, AST::Node::SubType::Postfix));
         // auto   precedence = operator_precedence.at(std::string(it->value));
@@ -826,17 +826,17 @@ bool Parser::parse_operator(const std::span<Tokenizer::Token>& tokens, std::span
     }
 
     // '(', but not a function declaration or call operator.
-    if(operator_type == Tokenizer::Token::Type::OpenParenthesis && curr_node->children.empty())
+    if(operator_type == Token::Type::OpenParenthesis && curr_node->children.empty())
         return parse_next_expression(tokens, it, curr_node);
 
-    if(operator_type == Tokenizer::Token::Type::CloseParenthesis) {
+    if(operator_type == Token::Type::CloseParenthesis) {
         // Should have been handled by others parsing functions.
         throw Exception(fmt::format("[Parser::parse_operator] Unmatched ')' on line {}.\n", it->line), point_error(it->column, it->line));
         return false;
     }
 
     // Function call
-    if(operator_type == Tokenizer::Token::Type::OpenParenthesis) {
+    if(operator_type == Token::Type::OpenParenthesis) {
         auto       function_node = curr_node->pop_child();
         auto       call_node = curr_node->add_child(new AST::Node(AST::Node::Type::FunctionCall, function_node->token));
         call_node->add_child(function_node);
@@ -881,26 +881,26 @@ bool Parser::parse_operator(const std::span<Tokenizer::Token>& tokens, std::span
         return false;
     }
 
-    if(operator_type == Tokenizer::Token::Type::OpenSubscript) {
+    if(operator_type == Token::Type::OpenSubscript) {
         if(!parse_next_expression(tokens, it, binary_operator_node)) {
             delete curr_node->pop_child();
             return false;
         }
         // Check for ']' and advance
-        if(it->type != Tokenizer::Token::Type::CloseSubscript) {
+        if(it->type != Token::Type::CloseSubscript) {
             error("[Parser::parse_operator] Syntax error: Expected ']', got '{}' (line {}).\n", it->value, it->line);
             delete curr_node->pop_child();
             return false;
         }
         ++it;
-    } else if(operator_type == Tokenizer::Token::Type::MemberAccess) {
+    } else if(operator_type == Token::Type::MemberAccess) {
         if(prev_expr->value.type != GenericValue::Type::Composite) {
             error("[Parser] Syntax error: Use of the '.' operator is only valid on composite types.\n");
             delete curr_node->pop_child();
             return false;
         }
         // Only allow a single identifier, use subscript for more complex expressions?
-        if(!(it->type == Tokenizer::Token::Type::Identifier)) {
+        if(!(it->type == Token::Type::Identifier)) {
             error("[Parser] Syntax error: Expected identifier on the right side of '.' operator.\n");
             delete curr_node->pop_child();
             return false;
@@ -923,7 +923,7 @@ bool Parser::parse_operator(const std::span<Tokenizer::Token>& tokens, std::span
             auto member_identifier_node = binary_operator_node->add_child(new AST::Node(AST::Node::Type::MemberIdentifier, *it));
             member_identifier_node->value.value.as_int32_t = member_index;
             ++it;
-        } else if(peek(tokens, it, Tokenizer::Token::Type::OpenParenthesis)) {
+        } else if(peek(tokens, it, Token::Type::OpenParenthesis)) {
             // Search for a corresponding method
             const auto method = get_function(identifier_name);
             if(method && method->children.size() > 0 && method->children[0]->value.type == GenericValue::Type::Composite &&
@@ -967,7 +967,7 @@ bool Parser::parse_operator(const std::span<Tokenizer::Token>& tokens, std::span
 
     // TODO: Test if types are compatible (with the operator and between each other)
 
-    if(operator_type == Tokenizer::Token::Type::Assignment) {
+    if(operator_type == Token::Type::Assignment) {
         // Assignment: if variable is const and value is constexpr, mark the variable as constexpr.
         // FIXME: Workaround to allow more constant propagation. Should be done in a later stage.
         binary_operator_node->children[1] = AST::optimize(binary_operator_node->children[1]);
@@ -982,7 +982,7 @@ bool Parser::parse_operator(const std::span<Tokenizer::Token>& tokens, std::span
 
     // Convert l-values to r-values when necessary (will generate a Load on the LLVM backend)
     // Left side of Assignement and MemberAcces should always be a l-value.
-    if(operator_type != Tokenizer::Token::Type::Assignment && operator_type != Tokenizer::Token::Type::MemberAccess) {
+    if(operator_type != Token::Type::Assignment && operator_type != Token::Type::MemberAccess) {
         if(binary_operator_node->children[0]->type != AST::Node::Type::MemberIdentifier && binary_operator_node->children[0]->type != AST::Node::Type::ConstantValue) {
             auto ltor = binary_operator_node->insert_between(0, new AST::Node(AST::Node::Type::LValueToRValue));
             ltor->value.type = ltor->children.front()->value.type; // Propagate type
@@ -1010,14 +1010,14 @@ bool Parser::parse_operator(const std::span<Tokenizer::Token>& tokens, std::span
        ((binary_operator_node->children[0]->value.type == GenericValue::Type::Integer && binary_operator_node->children[1]->value.type == GenericValue::Type::Float) ||
         (binary_operator_node->children[0]->value.type == GenericValue::Type::Float && binary_operator_node->children[1]->value.type == GenericValue::Type::Integer))) {
 
-        if(binary_operator_node->token.type != Tokenizer::Token::Type::Assignment && binary_operator_node->children[0]->value.type == GenericValue::Type::Integer)
+        if(binary_operator_node->token.type != Token::Type::Assignment && binary_operator_node->children[0]->value.type == GenericValue::Type::Integer)
             create_cast_node(0, GenericValue::Type::Float);
         if(binary_operator_node->children[1]->value.type == GenericValue::Type::Integer)
             create_cast_node(1, GenericValue::Type::Float);
     }
     // Truncation to integer (in assignments for example)
     if(binary_operator_node->value.type == GenericValue::Type::Integer) {
-        if(binary_operator_node->token.type != Tokenizer::Token::Type::Assignment && binary_operator_node->children[0]->value.type == GenericValue::Type::Float)
+        if(binary_operator_node->token.type != Token::Type::Assignment && binary_operator_node->children[0]->value.type == GenericValue::Type::Float)
             create_cast_node(0, GenericValue::Type::Integer);
         if(binary_operator_node->children[1]->value.type == GenericValue::Type::Float)
             create_cast_node(1, GenericValue::Type::Integer);
@@ -1029,8 +1029,8 @@ bool Parser::parse_operator(const std::span<Tokenizer::Token>& tokens, std::span
 /* it must point to an type identifier
  * TODO: Handle non-built-it types.
  */
-bool Parser::parse_variable_declaration(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node* curr_node, bool is_const) {
-    assert(it->type == Tokenizer::Token::Type::Identifier);
+bool Parser::parse_variable_declaration(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node, bool is_const) {
+    assert(it->type == Token::Type::Identifier);
     assert(is_type(it->value));
     auto varDecNode = curr_node->add_child(new AST::Node(AST::Node::Type::VariableDeclaration, *it));
     auto cleanup_on_error = [&]() { delete curr_node->pop_child(); };
@@ -1045,7 +1045,7 @@ bool Parser::parse_variable_declaration(const std::span<Tokenizer::Token>& token
         varDecNode->subtype = AST::Node::SubType::Const;
     ++it;
     // Array declaration
-    if(it != tokens.end() && (it->type == Tokenizer::Token::Type::OpenSubscript)) {
+    if(it != tokens.end() && (it->type == Token::Type::OpenSubscript)) {
         varDecNode->value.value.as_array.type = varDecNode->value.type;
         varDecNode->value.type = GenericValue::Type::Array;
         ++it;
@@ -1060,7 +1060,7 @@ bool Parser::parse_variable_declaration(const std::span<Tokenizer::Token>& token
             error("[Parser] Syntax error: Expected ']', got end-of-document.");
             cleanup_on_error();
             return false;
-        } else if(it->type != Tokenizer::Token::Type::CloseSubscript) {
+        } else if(it->type != Token::Type::CloseSubscript) {
             error("[Parser] Syntax error: Expected ']', got {}.", *it);
             cleanup_on_error();
             return false;
@@ -1073,7 +1073,7 @@ bool Parser::parse_variable_declaration(const std::span<Tokenizer::Token>& token
         return false;
     }
     auto next = *it; // Hopefully a name
-    if(next.type != Tokenizer::Token::Type::Identifier) {
+    if(next.type != Token::Type::Identifier) {
         error("[Parser] Syntax error: Expected Identifier for variable declaration, got {}.\n", next);
         cleanup_on_error();
         return false;
@@ -1086,7 +1086,7 @@ bool Parser::parse_variable_declaration(const std::span<Tokenizer::Token>& token
     }
     ++it;
     // Also push a variable identifier for initialisation
-    bool has_initializer = it != tokens.end() && (it->type == Tokenizer::Token::Type::Assignment);
+    bool has_initializer = it != tokens.end() && (it->type == Token::Type::Assignment);
     if(is_const && !has_initializer) {
         error("[Parser] Syntax error: Variable '{}' declared as const but not initialized on line {}.\n", next.value, next.line);
         cleanup_on_error();
@@ -1106,8 +1106,8 @@ bool Parser::parse_variable_declaration(const std::span<Tokenizer::Token>& token
     return true;
 }
 
-bool Parser::parse_import(const std::span<Tokenizer::Token>& tokens, std::span<Tokenizer::Token>::iterator& it, AST::Node*) {
-    assert(it->type == Tokenizer::Token::Type::Import);
+bool Parser::parse_import(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node*) {
+    assert(it->type == Token::Type::Import);
     ++it;
 
     // TODO: Check Cache
