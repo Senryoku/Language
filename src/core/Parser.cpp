@@ -21,11 +21,8 @@ bool Parser::parse(const std::span<Token>& tokens, AST::Node* curr_node) {
                 assert(false); // FIXME: I don't think this case is needed, it should already be taken care of and always return an error.
                 while(curr_node->type != AST::Node::Type::Scope && curr_node->parent != nullptr)
                     curr_node = curr_node->parent;
-                if(curr_node->type != AST::Node::Type::Scope) {
-                    throw Exception(fmt::format("[Parser] Syntax error: Unmatched '}}' on line {}.\n", it->line),
-                                    point_error(it->column, it->line));
-                    return false;
-                }
+                if(curr_node->type != AST::Node::Type::Scope)
+                    throw Exception(fmt::format("[Parser] Syntax error: Unmatched '}}' on line {}.\n", it->line), point_error(*it));
                 curr_node->value.type = get_scope().get_return_type();
                 curr_node = curr_node->parent;
                 pop_scope();
@@ -235,8 +232,7 @@ bool Parser::parse_next_scope(const std::span<Token>& tokens, std::span<Token>::
 }
 
 // TODO: Formely define wtf is an expression :)
-bool Parser::parse_next_expression(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node, uint32_t precedence,
-                                   bool search_for_matching_bracket) {
+bool Parser::parse_next_expression(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node, uint32_t precedence, bool search_for_matching_bracket) {
     if(it == tokens.end()) {
         error("[Parser] Expected expression, got end-of-file.\n");
         return false;
@@ -603,20 +599,27 @@ bool Parser::parse_function_declaration(const std::span<Token>& tokens, std::spa
         ++it;
     }
 
+    // FIXME: Hackish this.
+    if(functionNode->children.size() > 0)
+        get_scope().set_this(get(functionNode->children[0]->token.value));
+
+    // Function body
     if(!parse_scope_or_single_statement(tokens, it, functionNode)) {
         cleanup_on_error();
         return false;
     }
 
     // Return type deduction
-    if(functionNode->value.type == GenericValue::Type::Undefined)
-        functionNode->value.type = functionNode->children.back()->value.type;
-    else if(functionNode->value.type != functionNode->children.back()->value.type) {
-        error("[Parser] Syntax error: Incoherent return types for function {}, got {} on line {}, expected {}.\n", functionNode->token.value,
-              functionNode->children.back()->value.type, functionNode->children.back()->token.line, functionNode->value.type);
+    auto return_type = functionNode->children.back()->value.type;
+    if(return_type == GenericValue::Type::Undefined)
+        return_type = GenericValue::Type::Void;
+    if(functionNode->value.type != GenericValue::Type::Undefined && functionNode->value.type != return_type) {
+        error("[Parser] Syntax error: Incoherent return types for function {}, got {} on line {}, expected {}.\n", functionNode->token.value, return_type,
+              functionNode->children.back()->token.line, functionNode->value.type);
         cleanup_on_error();
         return false;
     }
+    functionNode->value.type = return_type;
 
     pop_scope();
 
@@ -649,6 +652,12 @@ bool Parser::parse_type_declaration(const std::span<Token>& tokens, std::span<To
     ++it;
 
     while(it != tokens.end() && !(it->type == Token::Type::CloseScope)) {
+
+        if(it->type == Token::Type::Comment) {
+            it++;
+            continue;
+        }
+
         if(it->type == Token::Type::Function) {
             if(!parse_method_declaration(tokens, it, curr_node)) { // Note: Added to curr_node, not type_not. Right now methods are not special.
                 delete curr_node->pop_child();
@@ -663,7 +672,7 @@ bool Parser::parse_type_declaration(const std::span<Token>& tokens, std::span<To
             pop_scope();
             return false;
         }
-        
+
         skip(tokens, it, Token::Type::EndStatement);
 
         // parse_variable_declaration may add an initialisation node, we'll make this a special case and add the default value as a child.
@@ -829,16 +838,14 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
     if(operator_type == Token::Type::OpenParenthesis && curr_node->children.empty())
         return parse_next_expression(tokens, it, curr_node);
 
-    if(operator_type == Token::Type::CloseParenthesis) {
-        // Should have been handled by others parsing functions.
+    // Should have been handled by others parsing functions.
+    if(operator_type == Token::Type::CloseParenthesis)
         throw Exception(fmt::format("[Parser::parse_operator] Unmatched ')' on line {}.\n", it->line), point_error(it->column, it->line));
-        return false;
-    }
 
     // Function call
     if(operator_type == Token::Type::OpenParenthesis) {
-        auto       function_node = curr_node->pop_child();
-        auto       call_node = curr_node->add_child(new AST::Node(AST::Node::Type::FunctionCall, function_node->token));
+        auto function_node = curr_node->pop_child();
+        auto call_node = curr_node->add_child(new AST::Node(AST::Node::Type::FunctionCall, function_node->token));
         call_node->add_child(function_node);
 
         // TODO: Check type of function_node (is it actually callable?)
@@ -863,10 +870,20 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
         return true;
     }
 
-    if(curr_node->children.empty()) {
-        error("[Parser::parse_operator] Syntax error: unexpected binary operator: {}.\n", *it);
-        return false;
+    // Implicit 'this'
+    if(curr_node->children.empty() && operator_type == Token::Type::MemberAccess) {
+        auto t = get_this();
+        if(!t)
+            throw Exception(fmt::format("[Parser] Syntax error: Implicit 'this' access, but 'this' is not defined here.\n", *it), point_error(*it));
+        Token token = *it;
+        token.value = *internalize_string("this");
+        auto this_node = curr_node->add_child(new AST::Node(AST::Node::Type::Variable, token));
+        this_node->value = *t;
     }
+
+    if(curr_node->children.empty())
+        throw Exception(fmt::format("[Parser::parse_operator] Syntax error: unexpected binary operator: {}.\n", *it), point_error(*it));
+
     AST::Node* prev_expr = curr_node->pop_child();
     // TODO: Test type of previous node! (Must be an expression resolving to something operable)
     AST::Node* binary_operator_node = curr_node->add_child(new AST::Node(AST::Node::Type::BinaryOperator, *it));
@@ -942,20 +959,14 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
                 to_rvalue->add_child(first_argument);
 
                 if(!parse_function_arguments(tokens, it, call_node)) {
-                    delete curr_node->pop_child();
-                    throw Exception(fmt::format("[Parser] Error parsing '{}' method arguments on line {}.\n", call_node->token.value, it->line),
-                                    point_error(type->token.column, type->token.line));
+                    throw Exception(fmt::format("[Parser] Error parsing '{}' method arguments.\n", call_node->token.value), point_error(*it));
                 }
                 return true;
             } else {
-                delete curr_node->pop_child();
-                throw Exception(fmt::format("[Parser] Syntax error: Method '{}' does not exists on type {}.\n", identifier_name, type->token.value),
-                                point_error(type->token.column, type->token.line));
+                throw Exception(fmt::format("[Parser] Syntax error: Method '{}' does not exists on type {}.\n", identifier_name, type->token.value), point_error(*it));
             }
         } else {
-            error("[Parser] Syntax error: Member '{}' does not exists on type {} on line {}.\n", identifier_name, type->token.value, it->line);
-            delete curr_node->pop_child();
-            return false;
+            throw Exception(fmt::format("[Parser] Syntax error: Member '{}' does not exists on type {}.\n", identifier_name, type->token.value), point_error(*it));
         }
     } else {
         // Lookahead for rhs

@@ -12,8 +12,10 @@ class Exception : public std::logic_error {
 
     void display() const {
         error(what());
-        print("\n");
-        info(hint());
+        if(!hint().empty()) {
+            print("\n");
+            info("{}", hint());
+        }
     }
 
   private:

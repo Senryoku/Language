@@ -2,6 +2,7 @@
 
 #include <fmt/core.h>
 #include <fmt/format.h>
+#include <fmt/color.h>
 
 struct Token {
     enum class Type {

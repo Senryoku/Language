@@ -19,29 +19,28 @@ static std::unordered_map<Token::Type, std::unordered_map<GenericValue::Type, st
         GenericValue::Type::VALUETYPE, [](llvm::IRBuilder<>& ir_builder, llvm::Value* lhs, llvm::Value* rhs) { FUNC } \
     }
 
-static std::unordered_map<Token::Type, std::unordered_map<GenericValue::Type, std::function<llvm::Value*(llvm::IRBuilder<>&, llvm::Value*, llvm::Value*)>>> binary_ops =
-    {
-        {Token::Type::Addition, {OP(Integer, return ir_builder.CreateAdd(lhs, rhs, "add");), OP(Float, return ir_builder.CreateFAdd(lhs, rhs, "fadd");)}},
-        {Token::Type::Substraction, {OP(Integer, return ir_builder.CreateSub(lhs, rhs, "sub");), OP(Float, return ir_builder.CreateFSub(lhs, rhs, "fsub");)}},
-        {Token::Type::Multiplication, {OP(Integer, return ir_builder.CreateMul(lhs, rhs, "mul");), OP(Float, return ir_builder.CreateFMul(lhs, rhs, "fmul");)}},
-        {Token::Type::Division, {OP(Integer, return ir_builder.CreateSDiv(lhs, rhs, "div");), OP(Float, return ir_builder.CreateFDiv(lhs, rhs, "fdiv");)}},
-        {Token::Type::Modulus, {OP(Integer, return ir_builder.CreateSRem(lhs, rhs, "srem");)}},
-        // Comparisons
-        {Token::Type::Equal,
-         {OP(Integer, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_EQ, lhs, rhs, "ICMP_EQ");),
-          OP(Float, return ir_builder.CreateFCmp(llvm::CmpInst::Predicate::FCMP_OEQ, lhs, rhs, "FCMP_OEQ");)}},
-        {Token::Type::Lesser,
-         {OP(Integer, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_SLT, lhs, rhs, "ICMP_SLT");),
-          OP(Float, return ir_builder.CreateFCmp(llvm::CmpInst::Predicate::FCMP_OLT, lhs, rhs, "FCMP_OLT");)}},
-        {Token::Type::LesserOrEqual,
-         {OP(Integer, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_SLE, lhs, rhs, "ICMP_SLE");),
-          OP(Float, return ir_builder.CreateFCmp(llvm::CmpInst::Predicate::FCMP_OLE, lhs, rhs, "FCMP_OLE");)}},
-        {Token::Type::Greater,
-         {OP(Integer, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_SGT, lhs, rhs, "ICMP_SGT");),
-          OP(Float, return ir_builder.CreateFCmp(llvm::CmpInst::Predicate::FCMP_OGT, lhs, rhs, "FCMP_OGT");)}},
-        {Token::Type::GreaterOrEqual,
-         {OP(Integer, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_SGE, lhs, rhs, "ICMP_SGE");),
-          OP(Float, return ir_builder.CreateFCmp(llvm::CmpInst::Predicate::FCMP_OGE, lhs, rhs, "FCMP_OGE");)}},
+static std::unordered_map<Token::Type, std::unordered_map<GenericValue::Type, std::function<llvm::Value*(llvm::IRBuilder<>&, llvm::Value*, llvm::Value*)>>> binary_ops = {
+    {Token::Type::Addition, {OP(Integer, return ir_builder.CreateAdd(lhs, rhs, "add");), OP(Float, return ir_builder.CreateFAdd(lhs, rhs, "fadd");)}},
+    {Token::Type::Substraction, {OP(Integer, return ir_builder.CreateSub(lhs, rhs, "sub");), OP(Float, return ir_builder.CreateFSub(lhs, rhs, "fsub");)}},
+    {Token::Type::Multiplication, {OP(Integer, return ir_builder.CreateMul(lhs, rhs, "mul");), OP(Float, return ir_builder.CreateFMul(lhs, rhs, "fmul");)}},
+    {Token::Type::Division, {OP(Integer, return ir_builder.CreateSDiv(lhs, rhs, "div");), OP(Float, return ir_builder.CreateFDiv(lhs, rhs, "fdiv");)}},
+    {Token::Type::Modulus, {OP(Integer, return ir_builder.CreateSRem(lhs, rhs, "srem");)}},
+    // Comparisons
+    {Token::Type::Equal,
+     {OP(Integer, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_EQ, lhs, rhs, "ICMP_EQ");),
+      OP(Float, return ir_builder.CreateFCmp(llvm::CmpInst::Predicate::FCMP_OEQ, lhs, rhs, "FCMP_OEQ");)}},
+    {Token::Type::Lesser,
+     {OP(Integer, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_SLT, lhs, rhs, "ICMP_SLT");),
+      OP(Float, return ir_builder.CreateFCmp(llvm::CmpInst::Predicate::FCMP_OLT, lhs, rhs, "FCMP_OLT");)}},
+    {Token::Type::LesserOrEqual,
+     {OP(Integer, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_SLE, lhs, rhs, "ICMP_SLE");),
+      OP(Float, return ir_builder.CreateFCmp(llvm::CmpInst::Predicate::FCMP_OLE, lhs, rhs, "FCMP_OLE");)}},
+    {Token::Type::Greater,
+     {OP(Integer, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_SGT, lhs, rhs, "ICMP_SGT");),
+      OP(Float, return ir_builder.CreateFCmp(llvm::CmpInst::Predicate::FCMP_OGT, lhs, rhs, "FCMP_OGT");)}},
+    {Token::Type::GreaterOrEqual,
+     {OP(Integer, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_SGE, lhs, rhs, "ICMP_SGE");),
+      OP(Float, return ir_builder.CreateFCmp(llvm::CmpInst::Predicate::FCMP_OGE, lhs, rhs, "FCMP_OGE");)}},
 };
 #undef OP
 
@@ -177,7 +176,7 @@ llvm::Value* Module::codegen(const AST::Node* node) {
             }
             auto function_body = codegen(node->children.back()); // Generate function body
             if(!_generated_return)
-                _llvm_ir_builder.CreateRet(function_body);
+                _llvm_ir_builder.CreateRet(node->value.type == GenericValue::Type::Void ? nullptr : function_body);
             pop_scope();
 
             // TODO: Correctly handle no return (llvm_ir_builder.CreateRet(RetVal);)
@@ -213,11 +212,14 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                 if(!v)
                     return nullptr;
                 // C Variadic functions promotes float to double (see https://stackoverflow.com/questions/63144506/printf-doesnt-work-for-floats-in-llvm-ir)
-                if (function_flags & AST::Node::FunctionFlag::Variadic && v->getType()->isFloatTy())
-                    v = _llvm_ir_builder.CreateFPExt(v, llvm::Type::getDoubleTy(* _llvm_context));
+                if(function_flags & AST::Node::FunctionFlag::Variadic && v->getType()->isFloatTy())
+                    v = _llvm_ir_builder.CreateFPExt(v, llvm::Type::getDoubleTy(*_llvm_context));
                 parameters.push_back(v);
             }
-            return _llvm_ir_builder.CreateCall(function, parameters, function_name);
+            if(node->value.type == GenericValue::Type::Void)
+                return _llvm_ir_builder.CreateCall(function, parameters);
+            else
+                return _llvm_ir_builder.CreateCall(function, parameters, function_name);
         }
         case AST::Node::Type::VariableDeclaration: {
             llvm::AllocaInst* ret = nullptr;
@@ -259,11 +261,17 @@ llvm::Value* Module::codegen(const AST::Node* node) {
             return ret;
         }
         case AST::Node::Type::Variable: {
-            auto var = get(node->token.value);
-            if(!var) {
-                error("[LLVMCodegen] Undeclared variable '{}'.\n", node->token.value);
-                return nullptr;
+            // FIXME: Quick hack to get a potential 'this'.
+            if(node->token.value == "this") {
+                auto scope_it = _scopes.rbegin();
+                while(scope_it->empty())
+                    scope_it++;
+                return scope_it->empty() ? nullptr : scope_it->begin()->second;
             }
+
+            auto var = get(node->token.value);
+            if(!var)
+                error("[LLVMCodegen] Undeclared variable '{}'.\n", node->token.value);
             return var;
         }
         case AST::Node::Type::LValueToRValue: {

@@ -117,6 +117,7 @@ class Module {
         switch(type) {
             case GenericValue::Type::Integer: return llvm::Type::getInt32Ty(*_llvm_context);
             case GenericValue::Type::Float: return llvm::Type::getFloatTy(*_llvm_context);
+            case GenericValue::Type::Void: return llvm::Type::getVoidTy(*_llvm_context);
             default: error("[Module::get_llvm_type] GenericValue Type '{}' not mapped to a LLVM Type.\n", type); assert(false);
         }
         return nullptr;
@@ -125,7 +126,7 @@ class Module {
     llvm::Type* get_llvm_type(const AST::Node* node) const {
         switch(node->value.type) {
             case GenericValue::Type::Composite: {
-                std::string type_name(node->value.value.as_composite.type_name.to_std_string_view()); // FIXME
+                std::string type_name(node->value.value.as_composite.type_name.to_std_string_view()); // FIXME: Internalize the string and remove this
                 return llvm::StructType::getTypeByName(*_llvm_context, type_name);
             }
             default: return get_llvm_type(node->value.type);

@@ -2,13 +2,19 @@ type NewType {
 	int   i;
 	float f;
 	
-	function get_i() {
+	// Bug: Not emited in the correct scope (currently inaccessible)
+	function get_i(NewType t) {
 		return .i;
 	}
 }
 
 function get_f(NewType t) : float {
-	return t.f;
+	return .f;
+}
+
+// Needs a notion of "mutable this"
+function set_f(NewType t, float f) {
+	.f = f;
 }
 
 function main() {
@@ -16,6 +22,7 @@ function main() {
 	value.i = 1234;
 	value.f = 666.0;
 	printf("  i:%d, f:%f\n", value.i, value.f);
+	value.set_f(888.0); // Doesn't work without a notion of "mutable this"
 	int r = value.get_f();
 	return r;
 }

@@ -6,8 +6,8 @@
 #include <VariableStore.hpp>
 #include <het_unordered_map.hpp>
 
-#include <FlyString.hpp>
 #include <AST.hpp>
+#include <FlyString.hpp>
 
 using TypeRegistry = std::unordered_map<TypeID, const AST::Node*>;
 
@@ -151,6 +151,10 @@ class Scope {
     GenericValue::Type get_return_type() const { return _return_type; }
     void               set_return_type(GenericValue::Type t) { _return_type = t; }
 
+    void            set_this(Variable* var) { _this = var; }
+    const Variable* get_this() const { return _this; }
+    Variable*       get_this() { return _this; }
+
   private:
     TypeRegistry* _type_registry; // Shared by the whole tree
 
@@ -158,6 +162,8 @@ class Scope {
     VariableStore                          _variables; // Owning
     het_unordered_map<FunctionDeclaration> _functions; // Non-owning
     het_unordered_map<TypeDeclaration>     _types;     // Non-owning
+
+    Variable* _this = nullptr;
 
     // Return Type for type checking. FIXME: Handle composite types.
     GenericValue::Type _return_type = GenericValue::Type::Undefined;
@@ -202,6 +208,25 @@ class Scoped {
     virtual ~Scoped() {
         for(auto& s : _scopes)
             delete s;
+    }
+
+    const Variable* get_this() const {
+        auto it = _scopes.rbegin();
+        while(it != _scopes.rend()) {
+            if((*it)->get_this())
+                return (*it)->get_this();
+            it++;
+        }
+        return nullptr;
+    }
+    Variable* get_this() {
+        auto it = _scopes.rbegin();
+        while(it != _scopes.rend()) {
+            if((*it)->get_this())
+                return (*it)->get_this();
+            it++;
+        }
+        return nullptr;
     }
 
     Scope&       get_root_scope() { return *_scopes.front(); }

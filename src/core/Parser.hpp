@@ -9,12 +9,12 @@
 #include <fmt/color.h>
 
 #include <AST.hpp>
+#include <Exception.hpp>
 #include <Logger.hpp>
 #include <ModuleInterface.hpp>
 #include <Scope.hpp>
 #include <Source.hpp>
 #include <Tokenizer.hpp>
-#include <Exception.hpp>
 #include <VariableStore.hpp>
 
 class Parser : public Scoped {
@@ -43,8 +43,7 @@ class Parser : public Scoped {
     };
 
     bool is_unary_operator(Token::Type type) {
-        return type == Token::Type::Addition || type == Token::Type::Substraction || type == Token::Type::Increment ||
-               type == Token::Type::Decrement;
+        return type == Token::Type::Addition || type == Token::Type::Substraction || type == Token::Type::Increment || type == Token::Type::Decrement;
     }
 
     void resolve_operator_type(AST::Node* op_node) {
@@ -119,9 +118,7 @@ class Parser : public Scoped {
     bool peek(const std::span<Token>& tokens, const std::span<Token>::iterator& it, const Token::Type& type, const std::string& value) {
         return it + 1 != tokens.end() && (it + 1)->type == type && (it + 1)->value == value;
     }
-    bool peek(const std::span<Token>& tokens, const std::span<Token>::iterator& it, const Token::Type& type) {
-        return it + 1 != tokens.end() && (it + 1)->type == type;
-    }
+    bool peek(const std::span<Token>& tokens, const std::span<Token>::iterator& it, const Token::Type& type) { return it + 1 != tokens.end() && (it + 1)->type == type; }
 
     const ModuleInterface& get_module_interface() const { return _module_interface; }
     ModuleInterface&       get_module_interface() { return _module_interface; }
@@ -161,9 +158,10 @@ class Parser : public Scoped {
             ++it;
     }
 
-    std::string point_error(size_t at, size_t line, size_t from = (std::numeric_limits<size_t>::max)(), size_t to = (std::numeric_limits<size_t>::max)()) {
+    template<typename... Args>
+    std::string point_error(Args&&... args) {
         if(_source)
-            return ::point_error(*_source, at, line, from, to);
+            return ::point_error_find_line(*_source, args...);
         return "";
     }
 };

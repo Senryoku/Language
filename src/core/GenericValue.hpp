@@ -21,6 +21,7 @@ struct GenericValue {
         Array,
         Composite,
         Reference,
+        Void,
         Undefined
     };
 
@@ -518,6 +519,7 @@ struct fmt::formatter<GenericValue::Type> {
             case Array: return fmt::format_to(ctx.out(), "{}", "array");
             case Composite: return fmt::format_to(ctx.out(), fg(fmt::color::light_green), "{}", "composite");
             case Reference: return fmt::format_to(ctx.out(), fg(fmt::color::blue), "{}", "reference");
+            case Void: return fmt::format_to(ctx.out(), fg(fmt::color::gray), "{}", "void");
             case Undefined: return fmt::format_to(ctx.out(), fg(fmt::color::gray), "{}", "undefined");
             default: return fmt::format_to(ctx.out(), fg(fmt::color::red), "{}: {}", "Unknown Generic Value Type [by the formatter]", static_cast<int>(t));
         }
