@@ -264,9 +264,9 @@ llvm::Value* Module::codegen(const AST::Node* node) {
             // FIXME: Quick hack to get a potential 'this'.
             if(node->token.value == "this") {
                 auto scope_it = _scopes.rbegin();
-                while(scope_it->empty())
+                while(scope_it != _scopes.rend() && scope_it->empty())
                     scope_it++;
-                return scope_it->empty() ? nullptr : scope_it->begin()->second;
+                return (scope_it == _scopes.rend() || scope_it->empty()) ? nullptr : scope_it->begin()->second;
             }
 
             auto var = get(node->token.value);
