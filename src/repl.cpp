@@ -6,7 +6,6 @@
 #include <string>
 #include <string_view>
 
-#include <Interpreter.hpp>
 #include <Logger.hpp>
 #include <Parser.hpp>
 #include <Tokenizer.hpp>
@@ -37,7 +36,7 @@ int main(int argc, char* argv[]) {
     std::vector<Token> tokens;
     AST                           ast;
     Parser                        parser;
-    Interpreter                   interpreter;
+    //Interpreter                   interpreter;
     std::string                   input;
 
     Prompt prompt;
@@ -60,15 +59,14 @@ int main(int argc, char* argv[]) {
             tokens.push_back(tokenizer.consume());
 
         auto newNode = parser.parse(std::span<Token>{tokens.begin() + first, tokens.end()}, ast);
-        ast.optimize();
         if(newNode) {
             log.group();
             log.print("Executing ({}) using Interpreter...\n", newNode->type);
             auto clock = std::chrono::steady_clock();
             auto start = clock.now();
-            interpreter.execute(*newNode);
+            //interpreter.execute(*newNode);
             auto end = clock.now();
-            log.print("Done in {}ms, returned: '{}'.\n", std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count(), interpreter.get_return_value());
+            //log.print("Done in {}ms, returned: '{}'.\n", std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count(), interpreter.get_return_value());
             log.end();
         }
         log.end();
@@ -88,7 +86,6 @@ int main(int argc, char* argv[]) {
             fmt::print(R"(Available commands:
     q           Exits the program.
     load [path] Loads, parse and interprets the file at specified path.
-    optimize    Run optimize on the current AST.
     dump        Dump the current AST.
     clear       Resets everything (AST and Interpreter states included).
     rerun       Reinitialize the interpreter and re-execute the current AST.
@@ -96,8 +93,6 @@ int main(int argc, char* argv[]) {
 )");
         } else if(input.starts_with("load ")) {
             load(input.substr(5));
-        } else if(input == "optimize") {
-            ast.optimize();
         } else if(input == "dump") {
             fmt::print("{}", ast);
         } else if(input == "clear") {
@@ -105,15 +100,15 @@ int main(int argc, char* argv[]) {
             tokens.clear();
             ast = {};
             parser = {};
-            interpreter = {};
+            //interpreter = {};
         } else if(input == "rerun") {
             log.print("Reseting interpreter and re-running AST...\n");
-            interpreter = {};
+            //interpreter = {};
             auto clock = std::chrono::steady_clock();
             auto start = clock.now();
-            interpreter.execute(ast.getRoot());
+            //interpreter.execute(ast.getRoot());
             auto end = clock.now();
-            log.print("Done in {}ms, returned: '{}'.\n", std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count(), interpreter.get_return_value());
+            //log.print("Done in {}ms, returned: '{}'.\n", std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count(), interpreter.get_return_value());
         } else if(input == "debug") {
             debug = !debug;
         } else {
@@ -137,9 +132,9 @@ int main(int argc, char* argv[]) {
                     log.print("Executing ({}) using Interpreter...\n", newNode->type);
                     auto clock = std::chrono::steady_clock();
                     auto start = clock.now();
-                    interpreter.execute(*newNode);
+                    //interpreter.execute(*newNode);
                     auto end = clock.now();
-                    log.print("Done in {}ms, returned: '{}'.\n", std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count(), interpreter.get_return_value());
+                    //log.print("Done in {}ms, returned: '{}'.\n", std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count(), interpreter.get_return_value());
                     log.end();
                 }
             } catch(const Exception& e) { e.display(); }

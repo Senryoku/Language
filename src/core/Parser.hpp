@@ -83,15 +83,13 @@ class Parser : public Scoped {
         }
     }
 
-    std::optional<AST> parse(const std::span<Token>& tokens, bool optimize = true) {
+    std::optional<AST> parse(const std::span<Token>& tokens) {
         std::optional<AST> ast(AST{});
         try {
             bool r = parse(tokens, &(*ast).getRoot());
             if(!r) {
                 error("Error while parsing!\n");
                 ast.reset();
-            } else if(optimize) {
-                ast->optimize();
             }
         } catch(const Exception& e) {
             e.display();

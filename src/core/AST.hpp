@@ -107,10 +107,6 @@ class AST {
     inline Node&       getRoot() { return _root; }
     inline const Node& getRoot() const { return _root; }
 
-    // Will perform some really basic optimisations
-    void                       optimize();
-    [[nodiscard]] static Node* optimize(Node*);
-
   private:
     Node _root{Node::Type::Root};
 };

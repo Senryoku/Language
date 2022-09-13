@@ -981,7 +981,6 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
     if(operator_type == Token::Type::Assignment) {
         // Assignment: if variable is const and value is constexpr, mark the variable as constexpr.
         // FIXME: Workaround to allow more constant propagation. Should be done in a later stage.
-        binary_operator_node->children[1] = AST::optimize(binary_operator_node->children[1]);
         if(binary_operator_node->children[0]->type == AST::Node::Type::Variable && binary_operator_node->children[0]->subtype == AST::Node::SubType::Const &&
            binary_operator_node->children[1]->type == AST::Node::Type::ConstantValue) {
             auto maybe_variable = get(binary_operator_node->children[0]->token.value);

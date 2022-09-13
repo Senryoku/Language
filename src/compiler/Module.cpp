@@ -270,8 +270,10 @@ llvm::Value* Module::codegen(const AST::Node* node) {
             }
 
             auto var = get(node->token.value);
-            if(!var)
+            if(!var) {
                 error("[LLVMCodegen] Undeclared variable '{}'.\n", node->token.value);
+                assert(false);
+            }
             return var;
         }
         case AST::Node::Type::LValueToRValue: {
