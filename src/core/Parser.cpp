@@ -571,7 +571,7 @@ bool Parser::parse_function_declaration(const std::span<Token>& tokens, std::spa
     auto return_type = functionNode->children.back()->value_type;
     if(return_type.is_undefined())
         return_type = ValueType::void_t();
-    if(functionNode->value_type.is_undefined() && functionNode->value_type != return_type)
+    if(!functionNode->value_type.is_undefined() && functionNode->value_type != return_type)
         throw Exception(
             fmt::format("[Parser] Syntax error: Incoherent return types for function {}, got {}, expected {}.\n", functionNode->token.value, return_type, functionNode->value_type),
             point_error(functionNode->children.back()->token));
@@ -1007,7 +1007,7 @@ ValueType Parser::parse_type(const std::span<Token>& tokens, std::span<Token>::i
         expect(tokens, it, Token::Type::CloseSubscript);
     }
 
-    return ValueType(type);
+    return r;
 }
 
 bool Parser::write_export_interface(const std::filesystem::path& path) const {

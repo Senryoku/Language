@@ -161,9 +161,9 @@ class AST {
     struct TypeDeclaration : public Node {
         TypeDeclaration(Token t) : Node(Node::Type::TypeDeclaration, t) {}
 
-        TypeID           type_id = InvalidTypeID;
         std::string_view name;
 
+        const auto& type_id() const { return value_type.type_id; }
         const auto& members() const { return children; }
     };
 
@@ -315,7 +315,8 @@ class GlobalTypeRegistry {
     TypeID register_type(AST::TypeDeclaration& type_node) {
         auto id = next_id();
         _types.push_back(&type_node);
-        type_node.type_id = id;
+        type_node.value_type.primitive = PrimitiveType::Composite;
+        type_node.value_type.type_id = id;
         return id;
     }
 
@@ -486,7 +487,7 @@ struct fmt::formatter<ValueType> {
             } else {
                 return fmt::format_to(ctx.out(), "{}", t.primitive);
             }
-        assert(false);
-        return fmt::format_to(ctx.out(), "{}", "ValueType");
+        // TEMP
+        return fmt::format_to(ctx.out(), "{}:{}", "Non-Primitive ValueType", t.type_id);
     }
 };

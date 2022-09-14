@@ -18,11 +18,11 @@ function set_f(t : NewType, f: float) {
 }
 
 function main() {
-	NewType value;
+	let value : NewType;
 	value.i = 1234;
 	value.f = 666.0;
 	printf("  i:%d, f:%f\n", value.i, value.f);
 	value.set_f(888.0); // Doesn't work without a notion of "mutable this"
-	int r = value.get_f();
+	const r : int = value.get_f();
 	return r;
 }
