@@ -68,16 +68,16 @@ class Module {
     }
 
     // Create declarations for imported external functions/variables
-    void codegen_imports(const std::vector<AST::Node*>& nodes) {
+    void codegen_imports(const std::vector<AST::FunctionDeclaration*>& nodes) {
         for(const auto& n : nodes) {
             assert(n->type == AST::Node::Type::FunctionDeclaration);
             auto                     name = n->token.value.data();
-            auto                     return_type = get_llvm_type(n->value.type);
+            auto                     return_type = get_llvm_type(n->value_type);
             std::vector<llvm::Type*> func_args_types;
             // These function nodes should not have bodies
             for(const auto& c : n->children) {
                 assert(c->type == AST::Node::Type::VariableDeclaration);
-                func_args_types.push_back(get_llvm_type(c->value.type));
+                func_args_types.push_back(get_llvm_type(c->value_type));
             }
             llvm::FunctionType* func_type = llvm::FunctionType::get(return_type, func_args_types, true);
             auto                func_func = _llvm_module->getOrInsertFunction(name, func_type);
@@ -110,27 +110,26 @@ class Module {
     Scope&       get_scope() { return _scopes.back(); }
     const Scope& get_scope() const { return _scopes.back(); }
 
-    llvm::Constant* codegen(const GenericValue& val);
+    llvm::Constant* codegen_constant(const AST::Node* val);
     llvm::Value*    codegen(const AST::Node* node);
 
-    llvm::Type* get_llvm_type(GenericValue::Type type) const {
+    llvm::Type* get_llvm_type(PrimitiveType type) const {
         switch(type) {
-            case GenericValue::Type::Integer: return llvm::Type::getInt32Ty(*_llvm_context);
-            case GenericValue::Type::Float: return llvm::Type::getFloatTy(*_llvm_context);
-            case GenericValue::Type::Void: return llvm::Type::getVoidTy(*_llvm_context);
+            using enum PrimitiveType;
+            case Integer: return llvm::Type::getInt32Ty(*_llvm_context);
+            case Float: return llvm::Type::getFloatTy(*_llvm_context);
+            case Char: return llvm::Type::getInt8Ty(*_llvm_context);
+            case Void: return llvm::Type::getVoidTy(*_llvm_context);
             default: error("[Module::get_llvm_type] GenericValue Type '{}' not mapped to a LLVM Type.\n", type); assert(false);
         }
         return nullptr;
     }
 
-    llvm::Type* get_llvm_type(const AST::Node* node) const {
-        switch(node->value.type) {
-            case GenericValue::Type::Composite: {
-                std::string type_name(node->value.value.as_composite.type_name.to_std_string_view()); // FIXME: Internalize the string and remove this
-                return llvm::StructType::getTypeByName(*_llvm_context, type_name);
-            }
-            default: return get_llvm_type(node->value.type);
+    llvm::Type* get_llvm_type(const ValueType& type) const {
+        if (type.is_composite()) {
+            std::string type_name(GlobalTypeRegistry::instance().get_type(type.type_id)->name); // FIXME: Internalize the string and remove this
+            return llvm::StructType::getTypeByName(*_llvm_context, type_name);
         }
-        return nullptr;
+        return get_llvm_type(type.primitive);
     }
 };

@@ -15,7 +15,6 @@
 #include <Scope.hpp>
 #include <Source.hpp>
 #include <Tokenizer.hpp>
-#include <VariableStore.hpp>
 
 class Parser : public Scoped {
   public:
@@ -46,40 +45,65 @@ class Parser : public Scoped {
         return type == Token::Type::Addition || type == Token::Type::Substraction || type == Token::Type::Increment || type == Token::Type::Decrement;
     }
 
-    void resolve_operator_type(AST::Node* op_node) {
-        assert(op_node->type == AST::Node::Type::BinaryOperator || op_node->type == AST::Node::Type::UnaryOperator);
-        if(op_node->type == AST::Node::Type::UnaryOperator) {
-            auto rhs = op_node->children[0]->value.type;
-            if(rhs == GenericValue::Type::Array && op_node->children[0]->children.size() > 0)
-                rhs = op_node->children[0]->value.value.as_array.type;
-            op_node->value.type = rhs;
-        } else {
-            if(op_node->token.value == ".") {
-                assert(op_node->children[0]->value.type == GenericValue::Type::Composite);
-                auto type_node = get_type(op_node->children[0]->value.value.as_composite.type_id);
-                for(const auto& c : type_node->children)
-                    if(c->token.value == op_node->children[1]->token.value) {
-                        op_node->value.type = c->value.type;
-                        if(op_node->value.type == GenericValue::Type::Composite)
-                            op_node->value.value.as_composite.type_id = c->value.value.as_composite.type_id;
-                        return;
-                    }
-                assert(false);
-            }
+    ValueType resolve_operator_type(Token::Type op, const ValueType& lhs, const ValueType& rhs) {
+        using enum Token::Type;
+        if(op == MemberAccess)
+            return rhs;
+        if(op == Assignment)
+            return lhs;
+        if(op == Equal || op == Different || op == Lesser || op == Greater || op == GreaterOrEqual || op == LesserOrEqual || op == And || op == Or)
+            return ValueType::boolean();
 
-            auto lhs = op_node->children[0]->value.type;
-            auto rhs = op_node->children[1]->value.type;
-            // FIXME: Here we're getting the item type if we're accessing array items. This should be done automatically elsewhere I think (wrap the indexed access in an
-            // expression, or another node type?)
-            if(lhs == GenericValue::Type::Array && op_node->children[0]->children.size() > 0)
-                lhs = op_node->children[0]->value.value.as_array.type;
-            if(rhs == GenericValue::Type::Array && op_node->children[1]->children.size() > 0)
-                rhs = op_node->children[1]->value.value.as_array.type;
-            op_node->value.type = GenericValue::resolve_operator_type(op_node->token.value, lhs, rhs);
+        if(lhs.is_array && op == OpenSubscript) {
+            auto type = lhs;
+            type.is_array = false;
+            return type;
         }
-        if(op_node->value.type == GenericValue::Type::Undefined) {
+
+        if(lhs == rhs && lhs.is_primitive())
+            return lhs;
+
+        // Promote integer to Float
+        if(lhs.is_primitive() && rhs.is_primitive() &&
+           ((lhs.primitive == PrimitiveType::Float && rhs.primitive == PrimitiveType::Integer) ||
+            (lhs.primitive == PrimitiveType::Integer && rhs.primitive == PrimitiveType::Float))) {
+            return ValueType::floating_point();
+        }
+
+        return ValueType::undefined();
+    }
+
+    void resolve_operator_type(AST::UnaryOperator* op_node) {
+        auto rhs = op_node->children[0]->value_type;
+        op_node->value_type = rhs;
+
+        if(op_node->value_type.is_undefined()) {
             warn("[Parser] Couldn't resolve operator return type (Missing impl.) on line {}. Node:\n", op_node->token.line);
-            fmt::print("{}\n", *op_node);
+            fmt::print("{}\n", *static_cast<AST::Node*>(op_node));
+        }
+    }
+
+    void resolve_operator_type(AST::BinaryOperator* op_node) {
+        if(op_node->token.type == Token::Type::MemberAccess) {
+            assert(op_node->children[0]->value_type.is_composite());
+            auto type_node = get_type(op_node->children[0]->value_type.type_id);
+            for(const auto& c : type_node->members())
+                if(c->token.value == op_node->children[1]->token.value) {
+                    op_node->value_type = c->value_type;
+                    if(op_node->value_type.is_composite())
+                        op_node->value_type.type_id = c->value_type.type_id;
+                    return;
+                }
+            assert(false);
+        }
+
+        auto lhs = op_node->children[0]->value_type;
+        auto rhs = op_node->children[1]->value_type;
+        op_node->value_type = resolve_operator_type(op_node->token.type, lhs, rhs);
+
+        if(op_node->value_type.is_undefined()) {
+            warn("[Parser] Couldn't resolve operator return type (Missing impl.) on line {}. Node:\n", op_node->token.line);
+            fmt::print("{}\n", *static_cast<AST::Node*>(op_node));
         }
     }
 
@@ -142,10 +166,11 @@ class Parser : public Scoped {
     bool parse_function_declaration(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node, bool exported = false);
     bool parse_function_arguments(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
     bool parse_type_declaration(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
-    bool parse_boolean(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
-    bool parse_digits(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
-    bool parse_float(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
-    bool parse_char(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
+    ValueType parse_type(std::span<Token>::iterator& it);
+    AST::BoolLiteral* parse_boolean(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
+    AST::IntegerLiteral* parse_digits(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
+    AST::FloatLiteral* parse_float(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
+    AST::CharLiteral* parse_char(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
     bool parse_string(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
     bool parse_operator(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
     bool parse_import(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
@@ -158,8 +183,15 @@ class Parser : public Scoped {
 
     template<typename... Args>
     std::string point_error(Args&&... args) {
-        if(_source)
-            return ::point_error_find_line(*_source, args...);
+        if(_source) return ::point_error_find_line(*_source, args...);
         return "";
+    }
+
+    void expect(const std::span<Token>& tokens, std::span<Token>::iterator& it, Token::Type token_type) {
+        if(it == tokens.end()) {
+            throw Exception(fmt::format("[Parser] Syntax error: Expected '{}', got end-of-file.", token_type));
+        } else if(it->type != token_type) {
+            throw Exception(fmt::format("[Parser] Syntax error: Expected '{}', got {}.", token_type, *it), point_error(*it));
+        }
     }
 };

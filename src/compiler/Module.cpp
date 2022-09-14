@@ -6,9 +6,9 @@
 
 #define OP(VALUETYPE, FUNC)                                                                         \
     {                                                                                               \
-        GenericValue::Type::VALUETYPE, [](llvm::IRBuilder<>& ir_builder, llvm::Value* val) { FUNC } \
+        PrimitiveType::VALUETYPE, [](llvm::IRBuilder<>& ir_builder, llvm::Value* val) { FUNC } \
     }
-static std::unordered_map<Token::Type, std::unordered_map<GenericValue::Type, std::function<llvm::Value*(llvm::IRBuilder<>&, llvm::Value*)>>> unary_ops = {
+static std::unordered_map<Token::Type, std::unordered_map<PrimitiveType, std::function<llvm::Value*(llvm::IRBuilder<>&, llvm::Value*)>>> unary_ops = {
     {Token::Type::Addition, {OP(Integer, (void)ir_builder; return val;), OP(Float, (void)ir_builder; return val;)}},
     {Token::Type::Substraction, {OP(Integer, return ir_builder.CreateNeg(val, "neg");), OP(Float, return ir_builder.CreateFNeg(val, "fneg");)}},
 };
@@ -16,10 +16,10 @@ static std::unordered_map<Token::Type, std::unordered_map<GenericValue::Type, st
 
 #define OP(VALUETYPE, FUNC)                                                                                           \
     {                                                                                                                 \
-        GenericValue::Type::VALUETYPE, [](llvm::IRBuilder<>& ir_builder, llvm::Value* lhs, llvm::Value* rhs) { FUNC } \
+        PrimitiveType::VALUETYPE, [](llvm::IRBuilder<>& ir_builder, llvm::Value* lhs, llvm::Value* rhs) { FUNC } \
     }
 
-static std::unordered_map<Token::Type, std::unordered_map<GenericValue::Type, std::function<llvm::Value*(llvm::IRBuilder<>&, llvm::Value*, llvm::Value*)>>> binary_ops = {
+static std::unordered_map<Token::Type, std::unordered_map<PrimitiveType, std::function<llvm::Value*(llvm::IRBuilder<>&, llvm::Value*, llvm::Value*)>>> binary_ops = {
     {Token::Type::Addition, {OP(Integer, return ir_builder.CreateAdd(lhs, rhs, "add");), OP(Float, return ir_builder.CreateFAdd(lhs, rhs, "fadd");)}},
     {Token::Type::Substraction, {OP(Integer, return ir_builder.CreateSub(lhs, rhs, "sub");), OP(Float, return ir_builder.CreateFSub(lhs, rhs, "fsub");)}},
     {Token::Type::Multiplication, {OP(Integer, return ir_builder.CreateMul(lhs, rhs, "mul");), OP(Float, return ir_builder.CreateFMul(lhs, rhs, "fmul");)}},
@@ -44,28 +44,32 @@ static std::unordered_map<Token::Type, std::unordered_map<GenericValue::Type, st
 };
 #undef OP
 
-llvm::Constant* Module::codegen(const GenericValue& val) {
-    assert(val.is_constexpr());
-    switch(val.type) {
-        case GenericValue::Type::Boolean: return llvm::ConstantInt::get(*_llvm_context, llvm::APInt(1, val.value.as_bool));
-        case GenericValue::Type::Char: return llvm::ConstantInt::get(*_llvm_context, llvm::APInt(8, val.value.as_char));
-        case GenericValue::Type::Float: return llvm::ConstantFP::get(*_llvm_context, llvm::APFloat(val.value.as_float));
-        case GenericValue::Type::Integer: return llvm::ConstantInt::get(*_llvm_context, llvm::APInt(32, val.value.as_int32_t));
-        case GenericValue::Type::Array: {
-            const auto&                  arr = val.value.as_array;
-            auto                         itemType = get_llvm_type(arr.type);
-            std::vector<llvm::Constant*> values(arr.capacity);
-            for(unsigned int i = 0; i < arr.capacity; i++)
-                values[i] = codegen(arr.items[i]);
+llvm::Constant* Module::codegen_constant(const AST::Node* val) {
+    assert(val->value_type.is_primitive());
+    if(val->value_type.is_array) {
+        auto                         arr = dynamic_cast<const AST::ArrayLiteral*>(val);
+        auto                         itemType = get_llvm_type(arr->value_type);
+        std::vector<llvm::Constant*> values(val->value_type.capacity);
+        for(unsigned int i = 0; i < val->value_type.capacity; i++)
+            values[i] = codegen_constant(val->children[i]);
 
-            auto arrayType = llvm::ArrayType::get(itemType, values.size());
-            auto globalDeclaration = (llvm::GlobalVariable*)_llvm_module->getOrInsertGlobal("", arrayType);
-            globalDeclaration->setInitializer(llvm::ConstantArray::get(arrayType, values));
-            globalDeclaration->setConstant(true);
-            globalDeclaration->setLinkage(llvm::GlobalValue::LinkageTypes::PrivateLinkage);
-            globalDeclaration->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Global);
-            return llvm::ConstantExpr::getBitCast(globalDeclaration, arrayType->getPointerTo());
-        }
+        auto arrayType = llvm::ArrayType::get(itemType, values.size());
+        auto globalDeclaration = (llvm::GlobalVariable*)_llvm_module->getOrInsertGlobal("", arrayType);
+        globalDeclaration->setInitializer(llvm::ConstantArray::get(arrayType, values));
+        globalDeclaration->setConstant(true);
+        globalDeclaration->setLinkage(llvm::GlobalValue::LinkageTypes::PrivateLinkage);
+        globalDeclaration->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Global);
+        return llvm::ConstantExpr::getBitCast(globalDeclaration, arrayType->getPointerTo());
+    }
+    switch(val->value_type.primitive) {
+        using enum PrimitiveType;
+        case Boolean: return llvm::ConstantInt::get(*_llvm_context, llvm::APInt(1, static_cast<const AST::BoolLiteral*>(val)->value));
+        case Char: return llvm::ConstantInt::get(*_llvm_context, llvm::APInt(8, static_cast<const AST::CharLiteral*>(val)->value));
+        case Float: return llvm::ConstantFP::get(*_llvm_context, llvm::APFloat(static_cast<const AST::FloatLiteral*>(val)->value));
+        case Integer: return llvm::ConstantInt::get(*_llvm_context, llvm::APInt(32, static_cast<const AST::IntegerLiteral*>(val)->value));
+        default: warn("LLVM Codegen: Unsupported constant value type '{}'.\n", val->value_type);
+    }
+    /*
         case GenericValue::Type::String: {
             // FIXME: Take a look at llvm::StringRef and llvm::Twine
             const auto& str = val.value.as_string;
@@ -93,8 +97,7 @@ llvm::Constant* Module::codegen(const GenericValue& val) {
             // 4. Return a cast to an i8*
             return llvm::ConstantExpr::getBitCast(globalDeclaration, charType->getPointerTo());
         }
-        default: warn("LLVM Codegen: Unsupported constant value type '{}'.\n", val.type);
-    }
+        */
     return nullptr;
 }
 
@@ -117,50 +120,52 @@ llvm::Value* Module::codegen(const AST::Node* node) {
             pop_scope();
             return ret;
         }
-        case AST::Node::Type::ConstantValue: return codegen(node->value);
+        case AST::Node::Type::ConstantValue: return codegen_constant(node);
         case AST::Node::Type::Cast: {
             assert(node->children.size() == 1);
             auto&& child = codegen(node->children[0]);
             if(!child)
                 return nullptr;
             // TODO: Handle child's type.
-            switch(node->value.type) {
-                case GenericValue::Type::Float: {
-                    assert(node->children[0]->value.type == GenericValue::Type::Integer); // TEMP
+            assert(node->value_type.is_primitive());
+            switch(node->value_type.primitive) {
+                case PrimitiveType::Float: {
+                    assert(node->children[0]->value_type.primitive == PrimitiveType::Integer); // TEMP
                     return _llvm_ir_builder.CreateSIToFP(child, llvm::Type::getFloatTy(*_llvm_context), "castSIToFP");
                 }
-                case GenericValue::Type::Integer: {
-                    assert(node->children[0]->value.type == GenericValue::Type::Float); // TEMP
+                case PrimitiveType::Integer: {
+                    assert(node->children[0]->value_type.primitive == PrimitiveType::Float); // TEMP
                     return _llvm_ir_builder.CreateFPToSI(child, llvm::Type::getInt32Ty(*_llvm_context), "castFPToSI");
                 }
-                default: error("[LLVMCodegen] LLVM::Codegen: Cast from {} to {} not supported.", node->children[0]->value.type, node->value.type); return nullptr;
+                default: error("[LLVMCodegen] LLVM::Codegen: Cast from {} to {} not supported.\n", node->children[0]->value_type, node->value_type); return nullptr;
             }
         }
         case AST::Node::Type::TypeDeclaration: {
             std::vector<llvm::Type*> members;
             for(const auto c : node->children)
-                members.push_back(get_llvm_type(c->value.type));
+                members.push_back(get_llvm_type(c->value_type));
             std::string type_name(node->token.value);
             auto        structType = llvm::StructType::create(*_llvm_context, members, type_name);
             break;
         }
         case AST::Node::Type::FunctionDeclaration: {
-            auto function_name = std::string{node->token.value};
+            auto function_declaration_node = static_cast<const AST::FunctionDeclaration*>(node);
+            auto function_name = std::string{function_declaration_node->name};
             auto prev_function = _llvm_module->getFunction(function_name);
             if(prev_function) { // Should be handled by the parser.
-                error("Redefinition of function '{}' (line {}).\n", function_name, node->token.line);
+                error("Redefinition of function '{}' (line {}).\n", function_name, function_declaration_node->token.line);
                 return nullptr;
             }
 
             auto                     current_block = _llvm_ir_builder.GetInsertBlock();
             std::vector<llvm::Type*> param_types;
-            if(node->children.size() > 1)
-                for(auto i = 0; i < node->children.size() - 1; ++i)
-                    param_types.push_back(get_llvm_type(node->children[i]));
-            auto return_type = get_llvm_type(node->value.type);
+            if(function_declaration_node->children.size() > 1)
+                for(auto i = 0; i < function_declaration_node->children.size() - 1; ++i)
+                    param_types.push_back(get_llvm_type(function_declaration_node->children[i]->value_type));
+            auto return_type = get_llvm_type(function_declaration_node->value_type);
             auto function_types = llvm::FunctionType::get(return_type, param_types, false);
-            auto flags = node->value.value.as_int32_t;
-            auto function = llvm::Function::Create(function_types, flags & AST::Node::FunctionFlag::Exported ? llvm::Function::ExternalLinkage : llvm::Function::PrivateLinkage,
+            auto flags = function_declaration_node->flags;
+            auto function = llvm::Function::Create(function_types, flags & AST::FunctionDeclaration::Flag::Exported ? llvm::Function::ExternalLinkage : llvm::Function::PrivateLinkage,
                                                    function_name, _llvm_module.get());
 
             auto* block = llvm::BasicBlock::Create(*_llvm_context, "entrypoint", function);
@@ -176,7 +181,7 @@ llvm::Value* Module::codegen(const AST::Node* node) {
             }
             auto function_body = codegen(node->children.back()); // Generate function body
             if(!_generated_return)
-                _llvm_ir_builder.CreateRet(node->value.type == GenericValue::Type::Void ? nullptr : function_body);
+                _llvm_ir_builder.CreateRet(node->value_type == ValueType::void_t() ? nullptr : function_body);
             pop_scope();
 
             // TODO: Correctly handle no return (llvm_ir_builder.CreateRet(RetVal);)
@@ -189,34 +194,35 @@ llvm::Value* Module::codegen(const AST::Node* node) {
             return function;
         }
         case AST::Node::Type::FunctionCall: {
-            auto function_name = std::string{node->token.value};
+            auto function_call_node = static_cast<const AST::FunctionCall*>(node);
+            auto function_name = std::string{function_call_node->token.value};
             auto function = _llvm_module->getFunction(function_name);
             if(!function) {
-                error("[LLVMCodegen] Call to undeclared function '{}' (line {}).\n", function_name, node->token.line);
+                error("[LLVMCodegen] Call to undeclared function '{}' (line {}).\n", function_name, function_call_node->token.line);
                 return nullptr;
             }
             // TODO: Handle default values.
             // TODO: Handle vargs functions (variable number of parameters, like printf :^) )
-            auto function_flags = node->value.value.as_int32_t;
-            if(!(function_flags & AST::Node::FunctionFlag::Variadic) && function->arg_size() != node->children.size() - 1) {
+            auto function_flags = function_call_node->flags;
+            if(!(function_flags & AST::FunctionDeclaration::Flag::Variadic) && function->arg_size() != function_call_node->arguments().size() - 1) {
                 error("[LLVMCodegen] Unexpected number of parameters in function call '{}' (line {}): Expected {}, got {}.\n", function_name, node->token.line,
-                      function->arg_size(), node->children.size() - 1);
-                for(auto i = 1u; i < node->children.size(); ++i)
-                    print("\tArgument #{}: {}", i, *node->children[i]);
+                      function->arg_size(), function_call_node->arguments().size() - 1);
+                for(auto i = 1u; i < function_call_node->arguments().size(); ++i)
+                    print("\tArgument #{}: {}", i, *function_call_node->arguments()[i]);
                 return nullptr;
             }
             std::vector<llvm::Value*> parameters;
             // Skip the first one, it (will) holds the function name (FIXME: No used yet, we don't support function as result of expression yet)
-            for(auto i = 1u; i < node->children.size(); ++i) {
-                auto v = codegen(node->children[i]);
+            for(auto i = 1u; i < function_call_node->arguments().size(); ++i) {
+                auto v = codegen(function_call_node->arguments()[i]);
                 if(!v)
                     return nullptr;
                 // C Variadic functions promotes float to double (see https://stackoverflow.com/questions/63144506/printf-doesnt-work-for-floats-in-llvm-ir)
-                if(function_flags & AST::Node::FunctionFlag::Variadic && v->getType()->isFloatTy())
+                if(function_flags & AST::FunctionDeclaration::Flag::Variadic && v->getType()->isFloatTy())
                     v = _llvm_ir_builder.CreateFPExt(v, llvm::Type::getDoubleTy(*_llvm_context));
                 parameters.push_back(v);
             }
-            if(node->value.type == GenericValue::Type::Void)
+            if(function_call_node->value_type == ValueType::void_t())
                 return _llvm_ir_builder.CreateCall(function, parameters);
             else
                 return _llvm_ir_builder.CreateCall(function, parameters, function_name);
@@ -226,33 +232,20 @@ llvm::Value* Module::codegen(const AST::Node* node) {
             auto              parent_function = _llvm_ir_builder.GetInsertBlock()->getParent();
             if(!parent_function)
                 warn("TODO: Correctly handle global variables! ({}:{})\n", __FILE__, __LINE__);
-            switch(node->value.type) {
-                case GenericValue::Type::Float: ret = create_entry_block_alloca(parent_function, llvm::Type::getFloatTy(*_llvm_context), std::string{node->token.value}); break;
-                case GenericValue::Type::Integer: ret = create_entry_block_alloca(parent_function, llvm::Type::getInt32Ty(*_llvm_context), std::string{node->token.value}); break;
-                case GenericValue::Type::Array: {
-                    // FIXME: Handle more types.
-                    auto arrayType = llvm::ArrayType::get(llvm::IntegerType::get(*_llvm_context, 32), node->value.value.as_array.capacity);
-                    ret = create_entry_block_alloca(parent_function, arrayType, std::string{node->token.value});
-                    break;
+            if (node->value_type.is_primitive()) {
+                ret = create_entry_block_alloca(parent_function, get_llvm_type(node->value_type.primitive), std::string{node->token.value});
+            } else if(node->value_type.is_array) {
+                auto arrayType = llvm::ArrayType::get(get_llvm_type(node->value_type), node->value_type.capacity);
+                ret = create_entry_block_alloca(parent_function, arrayType, std::string{node->token.value});
+            } else {
+                std::string type_name(GlobalTypeRegistry::instance().get_type(node->value_type.type_id)->name);
+                auto        structType = llvm::StructType::getTypeByName(*_llvm_context, type_name);
+                if(!structType) {
+                    error("[LLVMCodegen] Type {} not found.\n", type_name);
+                    return nullptr;
                 }
-                case GenericValue::Type::String: {
-                    // FIXME: Change this to a struct with size
-                    auto charType = llvm::IntegerType::get(*_llvm_context, 8);
-                    auto stringType = llvm::PointerType::get(charType, 0);
-                    ret = create_entry_block_alloca(parent_function, stringType, std::string{node->token.value});
-                    break;
-                }
-                case GenericValue::Type::Composite: {
-                    std::string type_name(node->value.value.as_composite.type_name.to_std_string_view());
-                    auto        structType = llvm::StructType::getTypeByName(*_llvm_context, type_name);
-                    if(!structType) {
-                        error("[LLVMCodegen] Type {} not found.\n", type_name);
-                        return nullptr;
-                    }
-                    ret = create_entry_block_alloca(parent_function, structType, std::string{node->token.value});
-                    break;
-                }
-                default: warn("[LLVMCodegen] Unsupported variable type '{}'.\n", node->value.type); break;
+                ret = create_entry_block_alloca(parent_function, structType, std::string{node->token.value});
+                break;
             }
             if(!set(node->token.value, ret)) {
                 error("[LLVMCodegen] Variable '{}' already declared (line {}).\n", node->token.value, node->token.line);
@@ -286,7 +279,7 @@ llvm::Value* Module::codegen(const AST::Node* node) {
             }
             if(child->type == AST::Node::Type::BinaryOperator && child->token.type == Token::Type::MemberAccess) {
                 assert(value->getType()->isPointerTy());
-                return _llvm_ir_builder.CreateLoad(get_llvm_type(node->value.type), value, "l-to-rvalue");
+                return _llvm_ir_builder.CreateLoad(get_llvm_type(node->value_type), value, "l-to-rvalue");
             }
             return value;
         }
@@ -302,16 +295,17 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                     return var;
                 }
                 default: {
-                    if(unary_ops[node->token.type].find(node->children[0]->value.type) == unary_ops[node->token.type].end()) {
-                        error("[LLVMCodegen] Unsupported type {} for unary operator {}.\n", node->children[0]->value.type, node->token.type);
+                    if(unary_ops[node->token.type].find(node->children[0]->value_type.primitive) == unary_ops[node->token.type].end()) {
+                        error("[LLVMCodegen] Unsupported type {} for unary operator {}.\n", node->children[0]->value_type, node->token.type);
                         return nullptr;
                     }
-                    return unary_ops[node->token.type][node->children[0]->value.type](_llvm_ir_builder, val);
+                    return unary_ops[node->token.type][node->children[0]->value_type.primitive](_llvm_ir_builder, val);
                 }
             }
         }
         case AST::Node::Type::MemberIdentifier: {
-            return llvm::ConstantInt::get(*_llvm_context, llvm::APInt(32, node->value.value.as_int32_t)); // Returns member index
+            auto member_identifier = static_cast<const AST::MemberIdentifier*>(node);
+            return llvm::ConstantInt::get(*_llvm_context, llvm::APInt(32, member_identifier->index)); // Returns member index
         }
         case AST::Node::Type::BinaryOperator: {
             auto lhs = codegen(node->children[0]);
@@ -330,13 +324,13 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                 case Token::Type::LesserOrEqual: [[fallthrough]];
                 case Token::Type::Greater: [[fallthrough]];
                 case Token::Type::GreaterOrEqual: {
-                    assert(node->children[0]->value.type == node->children[1]->value.type);
-                    if(binary_ops[node->token.type].find(node->children[0]->value.type) == binary_ops[node->token.type].end()) {
-                        error("[LLVMCodegen] Unsupported types {} and {} for binary operator {}.\n", node->children[0]->value.type, node->children[1]->value.type,
+                    assert(node->children[0]->value_type == node->children[1]->value_type);
+                    if(binary_ops[node->token.type].find(node->children[0]->value_type.primitive) == binary_ops[node->token.type].end()) {
+                        error("[LLVMCodegen] Unsupported types {} and {} for binary operator {}.\n", node->children[0]->value_type, node->children[1]->value_type,
                               node->token.type);
                         return nullptr;
                     }
-                    return binary_ops[node->token.type][node->children[0]->value.type](_llvm_ir_builder, lhs, rhs);
+                    return binary_ops[node->token.type][node->children[0]->value_type.primitive](_llvm_ir_builder, lhs, rhs);
                 }
                 case Token::Type::And: {
                     return _llvm_ir_builder.CreateAnd(lhs, rhs, "and");
@@ -344,8 +338,8 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                 case Token::Type::OpenSubscript: {
                     // FIXME: Remove these checks
                     assert(node->children[0]->type == AST::Node::Type::Variable);
-                    assert(node->children[0]->value.type == GenericValue::Type::Array);
-                    auto element_type = node->children[0]->value.value.as_array.type;
+                    assert(node->children[0]->value_type.is_array);
+                    auto element_type = node->children[0]->value_type.get_element_type();
                     return _llvm_ir_builder.CreateGEP(get_llvm_type(element_type), lhs, {llvm::ConstantInt::get(*_llvm_context, llvm::APInt(32, 0)), rhs},
                                                       "ArrayGEP"); // FIXME: I don't know.
                 }

@@ -7,7 +7,6 @@
 #include <vector>
 
 #include <FlyString.hpp>
-#include <GenericValue.hpp>
 #include <Logger.hpp>
 
 class ModuleInterface {
@@ -15,17 +14,17 @@ class ModuleInterface {
     std::filesystem::path working_directory;
 
     std::vector<std::string>                dependencies;
-    std::vector<AST::Node*>                 exports;
-    std::vector<AST::Node*>                 imports;
-    std::vector<std::unique_ptr<AST::Node>> external_nodes;
+    std::vector<AST::FunctionDeclaration*>  exports;
+    std::vector<AST::FunctionDeclaration*>  imports;
+    std::vector<std::unique_ptr<AST::FunctionDeclaration>> external_nodes;
 
     // Returns a span containing the newly imported nodes
-    std::tuple<bool, std::span<AST::Node*>> import_module(const std::filesystem::path& path) {
+    std::tuple<bool, std::span<AST::FunctionDeclaration*>> import_module(const std::filesystem::path& path) {
         std::ifstream module_file(path);
         if(!module_file) {
             error("[ModuleInterface] Could not find interface file {}.\n", path.string());
             // TODO: Throw here, so we can actually directly address the issue? (i.e. 1/ Checking if the dependency exists, 2/ Compile it)
-            return {false, std::span<AST::Node*>{}};
+            return {false, std::span<AST::FunctionDeclaration*>{}};
         }
         // FIXME: File format not specified
         std::string line;
@@ -43,20 +42,24 @@ class ModuleInterface {
             Token token;
             token.type = Token::Type::Identifier;
             token.value = *internalize_string(name);
-            auto func_dec_node = external_nodes.emplace_back(new AST::Node(AST::Node::Type::FunctionDeclaration, token)).get(); // Keep it out of the AST
+            auto func_dec_node = external_nodes.emplace_back(new AST::FunctionDeclaration(token)).get(); // Keep it out of the AST
             imports.push_back(func_dec_node);
-            func_dec_node->value.type = GenericValue::parse_type(type);
+            // FIXME: Handle composite types
+            func_dec_node->value_type.primitive = parse_primitive_type(type);
+            assert(func_dec_node->value_type.primitive != PrimitiveType::Undefined);
 
             while(iss >> type) {
                 auto arg = func_dec_node->add_child(new AST::Node(AST::Node::Type::VariableDeclaration));
-                arg->value.type = GenericValue::parse_type(type);
+                // FIXME: Handle composite types
+                arg->value_type.primitive = parse_primitive_type(type);
+                assert(arg->value_type.primitive != PrimitiveType::Undefined);
             }
         }
 
         if(begin == imports.size())
             warn("[ModuleInterface] Imported module {} doesn't export any symbol.\n", path.string());
 
-        return {true, std::span<AST::Node*>(imports.begin() + begin, imports.end())};
+        return {true, std::span<AST::FunctionDeclaration*>(imports.begin() + begin, imports.end())};
     }
 
     bool save(const std::filesystem::path& path) const {
@@ -71,9 +74,9 @@ class ModuleInterface {
         }
         interface_file << std::endl;
         for(const auto& n : exports) {
-            interface_file << n->token.value << " " << serialize(n->value.type);
+            interface_file << n->token.value << " " << serialize(n->value_type);
             for (auto i = 0u; i < n->children.size() - 1; ++i) {
-                interface_file << " " << serialize(n->children[i]->value.type);
+                interface_file << " " << serialize(n->children[i]->value_type);
             }
             interface_file << std::endl;
         }
