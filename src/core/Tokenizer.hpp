@@ -78,6 +78,7 @@ class Tokenizer {
 
     const het_unordered_map<Token::Type> keywords{
         {"function", Token::Type::Function},
+        {"let", Token::Type::Let},
         {"return", Token::Type::Return},
         {"if", Token::Type::If},
         {"else", Token::Type::Else},

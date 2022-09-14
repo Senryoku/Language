@@ -33,11 +33,13 @@ std::string point_error(const std::string_view& source, size_t at, size_t line, 
     std::string return_value = "";
     // Search previous line break
     auto line_start = at;
+    if(source[line_start] == '\n' && line_start > 0)
+        --line_start;
     while(line_start > 0 && source[line_start] != '\n')
         --line_start;
     if(source[line_start] == '\n')
         ++line_start;
-    auto line_end = at;
+    auto line_end = line_start;
     while(line_end < source.size() && source[line_end] != '\n')
         ++line_end;
     auto line_info = fmt::format("{: >5} | ", line + 1);

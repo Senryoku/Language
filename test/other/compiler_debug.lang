@@ -1,19 +1,19 @@
 type NewType {
-	int   i;
-	float f;
+	let i : int;
+	let f : float;
 	
 	// Bug: Not emited in the correct scope (currently inaccessible)
-	function get_i(NewType t) {
+	function get_i(t : NewType) {
 		return .i;
 	}
 }
 
-function get_f(NewType t) : float {
+function get_f(t : NewType) : float {
 	return .f;
 }
 
 // Needs a notion of "mutable this"
-function set_f(NewType t, float f) {
+function set_f(t : NewType, f: float) {
 	.f = f;
 }
 

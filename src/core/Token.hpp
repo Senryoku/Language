@@ -51,6 +51,7 @@ struct Token {
         While,
         For,
         Type,
+        Let,
         Function,
         Return,
         Const,

@@ -154,27 +154,27 @@ class Parser : public Scoped {
 
     bool parse(const std::span<Token>& tokens, AST::Node* curr_node);
 
-    bool parse_next_scope(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
-    bool parse_next_expression(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node, uint32_t precedence = max_precedence,
-                               bool search_for_matching_bracket = false);
-    bool parse_identifier(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
-    bool parse_statement(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
-    bool parse_scope_or_single_statement(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
-    bool parse_while(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
-    bool parse_for(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
-    bool parse_method_declaration(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
-    bool parse_function_declaration(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node, bool exported = false);
-    bool parse_function_arguments(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
-    bool parse_type_declaration(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
-    ValueType parse_type(std::span<Token>::iterator& it);
-    AST::BoolLiteral* parse_boolean(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
+    bool                 parse_next_scope(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
+    bool                 parse_next_expression(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node, uint32_t precedence = max_precedence,
+                                               bool search_for_matching_bracket = false);
+    bool                 parse_identifier(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
+    bool                 parse_statement(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
+    bool                 parse_scope_or_single_statement(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
+    bool                 parse_while(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
+    bool                 parse_for(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
+    bool                 parse_method_declaration(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
+    bool                 parse_function_declaration(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node, bool exported = false);
+    bool                 parse_function_arguments(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
+    bool                 parse_type_declaration(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
+    ValueType            parse_type(const std::span<Token>& tokens, std::span<Token>::iterator& it);
+    AST::BoolLiteral*    parse_boolean(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
     AST::IntegerLiteral* parse_digits(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
-    AST::FloatLiteral* parse_float(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
-    AST::CharLiteral* parse_char(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
-    bool parse_string(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
-    bool parse_operator(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
-    bool parse_import(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
-    bool parse_variable_declaration(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node, bool is_const = false);
+    AST::FloatLiteral*   parse_float(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
+    AST::CharLiteral*    parse_char(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
+    bool                 parse_string(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
+    bool                 parse_operator(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
+    bool                 parse_import(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
+    bool                 parse_variable_declaration(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node, bool is_const = false);
 
     void skip(const std::span<Token>& tokens, std::span<Token>::iterator& it, Token::Type token_type) {
         if(it != tokens.end() && it->type == token_type)
@@ -183,15 +183,19 @@ class Parser : public Scoped {
 
     template<typename... Args>
     std::string point_error(Args&&... args) {
-        if(_source) return ::point_error_find_line(*_source, args...);
+        if(_source)
+            return ::point_error_find_line(*_source, args...);
         return "";
     }
 
-    void expect(const std::span<Token>& tokens, std::span<Token>::iterator& it, Token::Type token_type) {
+    Token expect(const std::span<Token>& tokens, std::span<Token>::iterator& it, Token::Type token_type) {
         if(it == tokens.end()) {
             throw Exception(fmt::format("[Parser] Syntax error: Expected '{}', got end-of-file.", token_type));
         } else if(it->type != token_type) {
             throw Exception(fmt::format("[Parser] Syntax error: Expected '{}', got {}.", token_type, *it), point_error(*it));
         }
+        Token token = *it;
+        ++it;
+        return token;
     }
 };

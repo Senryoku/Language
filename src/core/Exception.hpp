@@ -11,7 +11,7 @@ class Exception : public std::logic_error {
     const std::string& hint() const { return _hint; }
 
     void display() const {
-        error(what());
+        error("{}", what());
         if(!hint().empty()) {
             print("\n");
             info("{}", hint());

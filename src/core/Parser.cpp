@@ -62,11 +62,15 @@ bool Parser::parse(const std::span<Token>& tokens, AST::Node* curr_node) {
                 }
                 break;
             }
+            case Token::Type::Let:
+                ++it;
+                assert(it->type == Token::Type::Identifier);
+                parse_variable_declaration(tokens, it, curr_node, false);
+                break;
             case Token::Type::Const:
                 ++it;
                 assert(it->type == Token::Type::Identifier);
-                if(!parse_variable_declaration(tokens, it, curr_node, true))
-                    return false;
+                parse_variable_declaration(tokens, it, curr_node, true);
                 break;
             case Token::Type::Return: {
                 auto returnNode = curr_node->add_child(new AST::Node(AST::Node::Type::ReturnStatement, *it));
@@ -553,8 +557,7 @@ bool Parser::parse_function_declaration(const std::span<Token>& tokens, std::spa
         if(it->type != Token::Type::Identifier || !is_type(it->value))
             throw Exception(fmt::format("[Parser] Expected type identifier after function '{}' declaration body, got '{}'.\n", functionNode->token.value, it->value),
                             point_error(*it));
-        functionNode->value_type = parse_type(it);
-        ++it;
+        functionNode->value_type = parse_type(tokens, it);
     }
 
     // FIXME: Hackish this.
@@ -591,38 +594,44 @@ bool Parser::parse_type_declaration(const std::span<Token>& tokens, std::span<To
 
     ++it;
     if(it->type != Token::Type::OpenScope)
-         Exception(fmt::format("Expected '{{' after type declaration, got {}.\n", it->value), point_error(*it));
+         throw Exception(fmt::format("Expected '{{' after type declaration, got {}.\n", it->value), point_error(*it));
 
     push_scope();
     ++it;
 
     while(it != tokens.end() && !(it->type == Token::Type::CloseScope)) {
+        bool const_var = false;
+        switch(it->type) {
+            case Token::Type::Function: {
+                // Note: Added to curr_node, not type_not. Right now methods are not special.
+                parse_method_declaration(tokens, it, curr_node);
+                break;
+            }
+            case Token::Type::Const:
+                const_var = true; [[fallthrough]];
+            case Token::Type::Let: {
+                ++it;
+                parse_variable_declaration(tokens, it, type_node, const_var);
+                skip(tokens, it, Token::Type::EndStatement);
 
-        while(it->type == Token::Type::Comment)
-            skip(tokens, it, Token::Type::Comment);
+                // parse_variable_declaration may add an initialisation node, we'll make this a special case and add the default value as a child.
+                if(type_node->children.back()->type == AST::Node::Type::BinaryOperator) {
+                    auto assignment_node = type_node->pop_child();
+                    auto rhs = assignment_node->pop_child();
+                    type_node->children.back()->add_child(rhs);
+                    delete assignment_node;
+                    // FIXME: Should we require a constexpr value here? In this case we could store it directly in the declaration node value.
+                }
 
-        if(it->type == Token::Type::Function) {
-            // Note: Added to curr_node, not type_not. Right now methods are not special.
-            parse_method_declaration(tokens, it, curr_node);
-            continue;
+                if(type_node->children.back()->type == AST::Node::Type::VariableDeclaration && type_node->children.back()->value_type.is_composite()) {
+                    // FIXME: Add a call to the constructor here? Like the default values?
+                }
+                break;
+            }
+            case Token::Type::Comment: ++it; break;
+            default: throw Exception(fmt::format("[Parser] Unexpected token '{}' in type declaration.\n", it->value), point_error(*it));
         }
 
-        parse_variable_declaration(tokens, it, type_node);
-
-        skip(tokens, it, Token::Type::EndStatement);
-
-        // parse_variable_declaration may add an initialisation node, we'll make this a special case and add the default value as a child.
-        if(type_node->children.back()->type == AST::Node::Type::BinaryOperator) {
-            auto assignment_node = type_node->pop_child();
-            auto rhs = assignment_node->pop_child();
-            type_node->children.back()->add_child(rhs);
-            delete assignment_node;
-            // FIXME: Should we require a constexpr value here? In this case we could store it directly in the declaration node value.
-        }
-
-        if(type_node->children.back()->type == AST::Node::Type::VariableDeclaration && type_node->children.back()->value_type.is_composite()) {
-            // FIXME: Add a call to the constructor here? Like the default values?
-        }
     }
     pop_scope();
 
@@ -916,47 +925,25 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
  * TODO: Handle non-built-it types.
  */
 bool Parser::parse_variable_declaration(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node, bool is_const) {
-    assert(it->type == Token::Type::Identifier);
-    assert(is_type(it->value));
+    auto identifier = expect(tokens, it, Token::Type::Identifier);
 
-    auto varDecNode = new AST::VariableDeclaration(*it);
+    auto varDecNode = new AST::VariableDeclaration(identifier);
     curr_node->add_child(varDecNode);
 
-    varDecNode->value_type = parse_type(it);
-
-    if(is_const)
-        varDecNode->subtype = AST::Node::SubType::Const;
-    ++it;
-    // Array declaration
-    if(it != tokens.end() && (it->type == Token::Type::OpenSubscript)) {
-        varDecNode->value_type = varDecNode->value_type;
-        varDecNode->value_type.is_array = true;
+    if (it->type == Token::Type::Colon) {
         ++it;
-        parse_next_expression(tokens, it, varDecNode);
-        assert(varDecNode->children.size() == 1);
-        // TODO: Check if size expression could be simplified to a constant here?
-        // std::from_chars(&*(it->value.begin()), &*(it->value.begin()) + it->value.length(), varDecNode->value.value.as_array.capacity);
-        expect(tokens, it, Token::Type::CloseSubscript);
-        ++it;
+        varDecNode->value_type = parse_type(tokens, it);
     }
 
-    if(it == tokens.end())
-        throw Exception("[Parser] Syntax error: Expected variable identifier, got end-of-document.");
-
-    auto next = *it; // Hopefully a name
-    if(next.type != Token::Type::Identifier)
-        throw Exception(fmt::format("[Parser] Syntax error: Expected Identifier for variable declaration, got {}.\n", next), point_error(next));
-
-    varDecNode->token = next;
     if(!get_scope().declare_variable(*varDecNode))
         throw Exception(fmt::format("[Scope] Syntax error: Variable '{}' already declared.\n", varDecNode->token.value), point_error(varDecNode->token));
-    ++it;
+    
     // Also push a variable identifier for initialisation
     bool has_initializer = it != tokens.end() && (it->type == Token::Type::Assignment);
     if(is_const && !has_initializer)
-        throw Exception(fmt::format("[Parser] Syntax error: Variable '{}' declared as const but not initialized.\n", next.value), point_error(next));
+        throw Exception(fmt::format("[Parser] Syntax error: Variable '{}' declared as const but not initialized.\n", identifier.value), point_error(identifier));
     if(has_initializer) {
-        auto varNode = curr_node->add_child(new AST::Node(AST::Node::Type::Variable, next));
+        auto varNode = curr_node->add_child(new AST::Node(AST::Node::Type::Variable, identifier));
         varNode->value_type = varDecNode->value_type;
         parse_operator(tokens, it, curr_node);
     }
@@ -994,18 +981,31 @@ bool Parser::parse_import(const std::span<Token>& tokens, std::span<Token>::iter
     return true;
 }
 
-ValueType Parser::parse_type(std::span<Token>::iterator& it) {
-    assert(false && "TODO!");
-
-    auto token = *it;
-
-    ++it;
+ValueType Parser::parse_type(const std::span<Token>& tokens, std::span<Token>::iterator& it) {
+    auto token = expect(tokens, it, Token::Type::Identifier);
 
     auto type = parse_primitive_type(token.value);
 
-    if(type == PrimitiveType::Undefined)
-        return get_type(token.value)->value_type;
+    ValueType r(type);
 
+    if(type == PrimitiveType::Undefined)
+        r = get_type(token.value)->value_type;
+
+
+    if(peek(tokens, it, Token::Type::Multiplication)) {
+        r.is_pointer = true;
+        ++it;
+    }
+
+    if(peek(tokens, it, Token::Type::OpenSubscript)) {
+        r.is_array = true;
+        ++it;
+        // FIXME: Parse full expression?
+        // parse_next_expression(tokens, it, varDecNode);
+        auto digits = expect(tokens, it, Token::Type::Digits);
+        std::from_chars(&*(digits.value.begin()), &*(digits.value.begin()) + digits.value.length(), r.capacity);
+        expect(tokens, it, Token::Type::CloseSubscript);
+    }
 
     return ValueType(type);
 }
