@@ -4,8 +4,8 @@
 
 // FIXME: We should not use maps here actually. Find another way to manage the nested switch cases.
 
-#define OP(VALUETYPE, FUNC)                                                                         \
-    {                                                                                               \
+#define OP(VALUETYPE, FUNC)                                                                    \
+    {                                                                                          \
         PrimitiveType::VALUETYPE, [](llvm::IRBuilder<>& ir_builder, llvm::Value* val) { FUNC } \
     }
 static std::unordered_map<Token::Type, std::unordered_map<PrimitiveType, std::function<llvm::Value*(llvm::IRBuilder<>&, llvm::Value*)>>> unary_ops = {
@@ -14,8 +14,8 @@ static std::unordered_map<Token::Type, std::unordered_map<PrimitiveType, std::fu
 };
 #undef OP
 
-#define OP(VALUETYPE, FUNC)                                                                                           \
-    {                                                                                                                 \
+#define OP(VALUETYPE, FUNC)                                                                                      \
+    {                                                                                                            \
         PrimitiveType::VALUETYPE, [](llvm::IRBuilder<>& ir_builder, llvm::Value* lhs, llvm::Value* rhs) { FUNC } \
     }
 
@@ -45,9 +45,9 @@ static std::unordered_map<Token::Type, std::unordered_map<PrimitiveType, std::fu
 #undef OP
 
 llvm::Constant* Module::codegen_constant(const AST::Node* val) {
-    assert(val->value_type.is_primitive());
     if(val->value_type.is_array) {
-        auto                         arr = dynamic_cast<const AST::ArrayLiteral*>(val);
+        auto arr = dynamic_cast<const AST::ArrayLiteral*>(val);
+        assert(arr);
         auto                         itemType = get_llvm_type(arr->value_type);
         std::vector<llvm::Constant*> values(val->value_type.capacity);
         for(unsigned int i = 0; i < val->value_type.capacity; i++)
@@ -61,24 +61,23 @@ llvm::Constant* Module::codegen_constant(const AST::Node* val) {
         globalDeclaration->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Global);
         return llvm::ConstantExpr::getBitCast(globalDeclaration, arrayType->getPointerTo());
     }
+    assert(val->value_type.is_primitive());
     switch(val->value_type.primitive) {
         using enum PrimitiveType;
         case Boolean: return llvm::ConstantInt::get(*_llvm_context, llvm::APInt(1, static_cast<const AST::BoolLiteral*>(val)->value));
         case Char: return llvm::ConstantInt::get(*_llvm_context, llvm::APInt(8, static_cast<const AST::CharLiteral*>(val)->value));
         case Float: return llvm::ConstantFP::get(*_llvm_context, llvm::APFloat(static_cast<const AST::FloatLiteral*>(val)->value));
         case Integer: return llvm::ConstantInt::get(*_llvm_context, llvm::APInt(32, static_cast<const AST::IntegerLiteral*>(val)->value));
-        default: warn("LLVM Codegen: Unsupported constant value type '{}'.\n", val->value_type);
-    }
-    /*
-        case GenericValue::Type::String: {
+        case String: {
             // FIXME: Take a look at llvm::StringRef and llvm::Twine
-            const auto& str = val.value.as_string;
+            auto        str_node = static_cast<const AST::StringLiteral*>(val);
+            const auto& str = str_node->value;
             auto        charType = llvm::IntegerType::get(*_llvm_context, 8);
 
             // 1. Initialize chars vector
-            std::vector<llvm::Constant*> chars(str.size);
-            for(unsigned int i = 0; i < str.size; i++)
-                chars[i] = llvm::ConstantInt::get(charType, *(str.begin + i));
+            std::vector<llvm::Constant*> chars(str.size());
+            for(unsigned int i = 0; i < str.size(); i++)
+                chars[i] = llvm::ConstantInt::get(charType, *(str.begin() + i));
 
             // 1b. add a zero terminator too
             // FIXME: Ultimately string will have a built-in length, should we keep the terminating null byte anyway?
@@ -88,7 +87,7 @@ llvm::Constant* Module::codegen_constant(const AST::Node* val) {
             auto stringType = llvm::ArrayType::get(charType, chars.size());
 
             // 3. Create the declaration statement
-            auto globalDeclaration = (llvm::GlobalVariable*)_llvm_module->getOrInsertGlobal(val.value.as_string.to_std_string_view().data(), stringType);
+            auto globalDeclaration = (llvm::GlobalVariable*)_llvm_module->getOrInsertGlobal(str.data(), stringType);
             globalDeclaration->setInitializer(llvm::ConstantArray::get(stringType, chars));
             globalDeclaration->setConstant(true);
             globalDeclaration->setLinkage(llvm::GlobalValue::LinkageTypes::PrivateLinkage);
@@ -97,7 +96,8 @@ llvm::Constant* Module::codegen_constant(const AST::Node* val) {
             // 4. Return a cast to an i8*
             return llvm::ConstantExpr::getBitCast(globalDeclaration, charType->getPointerTo());
         }
-        */
+        default: warn("LLVM Codegen: Unsupported constant value type '{}'.\n", val->value_type);
+    }
     return nullptr;
 }
 
@@ -160,13 +160,17 @@ llvm::Value* Module::codegen(const AST::Node* node) {
             auto                     current_block = _llvm_ir_builder.GetInsertBlock();
             std::vector<llvm::Type*> param_types;
             if(function_declaration_node->children.size() > 1)
-                for(auto i = 0; i < function_declaration_node->children.size() - 1; ++i)
-                    param_types.push_back(get_llvm_type(function_declaration_node->children[i]->value_type));
+                for(auto i = 0; i < function_declaration_node->children.size() - 1; ++i) {
+                    auto type = get_llvm_type(function_declaration_node->children[i]->value_type);
+                    assert(type);
+                    param_types.push_back(type);
+                }
             auto return_type = get_llvm_type(function_declaration_node->value_type);
             auto function_types = llvm::FunctionType::get(return_type, param_types, false);
             auto flags = function_declaration_node->flags;
-            auto function = llvm::Function::Create(function_types, flags & AST::FunctionDeclaration::Flag::Exported ? llvm::Function::ExternalLinkage : llvm::Function::PrivateLinkage,
-                                                   function_name, _llvm_module.get());
+            auto function =
+                llvm::Function::Create(function_types, flags & AST::FunctionDeclaration::Flag::Exported ? llvm::Function::ExternalLinkage : llvm::Function::PrivateLinkage,
+                                       function_name, _llvm_module.get());
 
             auto* block = llvm::BasicBlock::Create(*_llvm_context, "entrypoint", function);
             _llvm_ir_builder.SetInsertPoint(block);
@@ -232,20 +236,19 @@ llvm::Value* Module::codegen(const AST::Node* node) {
             auto              parent_function = _llvm_ir_builder.GetInsertBlock()->getParent();
             if(!parent_function)
                 warn("TODO: Correctly handle global variables! ({}:{})\n", __FILE__, __LINE__);
-            if (node->value_type.is_primitive()) {
+            if(node->value_type.is_primitive()) {
                 ret = create_entry_block_alloca(parent_function, get_llvm_type(node->value_type.primitive), std::string{node->token.value});
             } else if(node->value_type.is_array) {
                 auto arrayType = llvm::ArrayType::get(get_llvm_type(node->value_type), node->value_type.capacity);
                 ret = create_entry_block_alloca(parent_function, arrayType, std::string{node->token.value});
             } else {
-                std::string type_name(GlobalTypeRegistry::instance().get_type(node->value_type.type_id)->name);
+                std::string type_name(GlobalTypeRegistry::instance().get_type(node->value_type.type_id)->name());
                 auto        structType = llvm::StructType::getTypeByName(*_llvm_context, type_name);
                 if(!structType) {
                     error("[LLVMCodegen] Type {} not found.\n", type_name);
                     return nullptr;
                 }
                 ret = create_entry_block_alloca(parent_function, structType, std::string{node->token.value});
-                break;
             }
             if(!set(node->token.value, ret)) {
                 error("[LLVMCodegen] Variable '{}' already declared (line {}).\n", node->token.value, node->token.line);

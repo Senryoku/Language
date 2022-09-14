@@ -15,6 +15,7 @@ enum class PrimitiveType {
     Float,
     Char,
     Boolean,
+    String,
     Void,
     Composite,
     Undefined
@@ -61,7 +62,7 @@ struct ValueType {
 
     bool operator==(const ValueType&) const = default;
 
-    ValueType get_element_type() const { 
+    ValueType get_element_type() const {
         auto copy = *this;
         copy.is_array = false; // FIXME: This is obviously wrong.
         return copy;
@@ -161,8 +162,7 @@ class AST {
     struct TypeDeclaration : public Node {
         TypeDeclaration(Token t) : Node(Node::Type::TypeDeclaration, t) {}
 
-        std::string_view name;
-
+        const auto& name() const { return token.value; }
         const auto& type_id() const { return value_type.type_id; }
         const auto& members() const { return children; }
     };
@@ -228,8 +228,8 @@ class AST {
     struct MemberIdentifier : public Node {
         MemberIdentifier(Token t) : Node(Node::Type::MemberIdentifier, t) {}
 
-        uint32_t         index = 0;
-      
+        uint32_t index = 0;
+
         std::string_view get_name() const { return token.value; }
     };
 
@@ -254,14 +254,13 @@ class AST {
     struct FloatLiteral : public Literal<float> {
         FloatLiteral(Token t) : Literal(t) { value_type.primitive = PrimitiveType::Float; }
     };
-
+    
     struct StringLiteral : public Literal<std::string_view> {
         StringLiteral(Token t) : Literal(t) {
-            value_type.primitive = PrimitiveType::Char;
-            value_type.is_array = true;
+            value_type.primitive = PrimitiveType::String;
         }
     };
-
+    
     struct ArrayLiteral : public Node {
         ArrayLiteral(Token t) : Node(t) { value_type.is_array = true; }
     };
@@ -438,7 +437,7 @@ struct fmt::formatter<AST::Node::Type> {
             case AST::Node::Type::MemberIdentifier: return fmt::format_to(ctx.out(), fg(fmt::color::light_yellow), "{}", "MemberIdentifier");
             case AST::Node::Type::Variable: return fmt::format_to(ctx.out(), fg(fmt::color::light_blue), "{}", "Variable");
             case AST::Node::Type::Cast: return fmt::format_to(ctx.out(), "{}", "Cast");
-            case AST::Node::Type::LValueToRValue: return fmt::format_to(ctx.out(), "{}", "LValueToRValueCast");
+            case AST::Node::Type::LValueToRValue: return fmt::format_to(ctx.out(), fg(fmt::color::dim_gray), "{}", "LValueToRValueCast");
             case AST::Node::Type::ConstantValue: return fmt::format_to(ctx.out(), "{}", "ConstantValue");
             case AST::Node::Type::UnaryOperator: return fmt::format_to(ctx.out(), "{}", "UnaryOperator");
             case AST::Node::Type::BinaryOperator: return fmt::format_to(ctx.out(), "{}", "BinaryOperator");
@@ -463,6 +462,7 @@ struct fmt::formatter<PrimitiveType> {
             case Float: return fmt::format_to(ctx.out(), fg(fmt::color::golden_rod), "{}", "float");
             case Char: return fmt::format_to(ctx.out(), fg(fmt::color::burly_wood), "{}", "char");
             case Boolean: return fmt::format_to(ctx.out(), fg(fmt::color::royal_blue), "{}", "bool");
+            case String: return fmt::format_to(ctx.out(), fg(fmt::color::burly_wood), "{}", "string");
             case Void: return fmt::format_to(ctx.out(), fg(fmt::color::gray), "{}", "void");
             case Undefined: return fmt::format_to(ctx.out(), fg(fmt::color::gray), "{}", "undefined");
             default: return fmt::format_to(ctx.out(), fg(fmt::color::red), "{}: {}", "Unknown ValueType PrimitiveType [by the formatter]", static_cast<int>(t));
@@ -487,7 +487,9 @@ struct fmt::formatter<ValueType> {
             } else {
                 return fmt::format_to(ctx.out(), "{}", t.primitive);
             }
-        // TEMP
-        return fmt::format_to(ctx.out(), "{}:{}", "Non-Primitive ValueType", t.type_id);
+        // TODO: Handle Ref/Pointers
+        if(t.type_id == InvalidTypeID)
+            return fmt::format_to(ctx.out(), fg(fmt::color::red), "{}", "Non-Primitive ValueType With Invalid TypeID");
+        return fmt::format_to(ctx.out(), fg(fmt::color::dark_sea_green), "{}", GlobalTypeRegistry::instance().get_type(t.type_id)->token.value);
     }
 };

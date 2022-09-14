@@ -127,7 +127,7 @@ class Module {
 
     llvm::Type* get_llvm_type(const ValueType& type) const {
         if (type.is_composite()) {
-            std::string type_name(GlobalTypeRegistry::instance().get_type(type.type_id)->name); // FIXME: Internalize the string and remove this
+            std::string type_name(GlobalTypeRegistry::instance().get_type(type.type_id)->name()); // FIXME: Internalize the string and remove this
             return llvm::StructType::getTypeByName(*_llvm_context, type_name);
         }
         return get_llvm_type(type.primitive);
