@@ -366,11 +366,7 @@ bool Parser::parse_next_expression(const std::span<Token>& tokens, std::span<Tok
 
 bool Parser::parse_identifier(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node) {
     assert(it->type == Token::Type::Identifier);
-
-    if(is_type(it->value)) {
-        return parse_variable_declaration(tokens, it, curr_node);
-    }
-
+    
     // Function Call
     // FIXME: Should be handled by parse_operator for () to be a generic operator!
     //        Or realise that this is a function, somehow (keep track of declaration).
@@ -921,9 +917,6 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
     return true;
 }
 
-/* it must point to an type identifier
- * TODO: Handle non-built-it types.
- */
 bool Parser::parse_variable_declaration(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node, bool is_const) {
     auto identifier = expect(tokens, it, Token::Type::Identifier);
 
@@ -955,7 +948,6 @@ bool Parser::parse_import(const std::span<Token>& tokens, std::span<Token>::iter
     assert(it->type == Token::Type::Import);
     ++it;
 
-    // TODO: Check Cache
     if(it == tokens.end()) {
         error("[Parser] Syntax error: Module name expected after import statement, got end-of-file.\n");
         return false;
