@@ -1,8 +1,8 @@
 # Language
 
 Toy Language.
+
 Nothing, including the syntax, is specified. I only have some vague goals in mind.
-Features a basic an interpreter that may not be maintained for long.
 Working on a compiler using LLVM IR and clang to generate native executables.
 
 ## Features
