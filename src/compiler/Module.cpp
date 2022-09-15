@@ -270,7 +270,12 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                 assert(value->getType()->isPointerTy());
                 return _llvm_ir_builder.CreateLoad(get_llvm_type(node->value_type), value, "l-to-rvalue");
             }
-            if(node->value_type == ValueType::string() && child->type == AST::Node::Type::BinaryOperator && child->token.type == Token::Type::OpenSubscript) {
+            if(child->type == AST::Node::Type::BinaryOperator && child->token.type == Token::Type::OpenSubscript && child->children[0]->value_type.is_array) {
+                assert(value->getType()->isPointerTy());
+                auto element_type = get_llvm_type(node->value_type.get_element_type());
+                return _llvm_ir_builder.CreateLoad(element_type, value, "l-to-rvalue");
+            }
+            if(child->type == AST::Node::Type::BinaryOperator && child->token.type == Token::Type::OpenSubscript && child->children[0]->value_type == ValueType::string()) {
                 assert(value->getType()->isPointerTy());
                 auto charType = llvm::IntegerType::get(*_llvm_context, 8);
                 return _llvm_ir_builder.CreateLoad(charType, value, "l-to-rvalue");
