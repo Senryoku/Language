@@ -156,11 +156,9 @@ struct fmt::formatter<ValueType> {
     template<typename FormatContext>
     auto format(const ValueType& t, FormatContext& ctx) -> decltype(ctx.out()) {
         if(t.is_primitive())
-            if(t.is_array) {
-                return fmt::format_to(ctx.out(), "{}[{}]", t.primitive, t.capacity);
-            } else {
-                return fmt::format_to(ctx.out(), "{}{}", t.primitive, t.is_pointer ? "*" : "");
-            }
+            return fmt::format_to(ctx.out(), "{}{}", t.primitive, t.is_pointer ? "*" : "");
+        if(t.is_array)
+            return fmt::format_to(ctx.out(), "{}[{}]", t.primitive, t.capacity);
         // TODO: Handle Ref/Pointers
         if(t.type_id == InvalidTypeID)
             return fmt::format_to(ctx.out(), fg(fmt::color::red), "{}", "Non-Primitive ValueType With Invalid TypeID");

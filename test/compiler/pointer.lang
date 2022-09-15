@@ -1,0 +1,20 @@
+// RET : 666
+
+type NewType {
+	let i : int;
+	let f : float;
+}
+
+function get_i(t : NewType*) {
+	return .i;
+}
+
+function set_i(t : NewType*, i : int) {
+	.i = i;
+}
+
+function main() {
+	let value : NewType;
+	value.set_i(666);
+	return value.get_i();
+}

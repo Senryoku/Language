@@ -60,6 +60,7 @@ struct ValueType {
     static ValueType floating_point() { return ValueType{.primitive = PrimitiveType::Float}; }
     static ValueType character() { return ValueType{.primitive = PrimitiveType::Char}; }
     static ValueType boolean() { return ValueType{.primitive = PrimitiveType::Boolean}; }
+    static ValueType string() { return ValueType{.primitive = PrimitiveType::String}; }
     static ValueType void_t() { return ValueType{.primitive = PrimitiveType::Void}; }
     static ValueType undefined() { return ValueType{.primitive = PrimitiveType::Undefined}; }
 };

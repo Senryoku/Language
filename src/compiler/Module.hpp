@@ -90,6 +90,10 @@ class Module {
         std::vector<llvm::Type*> printf_args_types({llvm::Type::getInt8PtrTy(*_llvm_context)});
         llvm::FunctionType*      printf_type = llvm::FunctionType::get(llvm::Type::getInt32Ty(*_llvm_context), printf_args_types, true);
         auto                     printf_func = _llvm_module->getOrInsertFunction("printf", printf_type);
+        // put
+        std::vector<llvm::Type*> put_args_types({llvm::Type::getInt8Ty(*_llvm_context)});
+        llvm::FunctionType*      put_type = llvm::FunctionType::get(llvm::Type::getInt32Ty(*_llvm_context), put_args_types, false);
+        auto                     put_func = _llvm_module->getOrInsertFunction("put", put_type);
 
         // Actual codegen
         auto r = codegen(&ast.getRoot());
@@ -119,6 +123,7 @@ class Module {
             case Integer: return llvm::Type::getInt32Ty(*_llvm_context);
             case Float: return llvm::Type::getFloatTy(*_llvm_context);
             case Char: return llvm::Type::getInt8Ty(*_llvm_context);
+            case String: return llvm::Type::getInt8PtrTy(*_llvm_context); // FIXME
             case Void: return llvm::Type::getVoidTy(*_llvm_context);
             default: error("[Module::get_llvm_type] GenericValue Type '{}' not mapped to a LLVM Type.\n", type); assert(false);
         }
@@ -131,7 +136,7 @@ class Module {
             return llvm_type->getPointerTo(0);
         }
         if(type.is_array) {
-            auto llvm_type = get_llvm_type(type.get_pointed_type());
+            auto llvm_type = get_llvm_type(type.get_element_type());
             return llvm::ArrayType::get(llvm_type, type.capacity);
         }
         if(type.is_composite()) {

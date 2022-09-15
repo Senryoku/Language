@@ -96,8 +96,14 @@ class Scoped {
                 s_builtins[name]->flags = flags;
             }
             get_scope().declare_function(*s_builtins[name]);
+            return s_builtins[name].get();
         };
-        register_builtin(*internalize_string("put"), ValueType::integer());
+        auto  put = register_builtin(*internalize_string("put"), ValueType::integer());
+        Token token;
+        token.value = *internalize_string("character");
+        auto arg = put->add_child(new AST::VariableDeclaration(token));
+        arg->value_type = ValueType::character();
+        put->add_child(new AST::Node()); // Empty Body
         register_builtin(*internalize_string("printf"), ValueType::integer(), AST::FunctionDeclaration::Flag::Variadic);
     }
 

@@ -46,6 +46,8 @@ PrimitiveType parse_primitive_type(const std::string_view& str) {
         return Boolean;
     else if(str == "char")
         return Char;
+    else if(str == "string")
+        return String;
     return Undefined;
 }
 

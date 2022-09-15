@@ -276,10 +276,11 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                 case Token::Type::Increment: {
                     assert(node->children[0]->type == AST::Node::Type::Variable);
                     // FIXME: Doesn't work
-                    auto var = get(node->children[0]->token.value);
-                    _llvm_ir_builder.CreateAdd(val, _llvm_ir_builder.getInt32(1), "inc");
-                    _llvm_ir_builder.CreateStore(val, var);
-                    return var;
+                    auto allocaInst = static_cast<llvm::AllocaInst*>(val);
+                    auto value = _llvm_ir_builder.CreateLoad(allocaInst->getAllocatedType(), allocaInst, "l-to-rvalue");
+                    auto res = _llvm_ir_builder.CreateAdd(value, _llvm_ir_builder.getInt32(1), "inc");
+                    _llvm_ir_builder.CreateStore(res, val);
+                    return val;
                 }
                 default: {
                     if(unary_ops[node->token.type].find(node->children[0]->value_type.primitive) == unary_ops[node->token.type].end()) {
@@ -325,10 +326,15 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                 case Token::Type::OpenSubscript: {
                     // FIXME: Remove these checks
                     assert(node->children[0]->type == AST::Node::Type::Variable);
-                    assert(node->children[0]->value_type.is_array);
-                    auto element_type = node->children[0]->value_type.get_element_type();
-                    return _llvm_ir_builder.CreateGEP(get_llvm_type(element_type), lhs, {llvm::ConstantInt::get(*_llvm_context, llvm::APInt(32, 0)), rhs},
-                                                      "ArrayGEP"); // FIXME: I don't know.
+                    assert(node->children[0]->value_type.is_array || node->children[0]->value_type == ValueType::string());
+                    if(node->children[0]->value_type.is_array) {
+                        auto type = get_llvm_type(node->children[0]->value_type);
+                        return _llvm_ir_builder.CreateGEP(type, lhs, {llvm::ConstantInt::get(*_llvm_context, llvm::APInt(32, 0)), rhs}, "ArrayGEP");
+                    } else {
+                        auto charType = llvm::IntegerType::get(*_llvm_context, 8);
+                        return _llvm_ir_builder.CreateGEP(charType->getPointerTo(), lhs, {rhs},
+                                                          "StringGEP"); // FIXME: I don't know.
+                    }
                 }
                 case Token::Type::Assignment: {
                     _llvm_ir_builder.CreateStore(rhs, lhs);

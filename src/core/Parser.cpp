@@ -387,8 +387,8 @@ bool Parser::parse_identifier(const std::span<Token>& tokens, std::span<Token>::
     variable_node->value_type = variable.value_type;
 
     if(peek(tokens, it, Token::Type::OpenSubscript)) { // Array accessor
-        if(!variable.value_type.is_array)
-            throw Exception(fmt::format("[Parser] Syntax Error: Subscript operator on variable '{}' which is not an array.\n", it->value), point_error(*it));
+        if(!(variable.value_type == ValueType::string()) && !variable.value_type.is_array)
+            throw Exception(fmt::format("[Parser] Syntax Error: Subscript operator on variable '{}' which is neither a string nor an array.\n", it->value), point_error(*it));
         auto access_operator_node = new AST::BinaryOperator(*(it + 1));
         access_operator_node->add_child(curr_node->pop_child());
         curr_node->add_child(access_operator_node);
@@ -399,12 +399,13 @@ bool Parser::parse_identifier(const std::span<Token>& tokens, std::span<Token>::
         it += 2;
         // Get the index and add it as a child.
         // FIXME: Search the matching ']' here?
-        if(!parse_next_expression(tokens, it, access_operator_node, max_precedence, false)) {
-            delete curr_node->pop_child();
-            return false;
-        }
+        parse_next_expression(tokens, it, access_operator_node, max_precedence, false);
 
-        // TODO: Make sure this is an integer? And compile-time constant?
+        // TODO: Make sure this is an integer?
+        if(access_operator_node->children.back()->value_type != ValueType::integer()) {
+            auto cast_node = access_operator_node->insert_between(access_operator_node->children.size() - 1, new AST::Node(AST::Node::Type::Cast));
+            cast_node->value_type = ValueType::integer();
+        }
 
         expect(tokens, it, Token::Type::CloseSubscript);
     } else {
@@ -675,7 +676,7 @@ bool Parser::parse_string(const std::span<Token>&, std::span<Token>::iterator& i
     auto strNode = new AST::StringLiteral(*it);
     curr_node->add_child(strNode);
 
-    if(it->value.find('\\')) {
+    if(it->value.find('\\') != it->value.npos) {
         std::string str;
         for(auto idx = 0u; idx < it->value.size(); ++idx) {
             auto ch = it->value[idx];
