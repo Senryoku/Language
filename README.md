@@ -14,9 +14,9 @@ Working on a compiler using LLVM IR and clang to generate native executables.
     - Array (fixed size) of other Primitive Types `int[32]`
   - Variable Declaration
 ```
-type variable_name = optional_initial_value;
-int a = 0;
-float b = 0.0;
+let variable_name : type = optional_initial_value;
+let a : int = 0;
+let b : float = 0.0;
 ```
   - Branch
 ```
@@ -34,7 +34,7 @@ while(condition_expression) {
 ```
   - Function Declaration
 ```
-function name(int param_0, float param_1) : int {
+function name(param_0 : int, param_1 : float) : int {
 	[...function body]
 }
 ```
