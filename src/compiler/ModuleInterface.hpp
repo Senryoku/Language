@@ -13,9 +13,9 @@ class ModuleInterface {
   public:
     std::filesystem::path working_directory;
 
-    std::vector<std::string>                dependencies;
-    std::vector<AST::FunctionDeclaration*>  exports;
-    std::vector<AST::FunctionDeclaration*>  imports;
+    std::vector<std::string>                               dependencies;
+    std::vector<AST::FunctionDeclaration*>                 exports;
+    std::vector<AST::FunctionDeclaration*>                 imports;
     std::vector<std::unique_ptr<AST::FunctionDeclaration>> external_nodes;
 
     // Returns a span containing the newly imported nodes
@@ -74,9 +74,9 @@ class ModuleInterface {
         }
         interface_file << std::endl;
         for(const auto& n : exports) {
-            interface_file << n->token.value << " " << serialize(n->value_type);
-            for (auto i = 0u; i < n->children.size() - 1; ++i) {
-                interface_file << " " << serialize(n->children[i]->value_type);
+            interface_file << n->token.value << " " << n->value_type.serialize();
+            for(auto i = 0u; i < n->children.size() - 1; ++i) {
+                interface_file << " " << n->children[i]->value_type.serialize();
             }
             interface_file << std::endl;
         }
@@ -90,7 +90,7 @@ class ModuleInterface {
         return path.append(dep + ".lang").lexically_normal();
     }
 
-    static auto get_cache_filename(const std::filesystem::path& path) { 
+    static auto get_cache_filename(const std::filesystem::path& path) {
         return path.stem().concat("_").concat(fmt::format("{:x}", std::hash<std::filesystem::path>{}(std::filesystem::absolute(path))));
     }
 };
