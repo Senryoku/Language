@@ -264,10 +264,18 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                 auto allocaInst = static_cast<llvm::AllocaInst*>(value);
                 return _llvm_ir_builder.CreateLoad(allocaInst->getAllocatedType(), allocaInst, "l-to-rvalue");
             }
+            // FIXME: I don't know what I'm doing.
+            //        These special cases should not be needed. I'm pretty sure.
             if(child->type == AST::Node::Type::BinaryOperator && child->token.type == Token::Type::MemberAccess) {
                 assert(value->getType()->isPointerTy());
                 return _llvm_ir_builder.CreateLoad(get_llvm_type(node->value_type), value, "l-to-rvalue");
             }
+            if(node->value_type == ValueType::string() && child->type == AST::Node::Type::BinaryOperator && child->token.type == Token::Type::OpenSubscript) {
+                assert(value->getType()->isPointerTy());
+                auto charType = llvm::IntegerType::get(*_llvm_context, 8);
+                return _llvm_ir_builder.CreateLoad(charType, value, "l-to-rvalue");
+            }
+            // warn("[LLVMCodegen] LValueToRValue without effect:\n{}", *node);
             return value;
         }
         case AST::Node::Type::UnaryOperator: {
@@ -332,8 +340,8 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                         return _llvm_ir_builder.CreateGEP(type, lhs, {llvm::ConstantInt::get(*_llvm_context, llvm::APInt(32, 0)), rhs}, "ArrayGEP");
                     } else {
                         auto charType = llvm::IntegerType::get(*_llvm_context, 8);
-                        return _llvm_ir_builder.CreateGEP(charType->getPointerTo(), lhs, {rhs},
-                                                          "StringGEP"); // FIXME: I don't know.
+                        auto load = _llvm_ir_builder.CreateLoad(charType->getPointerTo(), lhs);
+                        return _llvm_ir_builder.CreateGEP(charType, load, {rhs}, "StringGEP"); // FIXME: Should not be there (Or should it?)
                     }
                 }
                 case Token::Type::Assignment: {

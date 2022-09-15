@@ -1,3 +1,5 @@
+// RET : 32
+
 function main() {
 	const sx : int = 192 / 2;
 	const sy : int = 64 / 2;

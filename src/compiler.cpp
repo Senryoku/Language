@@ -299,8 +299,10 @@ bool handle_all() {
         for(const auto& arg : args['r'].values)
             run_command += " " + arg;
         print("Running {}...\n", run_command);
-        auto retval = std::system(run_command.c_str());
-        print("\n > {} returned {}.\n", final_outputfile, retval);
+        const auto execution_start = std::chrono::high_resolution_clock::now();
+        auto       retval = std::system(run_command.c_str());
+        const auto execution_end = std::chrono::high_resolution_clock::now();
+        print("\n > {} returned {} after {}.\n", final_outputfile, retval, std::chrono::duration<double, std::milli>(execution_end - execution_start));
     }
     return true;
 }
