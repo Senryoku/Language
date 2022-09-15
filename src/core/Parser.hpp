@@ -198,4 +198,6 @@ class Parser : public Scoped {
         ++it;
         return token;
     }
+
+    void check_function_call(AST::FunctionCall*, const AST::FunctionDeclaration*);
 };

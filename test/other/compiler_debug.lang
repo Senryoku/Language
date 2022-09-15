@@ -1,28 +1,18 @@
 type NewType {
 	let i : int;
 	let f : float;
-	
-	// Bug: Not emited in the correct scope (currently inaccessible)
-	function get_i(t : NewType) {
-		return .i;
-	}
 }
 
-function get_f(t : NewType) : float {
-	return .f;
+function get_i(t : NewType*) {
+	return .i;
 }
 
-// Needs a notion of "mutable this"
-function set_f(t : NewType, f: float) {
-	.f = f;
+function set_i(t : NewType*, i : int) {
+	.i = i;
 }
 
 function main() {
 	let value : NewType;
-	value.i = 1234;
-	value.f = 666.0;
-	printf("  i:%d, f:%f\n", value.i, value.f);
-	value.set_f(888.0); // Doesn't work without a notion of "mutable this"
-	const r : int = value.get_f();
-	return r;
+	value.set_i(666);
+	return value.get_i();
 }

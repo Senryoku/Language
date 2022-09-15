@@ -366,7 +366,7 @@ bool Parser::parse_next_expression(const std::span<Token>& tokens, std::span<Tok
 
 bool Parser::parse_identifier(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node) {
     assert(it->type == Token::Type::Identifier);
-    
+
     // Function Call
     // FIXME: Should be handled by parse_operator for () to be a generic operator!
     //        Or realise that this is a function, somehow (keep track of declaration).
@@ -378,10 +378,8 @@ bool Parser::parse_identifier(const std::span<Token>& tokens, std::span<Token>::
     }
 
     auto maybe_variable = get(it->value);
-    if(!maybe_variable) {
-        error("[Parser] Syntax Error: Variable '{}' has not been declared on line {}.\n", it->value, it->line);
-        return false;
-    }
+    if(!maybe_variable)
+        throw Exception(fmt::format("[Parser] Syntax Error: Variable '{}' has not been declared.\n", it->value), point_error(*it));
     const auto& variable = *maybe_variable;
 
     auto variable_node = new AST::Variable(*it);
@@ -519,9 +517,9 @@ bool Parser::parse_function_declaration(const std::span<Token>& tokens, std::spa
         throw Exception(fmt::format("[Parser] Expected identifier in function declaration, got {}.\n", *it), point_error(*it));
     auto functionNode = new AST::FunctionDeclaration(*it);
     curr_node->add_child(functionNode);
-    functionNode->name = *internalize_string(std::string(it->value));
+    functionNode->token.value = *internalize_string(std::string(it->value));
 
-    if(exported || functionNode->name == "main")
+    if(exported || functionNode->name() == "main")
         functionNode->flags |= AST::FunctionDeclaration::Flag::Exported;
 
     ++it;
@@ -530,7 +528,7 @@ bool Parser::parse_function_declaration(const std::span<Token>& tokens, std::spa
 
     // Declare the function immediatly to allow recursive calls.
     if(!get_scope().declare_function(*functionNode))
-        throw Exception(fmt::format("[Parser] Syntax error: Function '{}' already declared in this scope.\n", functionNode->token.value), point_error(functionNode->token));
+        throw Exception(fmt::format("[Parser] Syntax error: Function '{}' already declared in this scope.\n", functionNode->name()), point_error(functionNode->token));
 
     push_scope(); // FIXME: Restrict function parameters to this scope, do better.
 
@@ -590,7 +588,7 @@ bool Parser::parse_type_declaration(const std::span<Token>& tokens, std::span<To
 
     ++it;
     if(it->type != Token::Type::OpenScope)
-         throw Exception(fmt::format("Expected '{{' after type declaration, got {}.\n", it->value), point_error(*it));
+        throw Exception(fmt::format("Expected '{{' after type declaration, got {}.\n", it->value), point_error(*it));
 
     push_scope();
     ++it;
@@ -603,8 +601,7 @@ bool Parser::parse_type_declaration(const std::span<Token>& tokens, std::span<To
                 parse_method_declaration(tokens, it, curr_node);
                 break;
             }
-            case Token::Type::Const:
-                const_var = true; [[fallthrough]];
+            case Token::Type::Const: const_var = true; [[fallthrough]];
             case Token::Type::Let: {
                 ++it;
                 parse_variable_declaration(tokens, it, type_node, const_var);
@@ -627,7 +624,6 @@ bool Parser::parse_type_declaration(const std::span<Token>& tokens, std::span<To
             case Token::Type::Comment: ++it; break;
             default: throw Exception(fmt::format("[Parser] Unexpected token '{}' in type declaration.\n", it->value), point_error(*it));
         }
-
     }
     pop_scope();
 
@@ -713,13 +709,26 @@ bool Parser::parse_function_arguments(const std::span<Token>& tokens, std::span<
     const auto start = (it + 1);
     // Parse arguments
     while(it != tokens.end() && it->type != Token::Type::CloseParenthesis) {
-        auto to_rvalue = curr_node->add_child(new AST::Node(AST::Node::Type::LValueToRValue, curr_node->token));
-        parse_next_expression(tokens, it, to_rvalue);
+        auto arg_index = curr_node->children.size();
+        parse_next_expression(tokens, it, curr_node);
+        // FIXME: Don't insert this cast for references.
+        // if(!function_declaration_node->arguments()[arg_index]->value_type.is_reference) {
+        auto to_rvalue = curr_node->insert_between(arg_index, new AST::Node(AST::Node::Type::LValueToRValue, curr_node->token));
         to_rvalue->value_type = to_rvalue->children[0]->value_type;
+        //}
         skip(tokens, it, Token::Type::Comma);
     }
     expect(tokens, it, Token::Type::CloseParenthesis);
     return true;
+}
+
+void Parser::check_function_call(AST::FunctionCall* call_node, const AST::FunctionDeclaration* function) {
+    // FIXME: Also type check.
+    auto function_flags = function->flags;
+    if(!(function_flags & AST::FunctionDeclaration::Flag::Variadic) && call_node->arguments().size() != function->arguments().size()) {
+        throw Exception(fmt::format("[Parser] Function '{}' expects {} argument(s), got {}.\n", function->name(), function->arguments().size(), call_node->arguments().size()),
+                        point_error(call_node->token));
+    }
 }
 
 bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node) {
@@ -778,6 +787,9 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
         call_node->flags = function->flags;
 
         parse_function_arguments(tokens, it, call_node);
+
+        check_function_call(call_node, function);
+
         return true;
     }
 
@@ -839,8 +851,7 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
         } else if(peek(tokens, it, Token::Type::OpenParenthesis)) {
             // Search for a corresponding method
             const auto method = get_function(identifier_name);
-            if(method && method->children.size() > 0 && method->children[0]->value_type.is_composite() &&
-               method->children[0]->value_type.type_id == type_id) {
+            if(method && method->children.size() > 0 && method->children[0]->value_type.is_composite() && method->children[0]->value_type.type_id == type_id) {
                 auto binary_node = curr_node->pop_child();
                 auto first_argument = binary_node->pop_child();
                 delete binary_node;
@@ -853,10 +864,13 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
                 call_node->value_type = method->value_type;
                 call_node->flags = method->flags;
 
-                auto to_rvalue = call_node->add_child(new AST::Node(AST::Node::Type::LValueToRValue, curr_node->token));
-                to_rvalue->add_child(first_argument);
+                // FIXME
+                // Insert the first argument as a reference.
+                first_argument->value_type.is_reference = true;
+                call_node->add_child(first_argument);
 
                 parse_function_arguments(tokens, it, call_node);
+                check_function_call(call_node, method);
                 return true;
             } else {
                 throw Exception(fmt::format("[Parser] Syntax error: Method '{}' does not exists on type {}.\n", identifier_name, type->token.value), point_error(*it));
@@ -920,24 +934,24 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
 bool Parser::parse_variable_declaration(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node, bool is_const) {
     auto identifier = expect(tokens, it, Token::Type::Identifier);
 
-    auto varDecNode = new AST::VariableDeclaration(identifier);
-    curr_node->add_child(varDecNode);
+    auto var_declaration_node = new AST::VariableDeclaration(identifier);
+    curr_node->add_child(var_declaration_node);
 
-    if (it->type == Token::Type::Colon) {
+    if(it->type == Token::Type::Colon) {
         ++it;
-        varDecNode->value_type = parse_type(tokens, it);
+        var_declaration_node->value_type = parse_type(tokens, it);
     }
 
-    if(!get_scope().declare_variable(*varDecNode))
-        throw Exception(fmt::format("[Scope] Syntax error: Variable '{}' already declared.\n", varDecNode->token.value), point_error(varDecNode->token));
-    
+    if(!get_scope().declare_variable(*var_declaration_node))
+        throw Exception(fmt::format("[Scope] Syntax error: Variable '{}' already declared.\n", var_declaration_node->token.value), point_error(var_declaration_node->token));
+
     // Also push a variable identifier for initialisation
     bool has_initializer = it != tokens.end() && (it->type == Token::Type::Assignment);
     if(is_const && !has_initializer)
         throw Exception(fmt::format("[Parser] Syntax error: Variable '{}' declared as const but not initialized.\n", identifier.value), point_error(identifier));
     if(has_initializer) {
-        auto varNode = curr_node->add_child(new AST::Node(AST::Node::Type::Variable, identifier));
-        varNode->value_type = varDecNode->value_type;
+        auto variable_node = curr_node->add_child(new AST::Node(AST::Node::Type::Variable, identifier));
+        variable_node->value_type = var_declaration_node->value_type;
         parse_operator(tokens, it, curr_node);
     }
 
@@ -948,10 +962,8 @@ bool Parser::parse_import(const std::span<Token>& tokens, std::span<Token>::iter
     assert(it->type == Token::Type::Import);
     ++it;
 
-    if(it == tokens.end()) {
-        error("[Parser] Syntax error: Module name expected after import statement, got end-of-file.\n");
-        return false;
-    }
+    if(it == tokens.end())
+        throw Exception("[Parser] Syntax error: Module name expected after import statement, got end-of-file.\n");
 
     std::string module_name = std::string(it->value);
     _module_interface.dependencies.push_back(module_name);
@@ -983,13 +995,12 @@ ValueType Parser::parse_type(const std::span<Token>& tokens, std::span<Token>::i
     if(type == PrimitiveType::Undefined)
         r = get_type(token.value)->value_type;
 
-
-    if(peek(tokens, it, Token::Type::Multiplication)) {
+    if(it->type == Token::Type::Multiplication) {
         r.is_pointer = true;
         ++it;
     }
 
-    if(peek(tokens, it, Token::Type::OpenSubscript)) {
+    if(it->type == Token::Type::OpenSubscript) {
         r.is_array = true;
         ++it;
         // FIXME: Parse full expression?

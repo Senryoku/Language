@@ -150,7 +150,7 @@ llvm::Value* Module::codegen(const AST::Node* node) {
         }
         case AST::Node::Type::FunctionDeclaration: {
             auto function_declaration_node = static_cast<const AST::FunctionDeclaration*>(node);
-            auto function_name = std::string{function_declaration_node->name};
+            auto function_name = std::string{function_declaration_node->name()};
             auto prev_function = _llvm_module->getFunction(function_name);
             if(prev_function) { // Should be handled by the parser.
                 error("Redefinition of function '{}' (line {}).\n", function_name, function_declaration_node->token.line);
@@ -188,7 +188,6 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                 _llvm_ir_builder.CreateRet(node->value_type == ValueType::void_t() ? nullptr : function_body);
             pop_scope();
 
-            // TODO: Correctly handle no return (llvm_ir_builder.CreateRet(RetVal);)
             _llvm_ir_builder.SetInsertPoint(current_block);
             if(verifyFunction(*function, &llvm::errs())) {
                 error("\n[LLVMCodegen] Error verifying function '{}'.\n", function_name);
@@ -208,17 +207,16 @@ llvm::Value* Module::codegen(const AST::Node* node) {
             // TODO: Handle default values.
             // TODO: Handle vargs functions (variable number of parameters, like printf :^) )
             auto function_flags = function_call_node->flags;
-            if(!(function_flags & AST::FunctionDeclaration::Flag::Variadic) && function->arg_size() != function_call_node->arguments().size() - 1) {
+            if(!(function_flags & AST::FunctionDeclaration::Flag::Variadic) && function->arg_size() != function_call_node->arguments().size()) {
                 error("[LLVMCodegen] Unexpected number of parameters in function call '{}' (line {}): Expected {}, got {}.\n", function_name, node->token.line,
-                      function->arg_size(), function_call_node->arguments().size() - 1);
-                for(auto i = 1u; i < function_call_node->arguments().size(); ++i)
+                      function->arg_size(), function_call_node->arguments().size());
+                for(auto i = 0; i < function_call_node->arguments().size(); ++i)
                     print("\tArgument #{}: {}", i, *function_call_node->arguments()[i]);
                 return nullptr;
             }
             std::vector<llvm::Value*> parameters;
-            // Skip the first one, it (will) holds the function name (FIXME: No used yet, we don't support function as result of expression yet)
-            for(auto i = 1u; i < function_call_node->arguments().size(); ++i) {
-                auto v = codegen(function_call_node->arguments()[i]);
+            for(auto arg_node : function_call_node->arguments()) {
+                auto v = codegen(arg_node);
                 if(!v)
                     return nullptr;
                 // C Variadic functions promotes float to double (see https://stackoverflow.com/questions/63144506/printf-doesnt-work-for-floats-in-llvm-ir)
@@ -236,24 +234,10 @@ llvm::Value* Module::codegen(const AST::Node* node) {
             auto              parent_function = _llvm_ir_builder.GetInsertBlock()->getParent();
             if(!parent_function)
                 warn("TODO: Correctly handle global variables! ({}:{})\n", __FILE__, __LINE__);
-            if(node->value_type.is_primitive()) {
-                ret = create_entry_block_alloca(parent_function, get_llvm_type(node->value_type.primitive), std::string{node->token.value});
-            } else if(node->value_type.is_array) {
-                auto arrayType = llvm::ArrayType::get(get_llvm_type(node->value_type), node->value_type.capacity);
-                ret = create_entry_block_alloca(parent_function, arrayType, std::string{node->token.value});
-            } else {
-                std::string type_name(GlobalTypeRegistry::instance().get_type(node->value_type.type_id)->name());
-                auto        structType = llvm::StructType::getTypeByName(*_llvm_context, type_name);
-                if(!structType) {
-                    error("[LLVMCodegen] Type {} not found.\n", type_name);
-                    return nullptr;
-                }
-                ret = create_entry_block_alloca(parent_function, structType, std::string{node->token.value});
-            }
-            if(!set(node->token.value, ret)) {
-                error("[LLVMCodegen] Variable '{}' already declared (line {}).\n", node->token.value, node->token.line);
-                return nullptr;
-            }
+            auto type = get_llvm_type(node->value_type);
+            ret = create_entry_block_alloca(parent_function, type, std::string{node->token.value});
+            if(!set(node->token.value, ret))
+                throw Exception(fmt::format("[LLVMCodegen] Variable '{}' already declared (line {}).\n", node->token.value, node->token.line));
             return ret;
         }
         case AST::Node::Type::Variable: {
@@ -352,6 +336,12 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                 }
                 case Token::Type::MemberAccess: {
                     auto allocaInst = static_cast<llvm::AllocaInst*>(lhs);
+                    // FIXME: Just a quick hack, I don't think this is the real solution.
+                    if(node->children[0]->value_type.is_reference || node->children[0]->value_type.is_pointer) {
+                        auto type = get_llvm_type(node->children[0]->value_type.get_pointed_type());
+                        auto load = _llvm_ir_builder.CreateLoad(allocaInst->getAllocatedType(), lhs);
+                        return _llvm_ir_builder.CreateGEP(type, load, {llvm::ConstantInt::get(*_llvm_context, llvm::APInt(32, 0)), rhs}, "memberptr");
+                    }
                     return _llvm_ir_builder.CreateGEP(allocaInst->getAllocatedType(), lhs, {llvm::ConstantInt::get(*_llvm_context, llvm::APInt(32, 0)), rhs}, "memberptr");
                 }
                 default: warn("[LLVMCodegen] Unimplemented Binary Operator '{}'.\n", node->token.value); break;

@@ -126,9 +126,20 @@ class Module {
     }
 
     llvm::Type* get_llvm_type(const ValueType& type) const {
-        if (type.is_composite()) {
+        if(type.is_pointer || type.is_reference) {
+            auto llvm_type = get_llvm_type(type.get_pointed_type());
+            return llvm_type->getPointerTo(0);
+        }
+        if(type.is_array) {
+            auto llvm_type = get_llvm_type(type.get_pointed_type());
+            return llvm::ArrayType::get(llvm_type, type.capacity);
+        }
+        if(type.is_composite()) {
             std::string type_name(GlobalTypeRegistry::instance().get_type(type.type_id)->name()); // FIXME: Internalize the string and remove this
-            return llvm::StructType::getTypeByName(*_llvm_context, type_name);
+            auto        structType = llvm::StructType::getTypeByName(*_llvm_context, type_name);
+            if(!structType)
+                throw Exception(fmt::format("[LLVMCodegen] Could not find struct with name '{}'.\n", type_name));
+            return structType;
         }
         return get_llvm_type(type.primitive);
     }

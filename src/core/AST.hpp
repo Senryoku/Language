@@ -2,6 +2,7 @@
 
 #include <cassert>
 #include <charconv>
+#include <span>
 #include <stack>
 #include <vector>
 
@@ -55,7 +56,7 @@ struct ValueType {
     PrimitiveType primitive = PrimitiveType::Undefined;
     bool          is_array = false;
     size_t        capacity = 0;
-    bool          is_reference = false;
+    bool          is_reference = false; // FIXME: Do we need both?
     bool          is_pointer = false;
 
     TypeID type_id = InvalidTypeID;
@@ -65,6 +66,14 @@ struct ValueType {
     ValueType get_element_type() const {
         auto copy = *this;
         copy.is_array = false; // FIXME: This is obviously wrong.
+        return copy;
+    }
+
+    ValueType get_pointed_type() const {
+        assert(is_reference || is_pointer);
+        auto copy = *this;
+        copy.is_reference = false;
+        copy.is_pointer = false;
         return copy;
     }
 
@@ -176,10 +185,13 @@ class AST {
             Variadic = 1 << 1,
         };
 
-        std::string_view name;
-        Flag             flags = Flag::None;
+        Flag flags = Flag::None;
 
-        const std::vector<AST::Node*>& arguments() const { return children; }
+        auto       name() const { return token.value; }
+        auto       body() { return children.back(); }
+        const auto body() const { return children.back(); }
+        auto       arguments() { return std::span<AST::Node*>(children.data(), children.size() - 1); }
+        const auto arguments() const { return std::span<const AST::Node* const>(children.data(), children.size() - 1); }
     };
 
     struct FunctionCall : public Node {
@@ -187,8 +199,9 @@ class AST {
 
         FunctionDeclaration::Flag flags = FunctionDeclaration::None;
 
-        auto&       arguments() { return children; }
-        const auto& arguments() const { return children; }
+        auto       function() { return children[0]; }
+        auto       arguments() { return std::span<AST::Node*>(children.data() + 1, children.size() - 1); }
+        const auto arguments() const { return std::span<const AST::Node* const>(children.data() + 1, children.size() - 1); }
     };
 
     struct VariableDeclaration : public Node {
@@ -254,13 +267,11 @@ class AST {
     struct FloatLiteral : public Literal<float> {
         FloatLiteral(Token t) : Literal(t) { value_type.primitive = PrimitiveType::Float; }
     };
-    
+
     struct StringLiteral : public Literal<std::string_view> {
-        StringLiteral(Token t) : Literal(t) {
-            value_type.primitive = PrimitiveType::String;
-        }
+        StringLiteral(Token t) : Literal(t) { value_type.primitive = PrimitiveType::String; }
     };
-    
+
     struct ArrayLiteral : public Node {
         ArrayLiteral(Token t) : Node(t) { value_type.is_array = true; }
     };
@@ -383,10 +394,10 @@ struct fmt::formatter<AST::Node> {
             case AST::Node::Type::ConstantValue: r = fmt::format_to(ctx.out(), "{}:{}", t.type, t.value_type); break;
             case AST::Node::Type::ReturnStatement: r = fmt::format_to(ctx.out(), "{}:{}", t.type, t.value_type); break;
             case AST::Node::Type::WhileStatement: r = fmt::format_to(ctx.out(), "{}", t.type); break;
-            case AST::Node::Type::Variable: r = fmt::format_to(ctx.out(), "{}:{}:{}", t.type, t.token.value, t.value_type); break;
-            case AST::Node::Type::FunctionDeclaration: r = fmt::format_to(ctx.out(), "{}:{}", t.type, t.token.value); break;
+            case AST::Node::Type::Variable: r = fmt::format_to(ctx.out(), "{} {}:{}", t.type, t.token.value, t.value_type); break;
+            case AST::Node::Type::FunctionDeclaration: r = fmt::format_to(ctx.out(), "{} {}():", t.type, t.token.value, t.value_type); break;
             case AST::Node::Type::FunctionCall: r = fmt::format_to(ctx.out(), "{}:{}():{}", t.type, t.token.value, t.value_type); break;
-            case AST::Node::Type::VariableDeclaration: r = fmt::format_to(ctx.out(), "{}:{} {}", t.type, t.value_type, t.token.value); break;
+            case AST::Node::Type::VariableDeclaration: r = fmt::format_to(ctx.out(), "{} {}:{}", t.type, t.token.value, t.value_type); break;
             case AST::Node::Type::Cast: r = fmt::format_to(ctx.out(), "{}:{}", t.type, t.value_type); break;
             case AST::Node::Type::BinaryOperator:
                 r = fmt::format_to(ctx.out(), "{} {}:{}", fmt::format(fmt::emphasis::bold | fg(fmt::color::black) | bg(fmt::color::dim_gray), t.token.value), t.type, t.value_type);
@@ -485,11 +496,11 @@ struct fmt::formatter<ValueType> {
             if(t.is_array) {
                 return fmt::format_to(ctx.out(), "{}[{}]", t.primitive, t.capacity);
             } else {
-                return fmt::format_to(ctx.out(), "{}", t.primitive);
+                return fmt::format_to(ctx.out(), "{}{}", t.primitive, t.is_pointer ? "*" : "");
             }
         // TODO: Handle Ref/Pointers
         if(t.type_id == InvalidTypeID)
             return fmt::format_to(ctx.out(), fg(fmt::color::red), "{}", "Non-Primitive ValueType With Invalid TypeID");
-        return fmt::format_to(ctx.out(), fg(fmt::color::dark_sea_green), "{}", GlobalTypeRegistry::instance().get_type(t.type_id)->token.value);
+        return fmt::format_to(ctx.out(), fg(fmt::color::dark_sea_green), "{}{}", GlobalTypeRegistry::instance().get_type(t.type_id)->token.value, t.is_pointer ? "*" : "");
     }
 };
