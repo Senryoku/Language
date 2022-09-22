@@ -1,11 +1,11 @@
 #pragma once
 
+#include <algorithm>
 #include <cassert>
 #include <charconv>
 #include <span>
 #include <stack>
 #include <vector>
-#include <algorithm>
 
 #include <Tokenizer.hpp>
 
@@ -159,12 +159,30 @@ class AST {
 
         Flag flags = Flag::None;
 
-        auto       name() const { return token.value; }
-        auto       body() { return children.back(); }
-        const auto body() const { return children.back(); }
-        auto       arguments() { return std::span<AST::Node*>(children.data(), std::max<int>(0, static_cast<int>(children.size()) - 1));
+        auto name() const { return token.value; }
+        AST::Node* body() {
+            if(children.empty() || children.back()->type != AST::Node::Type::Scope)
+                return nullptr;
+            return children.back();
         }
-        const auto arguments() const { return std::span<const AST::Node* const>(children.data(), std::max<int>(0, static_cast<int>(children.size()) - 1));
+        const AST::Node* body() const {
+            if(children.empty() || children.back()->type != AST::Node::Type::Scope)
+                return nullptr;
+            return children.back();
+        }
+        auto arguments() {
+            if(children.size() == 0)
+                return std::span<AST::Node*>();
+            if(!body())
+                return std::span<AST::Node*>(children);
+            return std::span<AST::Node*>(children.data(), std::max<int>(0, static_cast<int>(children.size()) - 1));
+        }
+        const auto arguments() const {
+            if(children.size() == 0)
+                return std::span<const AST::Node* const>();
+            if(!body())
+                return std::span<const AST::Node* const>(children);
+            return std::span<const AST::Node* const>(children.data(), std::max<int>(0, static_cast<int>(children.size()) - 1));
         }
     };
 
@@ -174,10 +192,8 @@ class AST {
         FunctionDeclaration::Flag flags = FunctionDeclaration::None;
 
         auto       function() { return children[0]; }
-        auto arguments() { return std::span<AST::Node*>(children.data() + 1, std::max<int>(0, static_cast<int>(children.size()) - 1));
-        }
-        const auto arguments() const { return std::span<const AST::Node* const>(children.data() + 1, std::max<int>(0, static_cast<int>(children.size()) - 1));
-        }
+        auto       arguments() { return std::span<AST::Node*>(children.data() + 1, std::max<int>(0, static_cast<int>(children.size()) - 1)); }
+        const auto arguments() const { return std::span<const AST::Node* const>(children.data() + 1, std::max<int>(0, static_cast<int>(children.size()) - 1)); }
     };
 
     struct VariableDeclaration : public Node {
