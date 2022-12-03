@@ -1,0 +1,42 @@
+type Socket {
+	let fd: int = 0;
+}
+
+function create(this: Socket*) {
+	.fd = __socket_create();
+}
+
+function connect(this: Socket*, addr: string, port: int) {
+	__socket_connect(.fd, addr, port);
+}
+
+function send(this: Socket*, data: string) {
+	__socket_send(.fd, data);
+}
+
+function close(this: Socket*) {
+	__socket_close(.fd);
+}
+
+function main() : int {
+
+	//printf("I will now attempt to connect to 127.0.0.1:8000... ");
+	//test_socket();
+	//printf("Done!\n");
+
+	__socket_init();
+	
+	printf("Now with my own socket?\n");
+	
+	let socket : Socket;
+	printf("Got socket: %d\n", socket.fd);
+
+	socket.create();
+	socket.connect("127.0.0.1", 8000);
+	socket.send("GET /fromLang HTTP/1.0\r\n\r\n");
+	socket.close();
+	
+	printf("Done!\n");
+
+	return 0;
+}

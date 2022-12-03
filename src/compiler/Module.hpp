@@ -95,6 +95,17 @@ class Module {
         llvm::FunctionType*      put_type = llvm::FunctionType::get(llvm::Type::getInt32Ty(*_llvm_context), put_args_types, false);
         auto                     put_func = _llvm_module->getOrInsertFunction("put", put_type);
 
+        const auto integer_t = llvm::Type::getInt32Ty(*_llvm_context);
+        const auto void_t = llvm::Type::getVoidTy(*_llvm_context);
+        const auto str_t = llvm::Type::getInt8PtrTy(*_llvm_context);
+
+        _llvm_module->getOrInsertFunction("test_socket", llvm::FunctionType::get(void_t, {}, false));
+        _llvm_module->getOrInsertFunction("__socket_init", llvm::FunctionType::get(void_t, {}, false));
+        _llvm_module->getOrInsertFunction("__socket_create", llvm::FunctionType::get(integer_t, {}, false));
+        _llvm_module->getOrInsertFunction("__socket_connect", llvm::FunctionType::get(integer_t, {integer_t, str_t, integer_t}, false));
+        _llvm_module->getOrInsertFunction("__socket_send", llvm::FunctionType::get(integer_t, {integer_t, str_t/*, str_t, integer_t*/}, false));
+        _llvm_module->getOrInsertFunction("__socket_close", llvm::FunctionType::get(integer_t, {integer_t}, false));
+
         // Actual codegen
         auto r = codegen(&ast.getRoot());
         // Add a return to our generated main (from constructor) if needed (FIXME?)

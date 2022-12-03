@@ -975,6 +975,9 @@ bool Parser::parse_import(const std::span<Token>& tokens, std::span<Token>::iter
     if(!success)
         return false;
 
+    if(new_imports.empty())
+        warn("[Parser] Imported module {} doesn't export any symbol.\n", module_name);
+
     for(const auto& e : new_imports) {
         if(!get_root_scope().declare_function(*e)) {
             return false;

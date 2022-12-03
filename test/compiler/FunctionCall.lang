@@ -1,4 +1,7 @@
-// PASS: 84
+// RET : 84
+// PASS:
+// FAIL:
+
 function get_42() {
 	return 42;
 }

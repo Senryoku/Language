@@ -56,9 +56,6 @@ class ModuleInterface {
             }
         }
 
-        if(begin == imports.size())
-            warn("[ModuleInterface] Imported module {} doesn't export any symbol.\n", path.string());
-
         return {true, std::span<AST::FunctionDeclaration*>(imports.begin() + begin, imports.end())};
     }
 

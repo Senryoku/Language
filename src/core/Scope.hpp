@@ -87,24 +87,36 @@ class Scoped {
     Scoped() {
         push_scope(); // TODO: Push an empty scope for now.
 
-        const auto register_builtin = [&](const std::string& name, ValueType type, AST::FunctionDeclaration::Flag flags = AST::FunctionDeclaration::Flag::None) {
+        const auto register_builtin = [&](const std::string& name, ValueType type = ValueType::void_t(), std::vector<std::string> args_names = {},
+                                          std::vector<ValueType> args_types = {},
+                                          AST::FunctionDeclaration::Flag flags = AST::FunctionDeclaration::Flag::None) {
             if(!s_builtins[name]) {
                 Token token;
-                token.value = name; // We have to provide a name via the token.
+                token.value = *internalize_string(name); // We have to provide a name via the token.
                 s_builtins[name].reset(new AST::FunctionDeclaration(token));
                 s_builtins[name]->value_type = type;
                 s_builtins[name]->flags = flags;
+
+                for(size_t i = 0; i < args_names.size(); ++i) {
+                    Token arg_token;
+                    arg_token.value = *internalize_string(args_names[i]);
+                    auto arg = s_builtins[name]->add_child(new AST::VariableDeclaration(arg_token));
+                    arg->value_type = args_types[i];
+                }
             }
             get_scope().declare_function(*s_builtins[name]);
             return s_builtins[name].get();
         };
-        auto  put = register_builtin(*internalize_string("put"), ValueType::integer());
-        Token token;
-        token.value = *internalize_string("character");
-        auto arg = put->add_child(new AST::VariableDeclaration(token));
-        arg->value_type = ValueType::character();
-        put->add_child(new AST::Node()); // Empty Body
-        register_builtin(*internalize_string("printf"), ValueType::integer(), AST::FunctionDeclaration::Flag::Variadic);
+        
+        register_builtin("put", ValueType::integer(), {"character"}, {ValueType::character()});        
+        register_builtin("printf", ValueType::integer(), {}, {}, AST::FunctionDeclaration::Flag::Variadic);
+        register_builtin("test_func", ValueType::void_t(), {"x", "y"}, {ValueType::integer(), ValueType::integer()});
+        register_builtin("test_socket");
+        register_builtin("__socket_init", ValueType::void_t());
+        register_builtin("__socket_create", ValueType::integer());
+        register_builtin("__socket_connect", ValueType::integer(), {"sockfd", "addr", "port"}, {ValueType::integer() , ValueType::string(), ValueType::integer()});
+        register_builtin("__socket_send", ValueType::integer(), {"sockfd", "data"}, {ValueType::integer(), ValueType::string()});
+        register_builtin("__socket_close", ValueType::integer(), {"sockfd"}, {ValueType::integer()});
     }
 
     const AST::VariableDeclaration* get_this() const {

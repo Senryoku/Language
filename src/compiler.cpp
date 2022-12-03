@@ -259,7 +259,7 @@ bool link(const std::string& final_outputfile) {
         for(const auto& file : object_files) {
             cmd_input_files += " \"" + file.string() + "\"";
         }
-        const auto command = fmt::format("clang {} -flto -o \"{}\"", cmd_input_files, final_outputfile);
+        const auto command = fmt::format("clang {} -flto build/stdlib.o -o \"{}\"", cmd_input_files, final_outputfile);
         print("Running '{}'\n", command);
         if(auto retval = std::system(command.c_str()); retval != 0) {
             error("Error running clang: {}.\n", retval);
@@ -281,18 +281,19 @@ bool handle_all() {
     //  1. Pull all the required dependencies if they're not explicitly passed as argmument
     //  2. Recompile only the necessary files.
     //  3. Recompile in the correct order. (< Most important)
-    for(const auto& file : input_files) {
-        if(!handle_file(file))
-            return false;
-    }
+    bool file_generated = false;
+    for(const auto& file : input_files)
+        file_generated = handle_file(file) || file_generated;
     const auto clang_start = std::chrono::high_resolution_clock::now();
     auto       final_outputfile = args['o'].set ? args['o'].value() : input_files.size() == 1 ? (*input_files.begin()).filename().replace_extension(".exe").string() : "a.out";
-    if(!link(final_outputfile))
-        return false;
-    const auto clang_end = std::chrono::high_resolution_clock::now();
-    const auto end = std::chrono::high_resolution_clock::now();
-    success("Compiled successfully to {} in {:.2} (clang: {:.2}).\n", final_outputfile, std::chrono::duration<double, std::milli>(end - start),
-            std::chrono::duration<double, std::milli>(clang_end - clang_start));
+    if(file_generated) {
+        if(!link(final_outputfile))
+            return false;
+        const auto clang_end = std::chrono::high_resolution_clock::now();
+        const auto end = std::chrono::high_resolution_clock::now();
+        success("Compiled successfully to {} in {:.2} (clang: {:.2}).\n", final_outputfile, std::chrono::duration<double, std::milli>(end - start),
+                std::chrono::duration<double, std::milli>(clang_end - clang_start));
+    }
     // Run the generated program. FIXME: Handy, but dangerous.
     if(args['r'].set) {
         auto run_command = final_outputfile;

@@ -59,6 +59,7 @@ find_package(LLVM CONFIG)
 if(DEFINED LLVM_PACKAGE_VERSION)
     message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
     message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
+    message(STATUS "LLVM_INCLUDE_DIRS=${LLVM_INCLUDE_DIRS}")
     separate_arguments(LLVM_DEFINITIONS_LIST NATIVE_COMMAND ${LLVM_DEFINITIONS})
     add_definitions(${LLVM_DEFINITIONS_LIST})
     llvm_map_components_to_libnames(llvm_libs support core irreader orcjit support native)
@@ -69,7 +70,7 @@ if(DEFINED LLVM_PACKAGE_VERSION)
     add_executable(compiler ${HEADERS} src/compiler.cpp src/compiler/Module.cpp)
     set_property(TARGET compiler PROPERTY CXX_STANDARD 20)
     target_include_directories(compiler SYSTEM PRIVATE "${CMAKE_SOURCE_DIR}/ext")
-    target_include_directories(compiler SYSTEM PRIVATE "ext/fmt-8.1.1/include")
+    target_include_directories(compiler SYSTEM PRIVATE "ext/fmt-9.1.0/include")
     target_include_directories(compiler SYSTEM PRIVATE ${LLVM_INCLUDE_DIRS})
     target_link_libraries(compiler langlib)
     target_link_libraries(compiler fmt::fmt)
@@ -77,6 +78,18 @@ if(DEFINED LLVM_PACKAGE_VERSION)
 else()
     message(WARNING "Could NOT find LLVM, skipping compiler.")
 endif()
+
+# Compile standard library
+set(STDLIB_PATH build/stdlib.o)
+file(GLOB STDLIB_SOURCES "stdlib/*.cpp" "stdlib/**/*.cpp")
+add_custom_command( 
+    OUTPUT ${STDLIB_PATH} 
+    DEPENDS ${STDLIB_SOURCES} 
+    COMMAND clang -c ${STDLIB_SOURCES} -o ${STDLIB_PATH}
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+add_custom_target(stdlib ALL DEPENDS ${STDLIB_PATH})
+set_property(TARGET compiler APPEND PROPERTY OBJECT_DEPENDS ${STDLIB_PATH})
 
 # Get GTest online
 include(FetchContent)
