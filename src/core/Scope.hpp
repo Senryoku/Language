@@ -110,8 +110,7 @@ class Scoped {
         
         register_builtin("put", ValueType::integer(), {"character"}, {ValueType::character()});        
         register_builtin("printf", ValueType::integer(), {}, {}, AST::FunctionDeclaration::Flag::Variadic);
-        register_builtin("test_func", ValueType::void_t(), {"x", "y"}, {ValueType::integer(), ValueType::integer()});
-        register_builtin("test_socket");
+
         register_builtin("__socket_init", ValueType::void_t());
         register_builtin("__socket_create", ValueType::integer());
         register_builtin("__socket_connect", ValueType::integer(), {"sockfd", "addr", "port"}, {ValueType::integer() , ValueType::string(), ValueType::integer()});

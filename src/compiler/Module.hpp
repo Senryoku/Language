@@ -99,7 +99,6 @@ class Module {
         const auto void_t = llvm::Type::getVoidTy(*_llvm_context);
         const auto str_t = llvm::Type::getInt8PtrTy(*_llvm_context);
 
-        _llvm_module->getOrInsertFunction("test_socket", llvm::FunctionType::get(void_t, {}, false));
         _llvm_module->getOrInsertFunction("__socket_init", llvm::FunctionType::get(void_t, {}, false));
         _llvm_module->getOrInsertFunction("__socket_create", llvm::FunctionType::get(integer_t, {}, false));
         _llvm_module->getOrInsertFunction("__socket_connect", llvm::FunctionType::get(integer_t, {integer_t, str_t, integer_t}, false));

@@ -392,3 +392,4 @@ build/
 Testing/
 ignore/
 lang_cache
+.exe

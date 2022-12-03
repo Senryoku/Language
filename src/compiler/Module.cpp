@@ -145,7 +145,7 @@ llvm::Value* Module::codegen(const AST::Node* node) {
             for(const auto c : node->children)
                 members.push_back(get_llvm_type(c->value_type));
             std::string type_name(node->token.value);
-            auto        structType = llvm::StructType::create(*_llvm_context, members, type_name);
+            llvm::StructType::create(*_llvm_context, members, type_name);
             break;
         }
         case AST::Node::Type::FunctionDeclaration: {

@@ -85,7 +85,7 @@ file(GLOB STDLIB_SOURCES "stdlib/*.cpp" "stdlib/**/*.cpp")
 add_custom_command( 
     OUTPUT ${STDLIB_PATH} 
     DEPENDS ${STDLIB_SOURCES} 
-    COMMAND clang -c ${STDLIB_SOURCES} -o ${STDLIB_PATH}
+    COMMAND clang -c ${STDLIB_SOURCES} -o ${STDLIB_PATH} -std=c++20
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 )
 add_custom_target(stdlib ALL DEPENDS ${STDLIB_PATH})
