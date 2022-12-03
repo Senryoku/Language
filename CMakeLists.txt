@@ -80,7 +80,7 @@ else()
 endif()
 
 # Compile standard library
-set(STDLIB_PATH build/stdlib.o)
+set(STDLIB_PATH ${CMAKE_SOURCE_DIR}/build/stdlib.o)
 file(GLOB STDLIB_SOURCES "stdlib/*.cpp" "stdlib/**/*.cpp")
 add_custom_command( 
     OUTPUT ${STDLIB_PATH} 
@@ -90,6 +90,7 @@ add_custom_command(
 )
 add_custom_target(stdlib ALL DEPENDS ${STDLIB_PATH})
 set_property(TARGET compiler APPEND PROPERTY OBJECT_DEPENDS ${STDLIB_PATH})
+add_definitions(-DLANG_STDLIB_PATH="${STDLIB_PATH}")
 
 # Get GTest online
 include(FetchContent)

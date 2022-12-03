@@ -259,7 +259,7 @@ bool link(const std::string& final_outputfile) {
         for(const auto& file : object_files) {
             cmd_input_files += " \"" + file.string() + "\"";
         }
-        const auto command = fmt::format("clang {} -flto build/stdlib.o -o \"{}\"", cmd_input_files, final_outputfile);
+        const auto command = fmt::format("clang {} -flto {} -o \"{}\"", cmd_input_files, LANG_STDLIB_PATH, final_outputfile);
         print("Running '{}'\n", command);
         if(auto retval = std::system(command.c_str()); retval != 0) {
             error("Error running clang: {}.\n", retval);
