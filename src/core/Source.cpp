@@ -5,7 +5,7 @@
 #include <fmt/format.h>
 
 std::string_view get_nth_line(const std::string& source, size_t n) {
-    auto start = 0;
+    size_t start = 0;
     for(auto i = 0; i < n; ++i)
         start = source.find('\n', start + 1);
     auto end = source.find('\n', start + 1);
