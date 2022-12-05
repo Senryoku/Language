@@ -12,9 +12,27 @@
     #pragma comment(lib, "Ws2_32.lib")
     #include <winsock2.h>
     #include <ws2tcpip.h> // inet_pton
+    #include <windows.h> // FormatMessageA
 #endif
 
 #include <string.h>
+
+#if _WIN32
+std::string get_error_string(int errorCode) {
+    // Get the error message for the error code
+    LPSTR  messageBuffer = nullptr;
+    size_t size = FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, nullptr, errorCode,
+                                 MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), reinterpret_cast<LPSTR>(&messageBuffer), 0, nullptr);
+
+    // Create a string with the error message
+    std::string message(messageBuffer, size);
+
+    // Free the buffer
+    LocalFree(messageBuffer);
+
+    return message;
+}
+#endif
 
 extern "C" {
 
@@ -40,11 +58,18 @@ int __socket_init() {
     return 0;
 }
 
+void __socket_cleanup() {
+#ifdef __linux__
+#elif _WIN32
+    WSACleanup();
+#endif
+}
+
 int __socket_create() {
     int sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if(sockfd < 0) {
-        // Handle error
-        printf("Error getting socket: %d.\n", get_socket_error());
+        auto err = get_socket_error();
+        printf("Error getting socket (%d): %s.\n", err, get_error_string(err).c_str());
         return 0;
     }
     return sockfd;
@@ -53,23 +78,43 @@ int __socket_create() {
 int __socket_connect(int sockfd, const char* addr, int port) {
     printf("__socket_connect to %s:%d\n", addr, port);
 
-    struct sockaddr_in server_addr;
-    memset(&server_addr, 0, sizeof(server_addr));
-    server_addr.sin_family = AF_INET;
-    server_addr.sin_port = htons(port);
-    if(auto inet_pton_result = inet_pton(AF_INET, addr, &server_addr.sin_addr); inet_pton_result <= 0) {
+    struct sockaddr server_addr;
+
+    struct sockaddr_in server_addr_in;
+    memset(&server_addr_in, 0, sizeof(server_addr_in));
+    server_addr_in.sin_family = AF_INET;
+    server_addr_in.sin_port = htons(port);
+
+    if(auto inet_pton_result = inet_pton(AF_INET, addr, &server_addr_in.sin_addr); inet_pton_result <= 0) {
         if(inet_pton_result == 0) {
             printf("__socket_connect: '%s' is not a valid IPv4 or IPv6.\n", addr);
+            struct addrinfo hints;
+            memset(&hints, 0, sizeof(hints));
+            hints.ai_family = AF_INET;
+            hints.ai_socktype = SOCK_STREAM;
+
+            struct addrinfo* results;
+            char             port_str[6];
+            snprintf(port_str, sizeof(port_str), "%d", port);
+            int status = getaddrinfo(addr, port_str, &hints, &results);
+            if(status != 0) {
+                printf("__socket_connect: '%s' could not be resolved to an IP address using getaddrinfo (error: %d).\n", addr, status);
+                freeaddrinfo(results);
+                return 1;
+            }
+            server_addr = *results->ai_addr;
+            freeaddrinfo(results);
         } else {
             printf("__socket_connect: inet_pton error %d.\n", inet_pton_result);
+            return 1;
         }
-        return 0;
-    }
+    } else
+        server_addr = *(struct sockaddr*)&server_addr_in;
 
     // Connect to the server
     if(connect(sockfd, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
         auto err = get_socket_error();
-        printf("Error connecting to %s: %d.\n", addr, err);
+        printf("Error connecting to %s (%d): %s.\n", addr, err, get_error_string(err).c_str());
         return err;
     }
 
@@ -81,6 +126,22 @@ int __socket_send(int sockfd, const char* req) {
 
     const std::string request(req);
     return send(sockfd, request.c_str(), request.size(), 0);
+}
+
+// FIXME: Leaks.
+char* __socket_recv(int sockfd) {
+    printf("__socket_recv on socket %d\n", sockfd);
+
+    char* buff = new char[2048];
+    int   status = recv(sockfd, buff, 2048, 0);
+    if(status == SOCKET_ERROR) {
+        auto err = get_socket_error();
+        printf("__socket_recv: error (%d): %s\n", err, get_error_string(err).c_str());
+        return nullptr;
+    }
+    printf("__socket_recv: received '%s'\n", buff);
+
+    return buff;
 }
 
 int __socket_close(int sockfd) {

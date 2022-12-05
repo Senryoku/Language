@@ -77,6 +77,7 @@ class AST {
         enum class Type {
             Root,
             Statement,
+            Defer,
             Scope,
             Expression,
             IfStatement,
@@ -161,12 +162,13 @@ class AST {
 
         auto name() const { return token.value; }
         AST::Node* body() {
-            if(children.empty() || children.back()->type != AST::Node::Type::Scope)
+            if(children.empty() || (children.back()->type != AST::Node::Type::Scope && children.back()->type != AST::Node::Type::Root))
                 return nullptr;
             return children.back();
         }
         const AST::Node* body() const {
-            if(children.empty() || children.back()->type != AST::Node::Type::Scope)
+            // FIXME: This is really bad. There should be a consistent way to tell if a function is defined (i.e. has a body) or not.
+            if(children.empty() || (children.back()->type != AST::Node::Type::Scope && children.back()->type != AST::Node::Type::Root))
                 return nullptr;
             return children.back();
         }
@@ -194,6 +196,21 @@ class AST {
         auto       function() { return children[0]; }
         auto       arguments() { return std::span<AST::Node*>(children.data() + 1, std::max<int>(0, static_cast<int>(children.size()) - 1)); }
         const auto arguments() const { return std::span<const AST::Node* const>(children.data() + 1, std::max<int>(0, static_cast<int>(children.size()) - 1)); }
+    };
+
+    struct Defer : public Node {
+        Defer(Token t) : Node(Node::Type::Defer, t) {}
+    };
+
+    struct Scope : public Node {
+        Scope(Token t) : Node(Node::Type::Scope, t) {}
+
+        AST::Defer* defer = nullptr;
+
+        ~Scope() override {
+            if(defer)
+                delete defer;
+        }
     };
 
     struct VariableDeclaration : public Node {

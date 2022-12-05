@@ -31,6 +31,7 @@ std::string point_error_find_line(const std::string& source, size_t at, size_t l
 std::string point_error(const std::string_view& source, size_t at, size_t line, size_t from, size_t to) noexcept {
     assert((from == std::numeric_limits<size_t>::max() || to == std::numeric_limits<size_t>::max()) || from <= to);
     std::string return_value = "";
+    at = std::min(at, source.size() - 1);
     // Search previous line break
     auto line_start = at;
     if(source[line_start] == '\n' && line_start > 0)

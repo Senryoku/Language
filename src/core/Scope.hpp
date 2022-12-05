@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <vector>
+#include <stack>
 
 #include <het_unordered_map.hpp>
 
@@ -45,6 +46,7 @@ class Scope {
         if(is_declared(name))
             return false;
         _variables.emplace(name, &decNode);
+        _ordered_variable_declarations.push(&decNode);
         return true;
     }
 
@@ -69,11 +71,16 @@ class Scope {
     const AST::VariableDeclaration* get_this() const { return _this; }
     AST::VariableDeclaration*       get_this() { return _this; }
 
+    // Returns a copy.
+    std::stack<AST::VariableDeclaration*> get_ordered_variable_declarations() const { return _ordered_variable_declarations; }
+
   private:
     // FIXME: At some point we'll have ton consolidate these string_view to their final home... Maybe the lexer should have done it already.
     het_unordered_map<AST::VariableDeclaration*> _variables;
     het_unordered_map<AST::FunctionDeclaration*> _functions;
     het_unordered_map<AST::TypeDeclaration*>     _types;
+
+    std::stack<AST::VariableDeclaration*> _ordered_variable_declarations;
 
     AST::VariableDeclaration* _this = nullptr;
 
@@ -115,6 +122,7 @@ class Scoped {
         register_builtin("__socket_create", ValueType::integer());
         register_builtin("__socket_connect", ValueType::integer(), {"sockfd", "addr", "port"}, {ValueType::integer() , ValueType::string(), ValueType::integer()});
         register_builtin("__socket_send", ValueType::integer(), {"sockfd", "data"}, {ValueType::integer(), ValueType::string()});
+        register_builtin("__socket_recv", ValueType::string(), {"sockfd"}, {ValueType::integer()});
         register_builtin("__socket_close", ValueType::integer(), {"sockfd"}, {ValueType::integer()});
     }
 

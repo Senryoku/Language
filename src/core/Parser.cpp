@@ -12,7 +12,7 @@ bool Parser::parse(const std::span<Token>& tokens, AST::Node* curr_node) {
         const auto& token = *it;
         switch(token.type) {
             case Token::Type::OpenScope: {
-                curr_node = curr_node->add_child(new AST::Node(AST::Node::Type::Scope, *it));
+                curr_node = curr_node->add_child(new AST::Scope(*it));
                 push_scope();
                 ++it;
                 break;
@@ -210,6 +210,7 @@ bool Parser::parse_next_scope(const std::span<Token>& tokens, std::span<Token>::
     auto   begin = it + 1;
     auto   end = it;
     size_t opened_scopes = 0;
+    Token  last_closing;
     while(end != tokens.end()) {
         if(end->type == Token::Type::OpenScope)
             ++opened_scopes;
@@ -225,10 +226,43 @@ bool Parser::parse_next_scope(const std::span<Token>& tokens, std::span<Token>::
         return false;
     }
 
-    auto scope = curr_node->add_child(new AST::Node(AST::Node::Type::Scope, *it));
+    auto scope = new AST::Scope(*it);
+    curr_node->add_child(scope);
     push_scope();
     bool r = parse({begin, end}, scope);
     scope->value_type = get_scope().get_return_type();
+
+    scope->defer = new AST::Defer(*it);
+    // Append calls to destructors in the defer node
+    auto ordered_variable_declarations = get_scope().get_ordered_variable_declarations();
+    while (!ordered_variable_declarations.empty()) {
+        auto dec = ordered_variable_declarations.top();
+        ordered_variable_declarations.pop();
+        print("Checking for {}'s destructor...\n", dec->token.value);
+        auto destructor = get_function("destructor");
+        if(destructor) {
+            print("Found a destructor!\n");
+            Token destructor_token = end != tokens.end() ? *end : Token();
+            destructor_token.type = Token::Type::Identifier;
+            destructor_token.value = *internalize_string("destructor");
+            auto destructor_node = new AST::Variable(destructor_token); // FIXME: Still using the token to get the function...
+            auto call_node = new AST::FunctionCall(destructor_token);
+            call_node->value_type = destructor->value_type;
+            call_node->flags = destructor->flags;
+
+            scope->defer->add_child(call_node);
+            call_node->add_child(destructor_node);
+            call_node->add_child(new AST::Variable(dec->token));
+
+            check_function_call(call_node, destructor);
+        }
+    }
+    // Defer node is empty, no need to keep it around.
+    if (scope->defer->children.size() == 0) {
+        delete scope->defer;
+        scope->defer = nullptr;
+    }
+    
     pop_scope();
     it = end + 1;
     return r;
@@ -563,13 +597,13 @@ bool Parser::parse_function_declaration(const std::span<Token>& tokens, std::spa
     parse_scope_or_single_statement(tokens, it, functionNode);
 
     // Return type deduction
-    auto return_type = functionNode->children.back()->value_type;
+    auto return_type = functionNode->body()->value_type;
     if(return_type.is_undefined())
         return_type = ValueType::void_t();
     if(!functionNode->value_type.is_undefined() && functionNode->value_type != return_type)
         throw Exception(
             fmt::format("[Parser] Syntax error: Incoherent return types for function {}, got {}, expected {}.\n", functionNode->token.value, return_type, functionNode->value_type),
-            point_error(functionNode->children.back()->token));
+            point_error(functionNode->body()->token));
     functionNode->value_type = return_type;
 
     pop_scope();

@@ -1,7 +1,27 @@
-// RET : 42
+type NewType {
+	let i : int = 0;
+}
 
-import "../compiler/include/double"
+type NewType2 {
+	let j : int = 0;
+}
 
-function main() {
-	return double(21);
+function init(this: NewType*) {
+	.i = 1;
+}
+
+function destructor(this: NewType*) {
+	printf("NewType destructor called.\n");
+}
+
+function destructor(this: NewType2*) {
+	printf("NewType2 destructor called.\n");
+}
+
+function main() : int {
+	let newObject : NewType;
+	
+	newObject.init();
+
+	return 0;
 }

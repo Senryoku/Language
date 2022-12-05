@@ -1,0 +1,13 @@
+type NewType {
+	let i : int = 0;
+}
+
+function destructor(this: NewType*) {
+	printf("NewType destructor called.\n");
+}
+
+
+function main() : int {
+	let newObject : NewType;
+	return 0;
+}

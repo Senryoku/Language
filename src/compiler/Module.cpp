@@ -44,6 +44,7 @@ static std::unordered_map<Token::Type, std::unordered_map<PrimitiveType, std::fu
 };
 #undef OP
 
+
 llvm::Constant* Module::codegen_constant(const AST::Node* val) {
     if(val->value_type.is_array) {
         auto arr = dynamic_cast<const AST::ArrayLiteral*>(val);
@@ -101,8 +102,23 @@ llvm::Constant* Module::codegen_constant(const AST::Node* val) {
     return nullptr;
 }
 
+void Module::insert_defer_block(const AST::Node* node) {
+    // Search for closest scope node
+    auto parent_node = node->parent;
+    while(parent_node && parent_node->type != AST::Node::Type::Scope) 
+        parent_node = parent_node->parent;
+
+    assert(parent_node != nullptr);
+    auto scope_node = static_cast<const AST::Scope*>(parent_node);
+    if(scope_node->defer) {
+        // TODO: Should this be a single block, instead of duplicating code?
+        //       How could we implement this? With a conditional return somehow?
+        for(auto c : scope_node->defer->children)
+            codegen(c);
+    }
+}
+
 llvm::Value* Module::codegen(const AST::Node* node) {
-    _generated_return = false;
     switch(node->type) {
         case AST::Node::Type::Root: [[fallthrough]];
         case AST::Node::Type::Statement: {
@@ -119,6 +135,10 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                 ret = codegen(c);
             pop_scope();
             return ret;
+        }
+        case AST::Node::Type::Defer: {
+            assert(false); // Defer nodes should not be in the basic AST.
+            return nullptr;
         }
         case AST::Node::Type::ConstantValue: return codegen_constant(node);
         case AST::Node::Type::Cast: {
@@ -184,13 +204,16 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                 ++arg_idx;
             }
             auto function_body = codegen(node->children.back()); // Generate function body
-            if(!_generated_return)
+            if(!_generated_return) {
                 _llvm_ir_builder.CreateRet(node->value_type == ValueType::void_t() ? nullptr : function_body);
+                _generated_return = false;
+            }
             pop_scope();
 
             _llvm_ir_builder.SetInsertPoint(current_block);
             if(verifyFunction(*function, &llvm::errs())) {
                 error("\n[LLVMCodegen] Error verifying function '{}'.\n", function_name);
+                function->dump();
                 function->eraseFromParent();
                 return nullptr;
             }
@@ -410,8 +433,10 @@ llvm::Value* Module::codegen(const AST::Node* node) {
             auto then_value = codegen(node->children[1]);
             if(!then_value)
                 return nullptr;
-            if(!_generated_return)
+            if(!_generated_return) {
                 _llvm_ir_builder.CreateBr(if_end_block);
+                _generated_return = false;
+            }
 
             // Note: The current block may have changed, this doesn't matter right now, but if the
             // if_then_block is reused in the future (to compute a PHI node holding a return value
@@ -426,18 +451,22 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                 if(!else_value)
                     return nullptr;
             }
-            if(!_generated_return)
+            if(!_generated_return) {
                 _llvm_ir_builder.CreateBr(if_end_block);
+                _generated_return = false;
+            }
 
             current_function->getBasicBlockList().push_back(if_end_block);
             _llvm_ir_builder.SetInsertPoint(if_end_block);
 
-            // If statement do not return a value (Should we?)
+            // If statements do not return a value (Should we?)
             return llvm::Constant::getNullValue(llvm::Type::getInt32Ty(*_llvm_context));
         }
         case AST::Node::Type::ReturnStatement: {
             auto val = codegen(node->children[0]);
             _generated_return = true;
+
+            insert_defer_block(node);
             return _llvm_ir_builder.CreateRet(val);
         }
         default: warn("LLVM Codegen: Unsupported node type '{}'.\n", node->type);

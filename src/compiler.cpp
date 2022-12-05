@@ -134,9 +134,9 @@ bool handle_file(const std::filesystem::path& path) {
                 out.print("{}", *ast);
                 fmt::print("AST written to '{}'.\n", args['o'].value());
                 std::system(fmt::format("cat \"{}\"", args['o'].value()).c_str());
+                return false;
             } else
                 fmt::print("{}", *ast);
-            return false;
         }
 
         try {
