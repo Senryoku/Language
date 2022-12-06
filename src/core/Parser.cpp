@@ -239,7 +239,9 @@ bool Parser::parse_next_scope(const std::span<Token>& tokens, std::span<Token>::
         auto dec = ordered_variable_declarations.top();
         ordered_variable_declarations.pop();
         print("Checking for {}'s destructor...\n", dec->token.value);
-        auto destructor = get_function("destructor");
+        std::vector<AST::Node*> span;
+        span.push_back(dec);
+        auto                  destructor = get_function("destructor", span);
         if(destructor) {
             print("Found a destructor!\n");
             Token destructor_token = end != tokens.end() ? *end : Token();
@@ -252,7 +254,8 @@ bool Parser::parse_next_scope(const std::span<Token>& tokens, std::span<Token>::
 
             scope->defer->add_child(call_node);
             call_node->add_child(destructor_node);
-            call_node->add_child(new AST::Variable(dec->token));
+            auto var_node = call_node->add_child(new AST::Variable(dec->token));
+            var_node->value_type = dec->value_type;
 
             check_function_call(call_node, destructor);
         }
@@ -815,15 +818,22 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
         // FIXME: FunctionCall uses its token for now to get the function name, but this in incorrect, it should look at the
         // first child and execute it to get a reference to the function. Using the function name token as a temporary workaround.
         auto function_name = function_node->token.value;
-        auto function = get_function(function_name);
-        if(!function)
-            throw Exception(fmt::format("[Parser] Call to undefined function '{}'.\n", function_name), point_error(*it));
-        call_node->value_type = function->value_type;
-        call_node->flags = function->flags;
 
         parse_function_arguments(tokens, it, call_node);
 
-        check_function_call(call_node, function);
+        auto resolved_function = get_function(function_name, call_node->arguments());
+        if(!resolved_function) {
+            throw Exception(fmt::format("[Parser] Call to undefined function '{}'.\n", function_name), point_error(*it));
+            // TODO: Better error message in the case when functions with the given name exists, but the argument types do not match.
+            //       Display supplied arguments types and descriptions of the candidates.
+            throw Exception(fmt::format("[Parser] Call to undefined function '{}', no candidate matches the arguments types.\n", function_name), point_error(*it));
+
+        }
+
+        call_node->value_type = resolved_function->value_type;
+        call_node->flags = resolved_function->flags;
+
+        check_function_call(call_node, resolved_function);
 
         return true;
     }
@@ -884,27 +894,28 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
             member_identifier_node->index = member_index;
             ++it;
         } else if(peek(tokens, it, Token::Type::OpenParenthesis)) {
-            // Search for a corresponding method
-            const auto method = get_function(identifier_name);
-            if(method && method->children.size() > 0 && method->children[0]->value_type.is_composite() && method->children[0]->value_type.type_id == type_id) {
-                auto binary_node = curr_node->pop_child();
-                auto first_argument = binary_node->pop_child();
-                delete binary_node;
-                auto call_node = new AST::FunctionCall(*it);
-                curr_node->add_child(call_node);
-                auto function_node = new AST::Variable(*it);
-                call_node->add_child(function_node);
-                ++it;
+            auto binary_node = curr_node->pop_child();
+            auto first_argument = binary_node->pop_child();
+            delete binary_node;
+            auto call_node = new AST::FunctionCall(*it);
+            curr_node->add_child(call_node);
+            auto function_node = new AST::Variable(*it);
+            call_node->add_child(function_node);
+            ++it;
 
+            // FIXME
+            // Insert the first argument as a reference.
+            first_argument->value_type.is_reference = true;
+            call_node->add_child(first_argument);
+
+            parse_function_arguments(tokens, it, call_node);
+
+            // Search for a corresponding method
+            const auto method = get_function(identifier_name, call_node->arguments());
+            if(method && method->children.size() > 0 && method->children[0]->value_type.is_composite() && method->children[0]->value_type.type_id == type_id) {
                 call_node->value_type = method->value_type;
                 call_node->flags = method->flags;
 
-                // FIXME
-                // Insert the first argument as a reference.
-                first_argument->value_type.is_reference = true;
-                call_node->add_child(first_argument);
-
-                parse_function_arguments(tokens, it, call_node);
                 check_function_call(call_node, method);
                 return true;
             } else {

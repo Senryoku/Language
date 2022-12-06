@@ -1,3 +1,5 @@
+// PASS: NewType2 destructor called. NewType destructor called.
+
 type NewType {
 	let i : int = 0;
 }
@@ -15,11 +17,12 @@ function destructor(this: NewType*) {
 }
 
 function destructor(this: NewType2*) {
-	printf("NewType2 destructor called.\n");
+	printf("NewType2 destructor called. ");
 }
 
 function main() : int {
 	let newObject : NewType;
+	let newObject2 : NewType2;
 	
 	newObject.init();
 

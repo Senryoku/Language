@@ -170,7 +170,7 @@ llvm::Value* Module::codegen(const AST::Node* node) {
         }
         case AST::Node::Type::FunctionDeclaration: {
             auto function_declaration_node = static_cast<const AST::FunctionDeclaration*>(node);
-            auto function_name = std::string{function_declaration_node->name()};
+            auto function_name = function_declaration_node->mangled_name();
             auto prev_function = _llvm_module->getFunction(function_name);
             if(prev_function) { // Should be handled by the parser.
                 error("Redefinition of function '{}' (line {}).\n", function_name, function_declaration_node->token.line);
@@ -221,17 +221,17 @@ llvm::Value* Module::codegen(const AST::Node* node) {
         }
         case AST::Node::Type::FunctionCall: {
             auto function_call_node = static_cast<const AST::FunctionCall*>(node);
-            auto function_name = std::string{function_call_node->token.value};
-            auto function = _llvm_module->getFunction(function_name);
+            auto mangled_function_name = function_call_node->mangled_name();
+            auto function = _llvm_module->getFunction(mangled_function_name);
             if(!function) {
-                error("[LLVMCodegen] Call to undeclared function '{}' (line {}).\n", function_name, function_call_node->token.line);
+                error("[LLVMCodegen] Call to undeclared function '{}' (line {}).\n", mangled_function_name, function_call_node->token.line);
                 return nullptr;
             }
             // TODO: Handle default values.
             // TODO: Handle vargs functions (variable number of parameters, like printf :^) )
             auto function_flags = function_call_node->flags;
             if(!(function_flags & AST::FunctionDeclaration::Flag::Variadic) && function->arg_size() != function_call_node->arguments().size()) {
-                error("[LLVMCodegen] Unexpected number of parameters in function call '{}' (line {}): Expected {}, got {}.\n", function_name, node->token.line,
+                error("[LLVMCodegen] Unexpected number of parameters in function call '{}' (line {}): Expected {}, got {}.\n", mangled_function_name, node->token.line,
                       function->arg_size(), function_call_node->arguments().size());
                 for(auto i = 0; i < function_call_node->arguments().size(); ++i)
                     print("\tArgument #{}: {}", i, *function_call_node->arguments()[i]);
@@ -250,7 +250,7 @@ llvm::Value* Module::codegen(const AST::Node* node) {
             if(function_call_node->value_type == ValueType::void_t())
                 return _llvm_ir_builder.CreateCall(function, parameters);
             else
-                return _llvm_ir_builder.CreateCall(function, parameters, function_name);
+                return _llvm_ir_builder.CreateCall(function, parameters, mangled_function_name);
         }
         case AST::Node::Type::VariableDeclaration: {
             llvm::AllocaInst* ret = nullptr;

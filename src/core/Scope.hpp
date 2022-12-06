@@ -13,10 +13,10 @@ class Scope {
   public:
     bool declare_function(AST::FunctionDeclaration& node) {
         auto sv = node.token.value;
-        if(is_valid(find_function(sv)))
+        if(resolve_function(sv, node.arguments()) != nullptr)
             return false;
         // TODO: Check & warn shadowing from other scopes?
-        _functions[std::string{sv}] = &node;
+        _functions[std::string{sv}].push_back(&node);
         return true;
     }
 
@@ -29,11 +29,9 @@ class Scope {
         return true;
     }
 
-    bool is_valid(const het_unordered_map<AST::FunctionDeclaration*>::iterator& it) const { return it != _functions.end(); }
-    bool is_valid(const het_unordered_map<AST::FunctionDeclaration*>::const_iterator& it) const { return it != _functions.cend(); }
-    [[nodiscard]] het_unordered_map<AST::FunctionDeclaration*>::iterator       find_function(const std::string_view& name) { return _functions.find(name); }
-    [[nodiscard]] het_unordered_map<AST::FunctionDeclaration*>::const_iterator find_function(const std::string_view& name) const { return _functions.find(name); }
-    [[nodiscard]] const AST::FunctionDeclaration*                              get_function(const std::string_view& name) const;
+    bool is_valid(const het_unordered_map < std::vector<AST::FunctionDeclaration*>>::iterator & it) const { return it != _functions.end(); }
+    bool is_valid(const het_unordered_map < std::vector<AST::FunctionDeclaration*>>::const_iterator & it) const { return it != _functions.cend(); }
+    [[nodiscard]] const AST::FunctionDeclaration* resolve_function(const std::string_view& name, const std::span<AST::Node*>& arguments) const;
 
     bool is_valid(const het_unordered_map<AST::TypeDeclaration*>::iterator& it) const { return it != _types.end(); }
     bool is_valid(const het_unordered_map<AST::TypeDeclaration*>::const_iterator& it) const { return it != _types.cend(); }
@@ -71,13 +69,13 @@ class Scope {
     const AST::VariableDeclaration* get_this() const { return _this; }
     AST::VariableDeclaration*       get_this() { return _this; }
 
-    // Returns a copy.
+    // Note: Returns a copy.
     std::stack<AST::VariableDeclaration*> get_ordered_variable_declarations() const { return _ordered_variable_declarations; }
 
   private:
     // FIXME: At some point we'll have ton consolidate these string_view to their final home... Maybe the lexer should have done it already.
     het_unordered_map<AST::VariableDeclaration*> _variables;
-    het_unordered_map<AST::FunctionDeclaration*> _functions;
+    het_unordered_map<std::vector<AST::FunctionDeclaration*>> _functions;
     het_unordered_map<AST::TypeDeclaration*>     _types;
 
     std::stack<AST::VariableDeclaration*> _ordered_variable_declarations;
@@ -156,69 +154,16 @@ class Scoped {
 
     void pop_scope() { _scopes.pop_back(); }
 
-    const AST::FunctionDeclaration* get_function(const std::string_view& name) const {
-        auto it = _scopes.rbegin();
-        auto val = it->find_function(name);
-        while(it != _scopes.rend() && !it->is_valid(val)) {
-            it++;
-            if(it != _scopes.rend())
-                val = it->find_function(name);
-        }
-        return it != _scopes.rend() && it->is_valid(val) ? val->second : nullptr;
-    }
+    const AST::FunctionDeclaration* get_function(const std::string_view& name, const std::span<AST::Node*>& arguments) const;
 
-    const AST::TypeDeclaration* get_type(const std::string_view& name) const {
-        auto it = _scopes.rbegin();
-        auto val = it->find_type(name);
-        while(it != _scopes.rend() && !it->is_valid(val)) {
-            it++;
-            if(it != _scopes.rend())
-                val = it->find_type(name);
-        }
-        assert(it != _scopes.rend() && it->is_valid(val));
-        return val->second;
-    }
-
+    const AST::TypeDeclaration* get_type(const std::string_view& name) const;
     const AST::TypeDeclaration* get_type(TypeID id) const { return GlobalTypeRegistry::instance().get_type(id); }
+    bool                        is_type(const std::string_view& name) const;
 
-    AST::VariableDeclaration* get(const std::string_view& name) {
-        auto it = _scopes.rbegin();
-        auto val = it->find(name);
-        while(it != _scopes.rend() && !it->is_valid(val)) {
-            it++;
-            if(it != _scopes.rend())
-                val = it->find(name);
-        }
-        return it != _scopes.rend() && it->is_valid(val) ? val->second : nullptr;
-    }
-
-    const AST::VariableDeclaration* get(const std::string_view& name) const {
-        auto it = _scopes.rbegin();
-        auto val = it->find(name);
-        while(it != _scopes.rend() && !it->is_valid(val)) {
-            it++;
-            if(it != _scopes.rend())
-                val = it->find(name);
-        }
-        return it != _scopes.rend() && it->is_valid(val) ? val->second : nullptr;
-    }
-
+    AST::VariableDeclaration* get(const std::string_view& name);
+    const AST::VariableDeclaration* get(const std::string_view& name) const;
     bool is_declared(const std::string_view& name) const { return get(name) != nullptr; }
 
-    bool is_type(const std::string_view& name) const {
-        auto builtin = parse_primitive_type(name);
-        if(builtin != PrimitiveType::Undefined)
-            return true;
-        // Search for a type declared with this name
-        auto it = _scopes.rbegin();
-        auto val = it->find_type(name);
-        while(it != _scopes.rend() && !it->is_valid(val)) {
-            it++;
-            if(it != _scopes.rend())
-                val = it->find_type(name);
-        }
-        return it != _scopes.rend() && it->is_valid(val);
-    }
 
   private:
     std::vector<Scope> _scopes;
