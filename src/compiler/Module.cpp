@@ -213,7 +213,9 @@ llvm::Value* Module::codegen(const AST::Node* node) {
             _llvm_ir_builder.SetInsertPoint(current_block);
             if(verifyFunction(*function, &llvm::errs())) {
                 error("\n[LLVMCodegen] Error verifying function '{}'.\n", function_name);
+#ifndef NDEBUG // dump is not available in release builds of LLVM
                 function->dump();
+#endif
                 function->eraseFromParent();
                 return nullptr;
             }
