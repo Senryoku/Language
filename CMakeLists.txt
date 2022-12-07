@@ -24,6 +24,12 @@ else()
     add_compile_options(-Wall -Wextra -pedantic)
 endif()
 
+set(STDLIB_BASE_FOLDER "${PROJECT_SOURCE_DIR}/stdlib/exports/")
+configure_file(
+    "${PROJECT_SOURCE_DIR}/src/core/Config.hpp.in"
+    "${PROJECT_SOURCE_DIR}/src/core/Config.hpp"
+)
+
 # Define sources
 aux_source_directory("src/core" SOURCES)
 aux_source_directory("test/" TEST_FILES)

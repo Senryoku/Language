@@ -10,8 +10,10 @@
 #include <Logger.hpp>
 #include <GlobalTypeRegistry.hpp>
 
+#include <Config.hpp>
+
 // FIXME: Correctly set this path.
-static const std::filesystem::path stdlib_folder("H:/Source/Lang/stdlib/exports/");
+static const std::filesystem::path stdlib_folder(STDLIB_BASE_FOLDER);
 
 class ModuleInterface {
   public:
