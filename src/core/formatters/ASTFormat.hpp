@@ -1,7 +1,5 @@
 ﻿#pragma once
 
-#include <GlobalTypeRegistry.hpp>
-
 template<>
 struct fmt::formatter<AST> {
     constexpr auto parse(format_parse_context& ctx) {
@@ -148,27 +146,5 @@ struct fmt::formatter<PrimitiveType> {
             case Undefined: return fmt::format_to(ctx.out(), fg(fmt::color::gray), "{}", "undefined");
             default: return fmt::format_to(ctx.out(), fg(fmt::color::red), "{}: {}", "Unknown ValueType PrimitiveType [by the formatter]", static_cast<int>(t));
         }
-    }
-};
-
-template<>
-struct fmt::formatter<ValueType> {
-    constexpr auto parse(format_parse_context& ctx) -> decltype(ctx.begin()) {
-        auto it = ctx.begin(), end = ctx.end();
-        if(it != end && *it != '}')
-            throw format_error("Invalid format for ValueType");
-        return it;
-    }
-
-    template<typename FormatContext>
-    auto format(const ValueType& t, FormatContext& ctx) -> decltype(ctx.out()) {
-        if(t.is_primitive())
-            return fmt::format_to(ctx.out(), "{}{}", t.primitive, t.is_pointer ? "*" : "");
-        if(t.is_array)
-            return fmt::format_to(ctx.out(), "{}[{}]", t.primitive, t.capacity);
-        // TODO: Handle Ref/Pointers
-        if(t.type_id == InvalidTypeID)
-            return fmt::format_to(ctx.out(), fg(fmt::color::red), "{}", "Non-Primitive ValueType With Invalid TypeID");
-        return fmt::format_to(ctx.out(), fg(fmt::color::dark_sea_green), "{}{}", GlobalTypeRegistry::instance().get_type(t.type_id)->token.value, t.is_pointer ? "*" : "");
     }
 };

@@ -182,10 +182,28 @@ bool Parser::parse(const std::span<Token>& tokens, AST::Node* curr_node) {
             }
             case Token::Type::Export: {
                 ++it;
-                // Assume it's a function for now
                 // TODO: Handle exported variables too.
-                parse_function_declaration(tokens, it, curr_node, AST::FunctionDeclaration::Flag::Exported);
-                _module_interface.exports.push_back(static_cast<AST::FunctionDeclaration*>(curr_node->children.back()));
+                switch(it->type) {
+                    case Token::Type::Function: {
+                        parse_function_declaration(tokens, it, curr_node, AST::FunctionDeclaration::Flag::Exported);
+                        _module_interface.exports.push_back(static_cast<AST::FunctionDeclaration*>(curr_node->children.back()));
+                        break;
+                    }
+                    case Token::Type::Type: {
+                        if(!parse_type_declaration(tokens, it, curr_node))
+                            return false;
+                        _module_interface.type_exports.push_back(static_cast<AST::TypeDeclaration*>(curr_node->children.back()));
+                        break;
+                    }
+                    case Token::Type::Let:
+                    case Token::Type::Const: {
+                        throw Exception("[Parser] Variable export not yet implemented!");
+                        break;
+                    }
+                    default: {
+                        throw Exception(fmt::format("[Parser] Unexpected token {} after export keyword.", it->value));
+                    }
+                }
                 break;
             }
             case Token::Type::Comment: ++it; break;
@@ -924,7 +942,7 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
 
             // Search for a corresponding method
             const auto method = get_function(identifier_name, call_node->arguments());
-            if(method && method->children.size() > 0 && method->children[0]->value_type.is_composite() && method->children[0]->value_type.type_id == type_id) {
+            if(method && method->arguments().size() > 0 && method->arguments()[0]->value_type.is_composite() && method->arguments()[0]->value_type.type_id == type_id) {
                 call_node->value_type = method->value_type;
                 call_node->flags = method->flags;
 
@@ -1028,14 +1046,20 @@ bool Parser::parse_import(const std::span<Token>& tokens, std::span<Token>::iter
     auto cached_interface_file = _cache_folder;
     cached_interface_file += ModuleInterface::get_cache_filename(_module_interface.resolve_dependency(module_name)).replace_extension(".int");
 
-    auto [success, new_imports] = _module_interface.import_module(cached_interface_file);
+    auto [success, new_type_imports, new_function_imports] = _module_interface.import_module(cached_interface_file);
     if(!success)
         return false;
 
-    if(new_imports.empty())
+    if(new_type_imports.empty() && new_function_imports.empty())
         warn("[Parser] Imported module {} doesn't export any symbol.\n", module_name);
 
-    for(const auto& e : new_imports) {
+    for(const auto& e : new_type_imports) {
+        if(!get_root_scope().declare_type(*e)) {
+            return false;
+        }
+    }
+
+    for(const auto& e : new_function_imports) {
         if(!get_root_scope().declare_function(*e)) {
             return false;
         }
@@ -1053,8 +1077,12 @@ ValueType Parser::parse_type(const std::span<Token>& tokens, std::span<Token>::i
 
     ValueType r(type);
 
-    if(type == PrimitiveType::Undefined)
-        r = get_type(token.value)->value_type;
+    if(type == PrimitiveType::Undefined) {
+        auto node_type = get_type(token.value);
+        if(!node_type)
+            throw Exception(fmt::format("[Parser] Unknown type '{}'.", token.value), point_error(token));
+        r = node_type->value_type;
+    }
 
     if(it->type == Token::Type::Multiplication) {
         r.is_pointer = true;

@@ -6,8 +6,9 @@
 
 #include <het_unordered_map.hpp>
 
-#include <AST.hpp>
 #include <FlyString.hpp>
+#include <AST.hpp>
+#include <GlobalTypeRegistry.hpp>
 
 class Scope {
   public:

@@ -1,3 +1,8 @@
+// FIXME: We're not able to export yet.
+type File {
+	let fd : int = 0;
+}
+
 import "File"
 
 function main() : int {

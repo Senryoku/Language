@@ -63,6 +63,7 @@ bool handle_file(const std::filesystem::path& path) {
     if(processed_files.contains(path))
         return false;
     auto filename = path.stem();
+
     auto cache_filename = ModuleInterface::get_cache_filename(path);
     auto o_filepath = cache_folder;
     o_filepath += cache_filename.replace_extension(".o");
@@ -82,6 +83,7 @@ bool handle_file(const std::filesystem::path& path) {
     }
     print("Processing {}... \n", path.string());
     const auto     total_start = std::chrono::high_resolution_clock::now();
+
     std ::ifstream input_file(path);
     if(!input_file) {
         error("[compiler::handle_file] Couldn't open file '{}' (Running from {}).\n", path.string(), std::filesystem::current_path().string());
@@ -143,6 +145,7 @@ bool handle_file(const std::filesystem::path& path) {
             const auto                         codegen_start = std::chrono::high_resolution_clock::now();
             std::unique_ptr<llvm::LLVMContext> llvm_context(new llvm::LLVMContext());
             Module                             new_module{path.string(), llvm_context.get()};
+            new_module.codegen_imports(parser.get_module_interface().type_imports);
             new_module.codegen_imports(parser.get_module_interface().imports);
             auto result = new_module.codegen(*ast);
             if(!result) {

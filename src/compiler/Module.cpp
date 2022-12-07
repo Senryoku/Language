@@ -2,6 +2,8 @@
 
 #include <vector>
 
+#include <GlobalTypeRegistry.hpp>
+
 // FIXME: We should not use maps here actually. Find another way to manage the nested switch cases.
 
 #define OP(VALUETYPE, FUNC)                                                                    \
@@ -500,4 +502,23 @@ llvm::Value* Module::codegen(const AST::Node* node) {
         default: warn("LLVM Codegen: Unsupported node type '{}'.\n", node->type);
     }
     return nullptr;
+}
+
+llvm::Type* Module::get_llvm_type(const ValueType& type) const {
+    if(type.is_pointer || type.is_reference) {
+        auto llvm_type = get_llvm_type(type.get_pointed_type());
+        return llvm_type->getPointerTo(0);
+    }
+    if(type.is_array) {
+        auto llvm_type = get_llvm_type(type.get_element_type());
+        return llvm::ArrayType::get(llvm_type, type.capacity);
+    }
+    if(type.is_composite()) {
+        std::string type_name(GlobalTypeRegistry::instance().get_type(type.type_id)->name()); // FIXME: Internalize the string and remove this
+        auto        structType = llvm::StructType::getTypeByName(*_llvm_context, type_name);
+        if(!structType)
+            throw Exception(fmt::format("[LLVMCodegen] Could not find struct with name '{}'.\n", type_name));
+        return structType;
+    }
+    return get_llvm_type(type.primitive);
 }

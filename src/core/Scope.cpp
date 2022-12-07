@@ -49,7 +49,8 @@ const AST::TypeDeclaration* Scoped::get_type(const std::string_view& name) const
         if(it != _scopes.rend())
             val = it->find_type(name);
     }
-    assert(it != _scopes.rend() && it->is_valid(val));
+    if(it == _scopes.rend() || !it->is_valid(val))
+        return nullptr;
     return val->second;
 }
 

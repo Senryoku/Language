@@ -1,0 +1,19 @@
+extern function __open_file(path: char*, mode: char*) : int;
+extern function __close_file(fd: int);
+
+export type File {
+	let fd : int = 0;
+}
+
+export function open(this: File*, path: string, mode: string) {
+	.fd = __open_file(path, mode);
+}
+
+export function close(this: File*) {
+	if(.fd != 0) __close_file(.fd);
+}
+
+// Crashes for some reason
+//export function destructor(this: File*) {
+//	.close();
+//}

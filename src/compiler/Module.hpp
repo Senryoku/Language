@@ -69,18 +69,16 @@ class Module {
 
     // Create declarations for imported external functions/variables
     void codegen_imports(const std::vector<AST::FunctionDeclaration*>& nodes) {
-        for(const auto& n : nodes) {
+        for(const auto n : nodes) {
             assert(n->type == AST::Node::Type::FunctionDeclaration);
-            auto                     name = n->token.value.data();
-            auto                     return_type = get_llvm_type(n->value_type);
-            std::vector<llvm::Type*> func_args_types;
-            // These function nodes should not have bodies
-            for(const auto& c : n->children) {
-                assert(c->type == AST::Node::Type::VariableDeclaration);
-                func_args_types.push_back(get_llvm_type(c->value_type));
-            }
-            llvm::FunctionType* func_type = llvm::FunctionType::get(return_type, func_args_types, true);
-            auto                func_func = _llvm_module->getOrInsertFunction(name, func_type);
+            codegen(n);
+        }
+    }
+        
+    void codegen_imports(const std::vector<AST::TypeDeclaration*>& nodes) {
+        for(const auto n : nodes) {
+            assert(n->type == AST::Node::Type::TypeDeclaration);
+            codegen(n);
         }
     }
 
@@ -141,24 +139,6 @@ class Module {
         return nullptr;
     }
 
-    llvm::Type* get_llvm_type(const ValueType& type) const {
-        if(type.is_pointer || type.is_reference) {
-            auto llvm_type = get_llvm_type(type.get_pointed_type());
-            return llvm_type->getPointerTo(0);
-        }
-        if(type.is_array) {
-            auto llvm_type = get_llvm_type(type.get_element_type());
-            return llvm::ArrayType::get(llvm_type, type.capacity);
-        }
-        if(type.is_composite()) {
-            std::string type_name(GlobalTypeRegistry::instance().get_type(type.type_id)->name()); // FIXME: Internalize the string and remove this
-            auto        structType = llvm::StructType::getTypeByName(*_llvm_context, type_name);
-            if(!structType)
-                throw Exception(fmt::format("[LLVMCodegen] Could not find struct with name '{}'.\n", type_name));
-            return structType;
-        }
-        return get_llvm_type(type.primitive);
-    }
-
+    llvm::Type* get_llvm_type(const ValueType& type) const;
     void insert_defer_block(const AST::Node* node);
 };
