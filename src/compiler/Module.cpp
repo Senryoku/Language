@@ -29,6 +29,9 @@ static std::unordered_map<Token::Type, std::unordered_map<PrimitiveType, std::fu
     {Token::Type::Equal,
      {OP(Integer, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_EQ, lhs, rhs, "ICMP_EQ");),
       OP(Float, return ir_builder.CreateFCmp(llvm::CmpInst::Predicate::FCMP_OEQ, lhs, rhs, "FCMP_OEQ");)}},
+    {Token::Type::Different,
+     {OP(Integer, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_NE, lhs, rhs, "ICMP_NE");),
+      OP(Float, return ir_builder.CreateFCmp(llvm::CmpInst::Predicate::FCMP_ONE, lhs, rhs, "FCMP_ONE");)}},
     {Token::Type::Lesser,
      {OP(Integer, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_SLT, lhs, rhs, "ICMP_SLT");),
       OP(Float, return ir_builder.CreateFCmp(llvm::CmpInst::Predicate::FCMP_OLT, lhs, rhs, "FCMP_OLT");)}},
@@ -177,49 +180,58 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                 return nullptr;
             }
 
-            auto                     current_block = _llvm_ir_builder.GetInsertBlock();
             std::vector<llvm::Type*> param_types;
-            if(function_declaration_node->children.size() > 1)
-                for(auto i = 0; i < function_declaration_node->children.size() - 1; ++i) {
-                    auto type = get_llvm_type(function_declaration_node->children[i]->value_type);
-                    assert(type);
-                    param_types.push_back(type);
-                }
+            for(auto arg : function_declaration_node->arguments()) {
+                auto type = get_llvm_type(arg->value_type);
+                assert(type);
+                param_types.push_back(type);
+            }
             auto return_type = get_llvm_type(function_declaration_node->value_type);
             auto function_types = llvm::FunctionType::get(return_type, param_types, false);
             auto flags = function_declaration_node->flags;
-            auto function =
-                llvm::Function::Create(function_types, flags & AST::FunctionDeclaration::Flag::Exported ? llvm::Function::ExternalLinkage : llvm::Function::PrivateLinkage,
-                                       function_name, _llvm_module.get());
 
-            auto* block = llvm::BasicBlock::Create(*_llvm_context, "entrypoint", function);
-            _llvm_ir_builder.SetInsertPoint(block);
+            if(function_declaration_node->body()) {
+                // ExternalLinkage: Externally visible function.
+                // InternalLinkage: Rename collisions when linking(static functions)
+                // PrivateLinkage:  Like Internal, but omit from symbol table.
+                auto function =
+                    llvm::Function::Create(function_types, flags & AST::FunctionDeclaration::Flag::Exported ? llvm::Function::ExternalLinkage : llvm::Function::PrivateLinkage,
+                                           function_name, _llvm_module.get());
+                auto  current_block = _llvm_ir_builder.GetInsertBlock();
+                auto* block = llvm::BasicBlock::Create(*_llvm_context, "entrypoint", function);
+                _llvm_ir_builder.SetInsertPoint(block);
 
-            push_scope(); // Scope for variable declarations
-            auto arg_idx = 0;
-            for(auto& arg : function->args()) {
-                arg.setName(std::string{node->children[arg_idx]->token.value});
-                auto alloca = codegen(node->children[arg_idx]); // Generate variable declarations
-                _llvm_ir_builder.CreateStore(&arg, alloca);
-                ++arg_idx;
-            }
-            auto function_body = codegen(node->children.back()); // Generate function body
-            if(!_generated_return) {
-                _llvm_ir_builder.CreateRet(node->value_type == ValueType::void_t() ? nullptr : function_body);
-                _generated_return = false;
-            }
-            pop_scope();
+                push_scope(); // Scope for variable declarations
+                auto arg_idx = 0;
+                for(auto& arg : function->args()) {
+                    arg.setName(std::string{function_declaration_node->arguments()[arg_idx]->token.value});
+                    auto alloca = codegen(function_declaration_node->arguments()[arg_idx]); // Generate variable declarations
+                    _llvm_ir_builder.CreateStore(&arg, alloca);
+                    ++arg_idx;
+                }
+                auto function_body = codegen(function_declaration_node->body()); // Generate function body
+                if(!_generated_return) {
+                    _llvm_ir_builder.CreateRet(node->value_type == ValueType::void_t() ? nullptr : function_body);
+                    _generated_return = false;
+                }
+                pop_scope();
 
-            _llvm_ir_builder.SetInsertPoint(current_block);
-            if(verifyFunction(*function, &llvm::errs())) {
-                error("\n[LLVMCodegen] Error verifying function '{}'.\n", function_name);
+                _llvm_ir_builder.SetInsertPoint(current_block);
+                if(verifyFunction(*function, &llvm::errs())) {
+                    error("\n[LLVMCodegen] Error verifying function '{}'.\n", function_name);
 #ifndef NDEBUG // dump is not available in release builds of LLVM
-                function->dump();
+                    function->dump();
 #endif
-                function->eraseFromParent();
+                    function->eraseFromParent();
+                    return nullptr;
+                }
+                return function;
+            } else {
+                assert((flags & AST::FunctionDeclaration::Flag::Extern) && "Functions without a body should be marked as 'extern'.");
+                _llvm_module->getOrInsertFunction(function_name, function_types);
                 return nullptr;
             }
-            return function;
+            return nullptr;
         }
         case AST::Node::Type::FunctionCall: {
             auto function_call_node = static_cast<const AST::FunctionCall*>(node);
@@ -235,8 +247,17 @@ llvm::Value* Module::codegen(const AST::Node* node) {
             if(!(function_flags & AST::FunctionDeclaration::Flag::Variadic) && function->arg_size() != function_call_node->arguments().size()) {
                 error("[LLVMCodegen] Unexpected number of parameters in function call '{}' (line {}): Expected {}, got {}.\n", mangled_function_name, node->token.line,
                       function->arg_size(), function_call_node->arguments().size());
+                print("Argument from function call (AST):\n");
                 for(auto i = 0; i < function_call_node->arguments().size(); ++i)
                     print("\tArgument #{}: {}", i, *function_call_node->arguments()[i]);
+#ifndef NDEBUG
+                print("Arguments from registered function in LLVM:\n");
+                for(llvm::Function::const_arg_iterator it = function->arg_begin(); it != function->arg_end(); ++it) {
+                    print("Argument #{}: ", it->getArgNo());
+                    it->dump();
+                    print("\n");
+                }
+#endif
                 return nullptr;
             }
             std::vector<llvm::Value*> parameters;
@@ -249,7 +270,7 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                     v = _llvm_ir_builder.CreateFPExt(v, llvm::Type::getDoubleTy(*_llvm_context));
                 parameters.push_back(v);
             }
-            if(function_call_node->value_type == ValueType::void_t())
+            if(function_call_node->value_type == ValueType::void_t()) // "Cannot assign a name to void values!"
                 return _llvm_ir_builder.CreateCall(function, parameters);
             else
                 return _llvm_ir_builder.CreateCall(function, parameters, mangled_function_name);
@@ -346,6 +367,7 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                 case Token::Type::Division: [[fallthrough]];
                 case Token::Type::Modulus: [[fallthrough]];
                 case Token::Type::Equal: [[fallthrough]];
+                case Token::Type::Different: [[fallthrough]];
                 case Token::Type::Lesser: [[fallthrough]];
                 case Token::Type::LesserOrEqual: [[fallthrough]];
                 case Token::Type::Greater: [[fallthrough]];
@@ -421,14 +443,20 @@ llvm::Value* Module::codegen(const AST::Node* node) {
         case AST::Node::Type::IfStatement: {
             auto current_function = _llvm_ir_builder.GetInsertBlock()->getParent();
             auto if_then_block = llvm::BasicBlock::Create(*_llvm_context, "if_then", current_function);
-            auto if_else_block = llvm::BasicBlock::Create(*_llvm_context, "if_else");
-            auto if_end_block = llvm::BasicBlock::Create(*_llvm_context, "if_end");
+            llvm::BasicBlock* if_else_block = nullptr;
+            auto              if_end_block = llvm::BasicBlock::Create(*_llvm_context, "if_end", current_function);
 
             // Condition evaluation and branch
             auto condition = codegen(node->children[0]);
             if(!condition)
                 return nullptr;
-            _llvm_ir_builder.CreateCondBr(condition, if_then_block, if_else_block);
+
+            if(node->children.size() > 2) {
+                if_else_block = llvm::BasicBlock::Create(*_llvm_context, "if_else", current_function);
+                _llvm_ir_builder.CreateCondBr(condition, if_then_block, if_else_block);
+            } else {
+                _llvm_ir_builder.CreateCondBr(condition, if_then_block, if_end_block);
+            }
 
             // Then
             _llvm_ir_builder.SetInsertPoint(if_then_block);
@@ -446,19 +474,17 @@ llvm::Value* Module::codegen(const AST::Node* node) {
             //   if_then_block = _llvm_ir_builder.GetInsertBlock();
 
             // Else
-            current_function->getBasicBlockList().push_back(if_else_block);
-            _llvm_ir_builder.SetInsertPoint(if_else_block);
-            if(node->children.size() > 2) {
+            if(if_else_block) {
+                _llvm_ir_builder.SetInsertPoint(if_else_block);
                 auto else_value = codegen(node->children[2]);
                 if(!else_value)
                     return nullptr;
-            }
-            if(!_generated_return) {
-                _llvm_ir_builder.CreateBr(if_end_block);
-                _generated_return = false;
+                if(!_generated_return) {
+                    _llvm_ir_builder.CreateBr(if_end_block);
+                    _generated_return = false;
+                }
             }
 
-            current_function->getBasicBlockList().push_back(if_end_block);
             _llvm_ir_builder.SetInsertPoint(if_end_block);
 
             // If statements do not return a value (Should we?)

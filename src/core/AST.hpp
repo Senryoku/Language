@@ -152,10 +152,12 @@ class AST {
     struct FunctionDeclaration : public Node {
         FunctionDeclaration(Token t) : Node(Node::Type::FunctionDeclaration, t) {}
 
-        enum Flag : int {
-            None = 0,
+        enum Flag : uint8_t {
+            None     = 0,
             Exported = 1 << 0,
             Variadic = 1 << 1,
+            Extern   = 1 << 2,
+            BuiltIn  = 1 << 3,
         };
 
         Flag flags = Flag::None;
@@ -190,7 +192,7 @@ class AST {
         auto mangled_name() const {
             std::string r{token.value};
             // FIXME: Correctly handle manged names for variadic functions.
-            if(flags & FunctionDeclaration::Flag::Variadic)
+            if((flags & FunctionDeclaration::Flag::Variadic) || (flags & FunctionDeclaration::Flag::Extern) || (flags & FunctionDeclaration::Flag::BuiltIn))
                 return r; 
             for(auto arg : arguments())
                 r += std::string("_") + std::to_string(arg->value_type.type_id);
@@ -210,7 +212,7 @@ class AST {
         auto mangled_name() const {
             std::string r{token.value};
             // FIXME: Correctly handle manged names for variadic functions.
-            if(flags & FunctionDeclaration::Flag::Variadic)
+            if((flags & FunctionDeclaration::Flag::Variadic) || (flags & FunctionDeclaration::Flag::Extern) || (flags & FunctionDeclaration::Flag::BuiltIn))
                 return r; 
             for(auto arg : arguments())
                 r += std::string("_") + std::to_string(arg->value_type.type_id);

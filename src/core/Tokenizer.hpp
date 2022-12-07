@@ -94,6 +94,7 @@ class Tokenizer {
         {"const", Token::Type::Const},
         {"import", Token::Type::Import},
         {"export", Token::Type::Export},
+        {"extern", Token::Type::Extern},
         {"type", Token::Type::Type},
         {"and", Token::Type::And},
         {"or", Token::Type::Or},

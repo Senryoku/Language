@@ -46,6 +46,7 @@ struct Token {
         // Keywords
         Import,
         Export,
+        Extern, // Allow defining functions that will be linked later (useful for providing C++ functions for example)
         If,
         Else,
         While,

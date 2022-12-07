@@ -102,7 +102,7 @@ class Module {
         _llvm_module->getOrInsertFunction("__socket_init", llvm::FunctionType::get(void_t, {}, false));
         _llvm_module->getOrInsertFunction("__socket_create", llvm::FunctionType::get(integer_t, {}, false));
         _llvm_module->getOrInsertFunction("__socket_connect", llvm::FunctionType::get(integer_t, {integer_t, str_t, integer_t}, false));
-        _llvm_module->getOrInsertFunction("__socket_send", llvm::FunctionType::get(integer_t, {integer_t, str_t/*, str_t, integer_t*/}, false));
+        _llvm_module->getOrInsertFunction("__socket_send", llvm::FunctionType::get(integer_t, {integer_t, str_t}, false));
         _llvm_module->getOrInsertFunction("__socket_recv", llvm::FunctionType::get(str_t, {integer_t}, false));
         _llvm_module->getOrInsertFunction("__socket_close", llvm::FunctionType::get(integer_t, {integer_t}, false));
 

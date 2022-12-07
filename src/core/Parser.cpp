@@ -52,7 +52,7 @@ bool Parser::parse(const std::span<Token>& tokens, AST::Node* curr_node) {
                     return false;
                 }
 
-                if(it->type == Token::Type::Else) {
+                if(it != tokens.end() && it->type == Token::Type::Else) {
                     ++it;
                     if(!parse_scope_or_single_statement(tokens, it, ifNode)) {
                         error("[Parser] Syntax error: Expected 'new scope' or single statement after 'else'.\n");
@@ -164,6 +164,12 @@ bool Parser::parse(const std::span<Token>& tokens, AST::Node* curr_node) {
                     return false;
                 break;
             }
+            case Token::Type::Extern: {
+                ++it;
+                if(!parse_function_declaration(tokens, it, curr_node, AST::FunctionDeclaration::Flag::Extern))
+                    return false;
+                break;
+            }
             case Token::Type::Type: {
                 if(!parse_type_declaration(tokens, it, curr_node))
                     return false;
@@ -178,7 +184,7 @@ bool Parser::parse(const std::span<Token>& tokens, AST::Node* curr_node) {
                 ++it;
                 // Assume it's a function for now
                 // TODO: Handle exported variables too.
-                parse_function_declaration(tokens, it, curr_node, true);
+                parse_function_declaration(tokens, it, curr_node, AST::FunctionDeclaration::Flag::Exported);
                 _module_interface.exports.push_back(static_cast<AST::FunctionDeclaration*>(curr_node->children.back()));
                 break;
             }
@@ -549,7 +555,7 @@ bool Parser::parse_method_declaration(const std::span<Token>& tokens, std::span<
     return parse_function_declaration(tokens, it, curr_node);
 }
 
-bool Parser::parse_function_declaration(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node, bool exported) {
+bool Parser::parse_function_declaration(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node, AST::FunctionDeclaration::Flag flags) {
     expect(tokens, it, Token::Type::Function);
     if(it->type != Token::Type::Identifier)
         throw Exception(fmt::format("[Parser] Expected identifier in function declaration, got {}.\n", *it), point_error(*it));
@@ -557,7 +563,7 @@ bool Parser::parse_function_declaration(const std::span<Token>& tokens, std::spa
     curr_node->add_child(functionNode);
     functionNode->token.value = *internalize_string(std::string(it->value));
 
-    if(exported || functionNode->name() == "main")
+    if((flags & AST::FunctionDeclaration::Flag::Exported) || functionNode->name() == "main")
         functionNode->flags |= AST::FunctionDeclaration::Flag::Exported;
 
     ++it;
@@ -596,18 +602,24 @@ bool Parser::parse_function_declaration(const std::span<Token>& tokens, std::spa
     if(functionNode->children.size() > 0)
         get_scope().set_this(get(functionNode->children[0]->token.value));
 
-    // Function body
-    parse_scope_or_single_statement(tokens, it, functionNode);
+    if(flags & AST::FunctionDeclaration::Flag::Extern) {
+        functionNode->flags |= AST::FunctionDeclaration::Flag::Extern;
+        if(functionNode->value_type.is_undefined())
+            functionNode->value_type = ValueType::void_t();
+    } else {
+        // Function body
+        parse_scope_or_single_statement(tokens, it, functionNode);
 
-    // Return type deduction
-    auto return_type = functionNode->body()->value_type;
-    if(return_type.is_undefined())
-        return_type = ValueType::void_t();
-    if(!functionNode->value_type.is_undefined() && functionNode->value_type != return_type)
-        throw Exception(
-            fmt::format("[Parser] Syntax error: Incoherent return types for function {}, got {}, expected {}.\n", functionNode->token.value, return_type, functionNode->value_type),
-            point_error(functionNode->body()->token));
-    functionNode->value_type = return_type;
+        // Return type deduction
+        auto return_type = functionNode->body()->value_type;
+        if(return_type.is_undefined())
+            return_type = ValueType::void_t();
+        if(!functionNode->value_type.is_undefined() && functionNode->value_type != return_type)
+            throw Exception(fmt::format("[Parser] Syntax error: Incoherent return types for function {}, got {}, expected {}.\n", functionNode->token.value, return_type,
+                                        functionNode->value_type),
+                            point_error(functionNode->body()->token));
+        functionNode->value_type = return_type;
+    }
 
     pop_scope();
 

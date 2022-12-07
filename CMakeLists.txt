@@ -81,11 +81,21 @@ endif()
 
 # Compile standard library
 set(STDLIB_PATH ${CMAKE_SOURCE_DIR}/build/stdlib.o)
-file(GLOB STDLIB_SOURCES "stdlib/*.cpp" "stdlib/**/*.cpp")
+file(GLOB STDLIB_SOURCES "./stdlib/*.cpp" "./stdlib/**/*.cpp")
+string(REGEX REPLACE ".cpp" ".o" STDLIB_OBJECTS "${STDLIB_SOURCES}")
+string(REGEX REPLACE "stdlib/" "build/stdlib/" STDLIB_OBJECTS "${STDLIB_OBJECTS}")
+foreach(src obj IN ZIP_LISTS STDLIB_SOURCES STDLIB_OBJECTS)
+    add_custom_command( 
+        OUTPUT ${obj} 
+        DEPENDS ${src} 
+        COMMAND clang++ -c ${src} -o ${obj} -std=c++20
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    )
+endforeach()
 add_custom_command( 
     OUTPUT ${STDLIB_PATH} 
-    DEPENDS ${STDLIB_SOURCES} 
-    COMMAND clang -c ${STDLIB_SOURCES} -o ${STDLIB_PATH} -std=c++20
+    DEPENDS ${STDLIB_OBJECTS} 
+    COMMAND llvm-ar rvs ${STDLIB_PATH} ${STDLIB_OBJECTS}
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 )
 add_custom_target(stdlib ALL DEPENDS ${STDLIB_PATH})

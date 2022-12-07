@@ -1,30 +1,29 @@
-// PASS: NewType2 destructor called. NewType destructor called.
+extern function __open_file(path: char*, mode: char*) : int;
+extern function __close_file(fd: int);
 
-type NewType {
-	let i : int = 0;
+type File {
+	let fd : int = 0;
 }
 
-type NewType2 {
-	let j : int = 0;
+function open(this: File*, path: string, mode: string) {
+	.fd = __open_file(path, mode);
 }
 
-function init(this: NewType*) {
-	.i = 1;
+function close(this: File*) {
+	if(.fd != 0) __close_file(.fd);
 }
 
-function destructor(this: NewType*) {
-	printf("NewType destructor called.\n");
-}
-
-function destructor(this: NewType2*) {
-	printf("NewType2 destructor called. ");
-}
+// Crashes for some reason
+//function destructor(this: File*) {
+//	.close();
+//}
 
 function main() : int {
-	let newObject : NewType;
-	let newObject2 : NewType2;
-	
-	newObject.init();
-
+	printf("Trying to open a file...\n");
+	let file : File;
+	printf("File Descriptor: %d.\n", file.fd);
+	file.open("H:/Source/Lang/.gitignore", "r");
+	printf("File Descriptor: %d.\n", file.fd);
+	file.close();
 	return 0;
 }

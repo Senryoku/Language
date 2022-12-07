@@ -13,7 +13,7 @@ std::string_view get_nth_line(const std::string& source, size_t n) {
         end = source.size();
     else
         ++end; // Include \n
-    return std::string_view(source.data() + start + 1, source.data() + end);
+    return std::string_view(source.data() + start, source.data() + end);
 }
 
 std::string point_error_find_line(const std::string& source, const Token& token) noexcept {
