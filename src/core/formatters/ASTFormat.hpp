@@ -10,7 +10,7 @@ struct fmt::formatter<AST> {
     }
     template<typename FormatContext>
     auto format(const AST& t, FormatContext& ctx) const -> decltype(ctx.out()) {
-        return fmt::format_to(ctx.out(), "AST Dump: {:}\n", t.getRoot());
+        return fmt::format_to(ctx.out(), "AST Dump: {:}\n", t.get_root());
     }
 };
 

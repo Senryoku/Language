@@ -246,8 +246,8 @@ class AST {
         ArrayLiteral(Token t) : Node(t) { value_type.is_array = true; }
     };
 
-    inline Node&       getRoot() { return _root; }
-    inline const Node& getRoot() const { return _root; }
+    inline Node&       get_root() { return _root; }
+    inline const Node& get_root() const { return _root; }
 
   private:
     Node _root{Node::Type::Root};

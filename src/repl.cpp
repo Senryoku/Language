@@ -106,7 +106,7 @@ int main(int argc, char* argv[]) {
             //interpreter = {};
             auto clock = std::chrono::steady_clock();
             auto start = clock.now();
-            //interpreter.execute(ast.getRoot());
+            //interpreter.execute(ast.get_root());
             auto end = clock.now();
             //log.print("Done in {}ms, returned: '{}'.\n", std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count(), interpreter.get_return_value());
         } else if(input == "debug") {

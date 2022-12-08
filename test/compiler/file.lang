@@ -1,9 +1,4 @@
-// FIXME: We're not able to export yet.
-type File {
-	let fd : int = 0;
-}
-
-import "File"
+import "std/File"
 
 function main() : int {
 	printf("Trying to open a file...\n");

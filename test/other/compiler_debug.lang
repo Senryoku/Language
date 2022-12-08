@@ -1,4 +1,4 @@
-import "File"
+import "std/File"
 
 function main() : int {
 	printf("Trying to open a file...\n");

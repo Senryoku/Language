@@ -105,7 +105,7 @@ class Module {
         _llvm_module->getOrInsertFunction("__socket_close", llvm::FunctionType::get(integer_t, {integer_t}, false));
 
         // Actual codegen
-        auto r = codegen(&ast.getRoot());
+        auto r = codegen(&ast.get_root());
         // Add a return to our generated main (from constructor) if needed (FIXME?)
         // if(!_generated_return)
         //    _llvm_ir_builder.CreateRet(llvm::ConstantInt::get(*_llvm_context, llvm::APInt(32, 0)));

@@ -110,7 +110,7 @@ class Parser : public Scoped {
     std::optional<AST> parse(const std::span<Token>& tokens) {
         std::optional<AST> ast(AST{});
         try {
-            bool r = parse(tokens, &(*ast).getRoot());
+            bool r = parse(tokens, &(*ast).get_root());
             if(!r) {
                 error("Error while parsing!\n");
                 ast.reset();
@@ -125,11 +125,11 @@ class Parser : public Scoped {
     // Append to an existing AST and return the added children
     AST::Node* parse(const std::span<Token>& tokens, AST& ast) {
         // Adds a dummy root node to easily get rid of it on error.
-        auto root = ast.getRoot().add_child(new AST::Node{AST::Node::Type::Root});
+        auto root = ast.get_root().add_child(new AST::Node{AST::Node::Type::Root});
         bool r = parse(tokens, root);
         if(!r) {
             error("Error while parsing!\n");
-            delete ast.getRoot().pop_child();
+            delete ast.get_root().pop_child();
             return nullptr;
         }
         return root;
