@@ -229,7 +229,7 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                 }
                 return function;
             } else {
-                assert((flags & AST::FunctionDeclaration::Flag::Extern) && "Functions without a body should be marked as 'extern'.");
+                assert(((flags & AST::FunctionDeclaration::Flag::Extern) || (flags & AST::FunctionDeclaration::Flag::Imported)) && "Functions without a body should be marked as 'extern' or imported.");
                 _llvm_module->getOrInsertFunction(function_name, function_types);
                 return nullptr;
             }

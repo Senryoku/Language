@@ -62,7 +62,7 @@ std::tuple<bool, std::span<AST::TypeDeclaration*>, std::span<AST::FunctionDeclar
         token.value = *internalize_string(name);
         auto func_dec_node = external_nodes.emplace_back(new AST::FunctionDeclaration(token)).get(); // Keep it out of the AST
         imports.push_back(func_dec_node);
-        func_dec_node->flags |= AST::FunctionDeclaration::Flag::Extern; // Note: Mark imported functions are 'extern' since their behavior is close to functions declared in the module as extern, not 100% sure this is the thing to do. 
+        func_dec_node->flags |= AST::FunctionDeclaration::Flag::Imported;
         func_dec_node->value_type = ValueType::parse(type);
 
         while(iss >> type) {

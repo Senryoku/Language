@@ -95,8 +95,9 @@ class AST {
             None     = 0,
             Exported = 1 << 0,
             Variadic = 1 << 1,
-            Extern   = 1 << 2,
+            Extern   = 1 << 2, // Implemented in another module (no body) and disable name mangling.
             BuiltIn  = 1 << 3,
+            Imported = 1 << 4, // Like Extern, but with name mangling
         };
 
         Flag flags = Flag::None;
