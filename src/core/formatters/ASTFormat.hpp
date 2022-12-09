@@ -117,6 +117,7 @@ struct fmt::formatter<AST::Node::Type> {
             case AST::Node::Type::Variable: return fmt::format_to(ctx.out(), fg(fmt::color::light_blue), "{}", "Variable");
             case AST::Node::Type::Cast: return fmt::format_to(ctx.out(), "{}", "Cast");
             case AST::Node::Type::LValueToRValue: return fmt::format_to(ctx.out(), fg(fmt::color::dim_gray), "{}", "LValueToRValueCast");
+            case AST::Node::Type::GetPointer: return fmt::format_to(ctx.out(), fg(fmt::color::dim_gray), "{}", "GetPointer");
             case AST::Node::Type::ConstantValue: return fmt::format_to(ctx.out(), "{}", "ConstantValue");
             case AST::Node::Type::UnaryOperator: return fmt::format_to(ctx.out(), "{}", "UnaryOperator");
             case AST::Node::Type::BinaryOperator: return fmt::format_to(ctx.out(), "{}", "BinaryOperator");

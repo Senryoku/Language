@@ -32,6 +32,7 @@ class AST {
             MemberIdentifier,
             Cast,
             LValueToRValue,
+            GetPointer,
             ConstantValue,
             UnaryOperator,
             BinaryOperator,
@@ -129,15 +130,7 @@ class AST {
             return std::span<const AST::Node* const>(children.data(), std::max<int>(0, static_cast<int>(children.size()) - 1));
         }
 
-        auto mangled_name() const {
-            std::string r{token.value};
-            // FIXME: Correctly handle manged names for variadic functions.
-            if((flags & FunctionDeclaration::Flag::Variadic) || (flags & FunctionDeclaration::Flag::Extern) || (flags & FunctionDeclaration::Flag::BuiltIn))
-                return r; 
-            for(auto arg : arguments())
-                r += std::string("_") + std::to_string(arg->value_type.type_id);
-            return r;
-        }
+        std::string mangled_name() const;
     };
 
     struct FunctionCall : public Node {
@@ -149,15 +142,16 @@ class AST {
         auto       arguments() { return std::span<AST::Node*>(children.data() + 1, std::max<int>(0, static_cast<int>(children.size()) - 1)); }
         const auto arguments() const { return std::span<const AST::Node* const>(children.data() + 1, std::max<int>(0, static_cast<int>(children.size()) - 1)); }
 
-        auto mangled_name() const {
-            std::string r{token.value};
-            // FIXME: Correctly handle manged names for variadic functions.
-            if((flags & FunctionDeclaration::Flag::Variadic) || (flags & FunctionDeclaration::Flag::Extern) || (flags & FunctionDeclaration::Flag::BuiltIn))
-                return r; 
-            for(auto arg : arguments())
-                r += std::string("_") + std::to_string(arg->value_type.type_id);
-            return r;
+        void set_argument(size_t idx, AST::Node* n) {
+            if(n)
+                assert(n->parent == nullptr);
+            if(children[idx + 1])
+                children[idx + 1]->parent = nullptr;
+            children[idx + 1] = n;
+            if(n) n->parent = this;
         }
+
+        std::string mangled_name() const;
     };
 
     struct Defer : public Node {

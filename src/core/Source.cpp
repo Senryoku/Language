@@ -6,8 +6,11 @@
 
 std::string_view get_nth_line(const std::string& source, size_t n) {
     size_t start = 0;
-    for(auto i = 0; i < n; ++i)
-        start = source.find('\n', start + 1);
+    while (start < source.size() && n > 0) {
+        if(source[start] == '\n')
+            --n;
+        ++start;
+    }
     auto end = source.find('\n', start + 1);
     if(end == source.npos)
         end = source.size();

@@ -1,0 +1,23 @@
+export type Socket {
+	let fd: int = 0;
+}
+
+export function create(this: Socket*) {
+	.fd = __socket_create();
+}
+
+export function connect(this: Socket*, addr: string, port: int) {
+	__socket_connect(.fd, addr, port);
+}
+
+export function send(this: Socket*, data: string) {
+	__socket_send(.fd, data);
+}
+
+export function recv(this: Socket*) : string {
+	return __socket_recv(.fd);
+}
+
+export function close(this: Socket*) {
+	__socket_close(.fd);
+}

@@ -101,7 +101,7 @@ class Scoped {
                 token.value = *internalize_string(name); // We have to provide a name via the token.
                 s_builtins[name].reset(new AST::FunctionDeclaration(token));
                 s_builtins[name]->value_type = type;
-                s_builtins[name]->flags = flags;
+                s_builtins[name]->flags = flags | AST::FunctionDeclaration::Flag::BuiltIn;
 
                 for(size_t i = 0; i < args_names.size(); ++i) {
                     Token arg_token;

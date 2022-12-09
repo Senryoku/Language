@@ -22,3 +22,21 @@ AST::Node* AST::Node::insert_between(size_t n, Node* node) {
     children[n] = node;
     return node;
 }
+
+auto mangle_name(const std::string_view& name, auto arguments, AST::FunctionDeclaration::Flag flags) {
+    std::string r{name};
+    // FIXME: Correctly handle manged names for variadic functions.
+    if((flags & AST::FunctionDeclaration::Flag::Variadic) || (flags & AST::FunctionDeclaration::Flag::Extern) || (flags & AST::FunctionDeclaration::Flag::BuiltIn))
+        return r;
+    for(auto arg : arguments)
+        r += std::string("_") + arg->value_type.serialize();
+    return r;
+}
+
+std::string AST::FunctionDeclaration::mangled_name() const {
+    return mangle_name(token.value, arguments(), flags);
+}
+
+std::string AST::FunctionCall::mangled_name() const {
+    return mangle_name(token.value, arguments(), flags);
+}

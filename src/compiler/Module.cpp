@@ -211,6 +211,8 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                     _llvm_ir_builder.CreateStore(&arg, alloca);
                     ++arg_idx;
                 }
+                
+                _generated_return = false;
                 auto function_body = codegen(function_declaration_node->body()); // Generate function body
                 if(!_generated_return) {
                     _llvm_ir_builder.CreateRet(node->value_type == ValueType::void_t() ? nullptr : function_body);
@@ -330,6 +332,10 @@ llvm::Value* Module::codegen(const AST::Node* node) {
             }
             // warn("[LLVMCodegen] LValueToRValue without effect:\n{}", *node);
             return value;
+        }
+        case AST::Node::Type::GetPointer: {
+            // FIXME: Our only case is actually already handled by the MemberAccess node.
+            return codegen(node->children[0]);
         }
         case AST::Node::Type::UnaryOperator: {
             auto val = codegen(node->children[0]);
@@ -462,6 +468,7 @@ llvm::Value* Module::codegen(const AST::Node* node) {
 
             // Then
             _llvm_ir_builder.SetInsertPoint(if_then_block);
+            _generated_return = false;
             auto then_value = codegen(node->children[1]);
             if(!then_value)
                 return nullptr;
@@ -478,6 +485,7 @@ llvm::Value* Module::codegen(const AST::Node* node) {
             // Else
             if(if_else_block) {
                 _llvm_ir_builder.SetInsertPoint(if_else_block);
+                _generated_return = false;
                 auto else_value = codegen(node->children[2]);
                 if(!else_value)
                     return nullptr;

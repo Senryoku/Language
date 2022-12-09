@@ -791,12 +791,25 @@ bool Parser::parse_function_arguments(const std::span<Token>& tokens, std::span<
 }
 
 void Parser::check_function_call(AST::FunctionCall* call_node, const AST::FunctionDeclaration* function) {
-    // FIXME: Also type check.
     auto function_flags = function->flags;
     if(!(function_flags & AST::FunctionDeclaration::Flag::Variadic) && call_node->arguments().size() != function->arguments().size()) {
         throw Exception(fmt::format("[Parser] Function '{}' expects {} argument(s), got {}.\n", function->name(), function->arguments().size(), call_node->arguments().size()),
                         point_error(call_node->token));
     }
+    // Type Check
+    // FIXME: Do better.
+    if(!(function_flags & AST::FunctionDeclaration::Flag::Variadic))
+        for(auto i = 0; i < call_node->arguments().size(); ++i) {
+            if(call_node->arguments()[i]->value_type != function->arguments()[i]->value_type) {
+                // FIXME: Exception for string -> char* conversion since we don't have a concrete plan for the string type yet.
+                if(call_node->arguments()[i]->value_type.primitive == PrimitiveType::String && function->arguments()[i]->value_type.primitive == PrimitiveType::Char &&
+                   function->arguments()[i]->value_type.is_pointer)
+                    continue;
+                throw Exception(fmt::format("[Parser] Function '{}' expects an argument of type {} on position #{}, got {}.\n", function->name(),
+                                            function->arguments()[i]->value_type.serialize(), i, call_node->arguments()[i]->value_type.serialize()),
+                                point_error(call_node->arguments()[i]->token));
+            }
+        }
 }
 
 bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node) {
@@ -933,9 +946,6 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
             call_node->add_child(function_node);
             ++it;
 
-            // FIXME
-            // Insert the first argument as a reference.
-            first_argument->value_type.is_reference = true;
             call_node->add_child(first_argument);
 
             parse_function_arguments(tokens, it, call_node);
@@ -943,6 +953,14 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
             // Search for a corresponding method
             const auto method = get_function(identifier_name, call_node->arguments());
             if(method && method->arguments().size() > 0 && method->arguments()[0]->value_type.is_composite() && method->arguments()[0]->value_type.type_id == type_id) {
+                auto first_arg = call_node->arguments()[0];
+                auto get_pointer_node = new AST::Node(AST::Node::Type::GetPointer, first_arg->token);
+                call_node->set_argument(0, nullptr);
+                get_pointer_node->add_child(first_arg);
+                get_pointer_node->value_type = first_arg->value_type;
+                get_pointer_node->value_type.is_pointer = true; // FIXME: Support multiple level of indirections.
+                call_node->set_argument(0, get_pointer_node);
+                
                 call_node->value_type = method->value_type;
                 call_node->flags = method->flags;
 
