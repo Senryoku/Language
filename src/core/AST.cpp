@@ -1,5 +1,7 @@
 #include <AST.hpp>
 
+#include <GlobalTypeRegistry.hpp>
+
 AST::Node* AST::Node::add_child(Node* n) {
     assert(n->parent == nullptr);
     children.push_back(n);
@@ -29,7 +31,7 @@ auto mangle_name(const std::string_view& name, auto arguments, AST::FunctionDecl
     if((flags & AST::FunctionDeclaration::Flag::Variadic) || (flags & AST::FunctionDeclaration::Flag::Extern) || (flags & AST::FunctionDeclaration::Flag::BuiltIn))
         return r;
     for(auto arg : arguments)
-        r += std::string("_") + arg->value_type.serialize();
+        r += std::string("_") + GlobalTypeRegistry::instance().get_type(arg->type_id).type->designation;
     return r;
 }
 

@@ -21,7 +21,7 @@ const AST::TypeDeclaration* Scope::get_type(const std::string_view& name) const 
             if(arguments.size() != function->arguments().size())
                 continue;
             for(auto idx = 0; idx < arguments.size(); ++idx) {
-                if(arguments[idx]->value_type != function->arguments()[idx]->value_type)
+                if(arguments[idx]->type_id != function->arguments()[idx]->type_id)
                     continue;
             }
         }
@@ -77,9 +77,10 @@ const AST::VariableDeclaration* Scoped::get(const std::string_view& name) const 
 }
 
 bool Scoped::is_type(const std::string_view& name) const {
-    auto builtin = parse_primitive_type(name);
-    if(builtin != PrimitiveType::Undefined)
+    auto builtin = GlobalTypeRegistry::instance().get_type(std::string(name)).type->type_id;
+    if(builtin != InvalidTypeID)
         return true;
+    // FIXME: Should be useless right now, but we may need to reintroduce some form of scoping for types, idk.
     // Search for a type declared with this name
     auto it = _scopes.rbegin();
     auto val = it->find_type(name);

@@ -63,11 +63,11 @@ std::tuple<bool, std::span<AST::TypeDeclaration*>, std::span<AST::FunctionDeclar
         auto func_dec_node = external_nodes.emplace_back(new AST::FunctionDeclaration(token)).get(); // Keep it out of the AST
         imports.push_back(func_dec_node);
         func_dec_node->flags |= AST::FunctionDeclaration::Flag::Imported;
-        func_dec_node->value_type = ValueType::parse(type);
+        func_dec_node->type_id = GlobalTypeRegistry::instance().get_type(type).type->type_id;
 
         while(iss >> type) {
             auto arg = func_dec_node->add_child(new AST::Node(AST::Node::Type::VariableDeclaration));
-            arg->value_type = ValueType::parse(type);
+            arg->type_id = GlobalTypeRegistry::instance().get_type(type).type->type_id;
         }
     }
 
@@ -93,7 +93,7 @@ bool ModuleInterface::save(const std::filesystem::path& path) const {
     for(const auto& n : type_exports) {
         interface_file << "type " << n->token.value << " { ";
         for(const auto& member : n->children) {
-            interface_file << "let " << member->token.value << ": " << member->value_type.serialize() << "; ";
+            interface_file << "let " << member->token.value << ": " << GlobalTypeRegistry::instance().get_type(member->type_id).type->designation << "; ";
         }
         interface_file << "}" << std::endl;
     }
@@ -101,9 +101,9 @@ bool ModuleInterface::save(const std::filesystem::path& path) const {
     
     // Functions
     for(const auto& n : exports) {
-        interface_file << n->token.value << " " << n->value_type.serialize();
+        interface_file << n->token.value << " " << GlobalTypeRegistry::instance().get_type(n->type_id).type->designation;
         for(auto i = 0u; i < n->children.size() - 1; ++i) {
-            interface_file << " " << n->children[i]->value_type.serialize();
+            interface_file << " " << GlobalTypeRegistry::instance().get_type(n->children[i]->type_id).type->designation;
         }
         interface_file << std::endl;
     }

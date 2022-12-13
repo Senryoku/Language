@@ -71,7 +71,7 @@ class AST {
         Type               type = Type::Undefined;
         SubType            subtype = SubType::Undefined;
         Node*              parent = nullptr;
-        ValueType          value_type;
+        TypeID             type_id = InvalidTypeID;
         Token              token;
         std::vector<Node*> children;
 
@@ -85,7 +85,6 @@ class AST {
         TypeDeclaration(Token t) : Node(Node::Type::TypeDeclaration, t) {}
 
         const auto& name() const { return token.value; }
-        const auto& type_id() const { return value_type.type_id; }
         const auto& members() const { return children; }
     };
 
@@ -218,27 +217,23 @@ class AST {
     };
 
     struct BoolLiteral : public Literal<bool> {
-        BoolLiteral(Token t) : Literal(t) { value_type.primitive = PrimitiveType::Boolean; }
+        BoolLiteral(Token t) : Literal(t) { type_id = PrimitiveType::Boolean; }
     };
 
     struct CharLiteral : public Literal<char> {
-        CharLiteral(Token t) : Literal(t) { value_type.primitive = PrimitiveType::Char; }
+        CharLiteral(Token t) : Literal(t) { type_id = PrimitiveType::Char; }
     };
 
     struct IntegerLiteral : public Literal<int32_t> {
-        IntegerLiteral(Token t) : Literal(t) { value_type.primitive = PrimitiveType::Integer; }
+        IntegerLiteral(Token t) : Literal(t) { type_id = PrimitiveType::Integer; }
     };
 
     struct FloatLiteral : public Literal<float> {
-        FloatLiteral(Token t) : Literal(t) { value_type.primitive = PrimitiveType::Float; }
+        FloatLiteral(Token t) : Literal(t) { type_id = PrimitiveType::Float; }
     };
 
     struct StringLiteral : public Literal<std::string_view> {
-        StringLiteral(Token t) : Literal(t) { value_type.primitive = PrimitiveType::String; }
-    };
-
-    struct ArrayLiteral : public Node {
-        ArrayLiteral(Token t) : Node(t) { value_type.is_array = true; }
+        StringLiteral(Token t) : Literal(t) { type_id = PrimitiveType::String; }
     };
 
     inline Node&       get_root() { return _root; }
@@ -278,4 +273,3 @@ inline AST::FunctionDeclaration::Flag operator&(AST::FunctionDeclaration::Flag l
                                                        static_cast<std::underlying_type_t<AST::FunctionDeclaration::Flag>>(rhs));
 }
 
-#include <formatters/ASTFormat.hpp>

@@ -51,28 +51,33 @@ static std::unordered_map<Token::Type, std::unordered_map<PrimitiveType, std::fu
 
 
 llvm::Constant* Module::codegen_constant(const AST::Node* val) {
-    if(val->value_type.is_array) {
-        auto arr = dynamic_cast<const AST::ArrayLiteral*>(val);
-        assert(arr);
-        auto                         itemType = get_llvm_type(arr->value_type);
-        std::vector<llvm::Constant*> values(val->value_type.capacity);
-        for(unsigned int i = 0; i < val->value_type.capacity; i++)
+    const auto& type = GlobalTypeRegistry::instance().get_type(val->type_id).type;
+    assert(type);
+    if(type->is_array()) {
+        const auto* type_arr = static_cast<const ArrayType*>(type.get());
+        auto                         element_type = get_llvm_type(type_arr->element_type);
+        std::vector<llvm::Constant*> values(type_arr->capacity);
+        for(unsigned int i = 0; i < type_arr->capacity; i++)
             values[i] = codegen_constant(val->children[i]);
 
-        auto arrayType = llvm::ArrayType::get(itemType, values.size());
-        auto globalDeclaration = (llvm::GlobalVariable*)_llvm_module->getOrInsertGlobal("", arrayType);
-        globalDeclaration->setInitializer(llvm::ConstantArray::get(arrayType, values));
-        globalDeclaration->setConstant(true);
-        globalDeclaration->setLinkage(llvm::GlobalValue::LinkageTypes::PrivateLinkage);
-        globalDeclaration->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Global);
-        return llvm::ConstantExpr::getBitCast(globalDeclaration, arrayType->getPointerTo());
+        auto array_type = llvm::ArrayType::get(element_type, values.size());
+        auto global_declaration = (llvm::GlobalVariable*)_llvm_module->getOrInsertGlobal("", array_type);
+        global_declaration->setInitializer(llvm::ConstantArray::get(array_type, values));
+        global_declaration->setConstant(true);
+        global_declaration->setLinkage(llvm::GlobalValue::LinkageTypes::PrivateLinkage);
+        global_declaration->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Global);
+        return llvm::ConstantExpr::getBitCast(global_declaration, array_type->getPointerTo());
     }
-    assert(val->value_type.is_primitive());
-    switch(val->value_type.primitive) {
+    if (type->is_pointer()) {
+        // Doesn't make sense, does it?
+        throw "Literal pointer? What?";
+    }
+    switch(val->type_id) {
         using enum PrimitiveType;
         case Boolean: return llvm::ConstantInt::get(*_llvm_context, llvm::APInt(1, static_cast<const AST::BoolLiteral*>(val)->value));
         case Char: return llvm::ConstantInt::get(*_llvm_context, llvm::APInt(8, static_cast<const AST::CharLiteral*>(val)->value));
         case Float: return llvm::ConstantFP::get(*_llvm_context, llvm::APFloat(static_cast<const AST::FloatLiteral*>(val)->value));
+        case I32: [[fallthrough]];
         case Integer: return llvm::ConstantInt::get(*_llvm_context, llvm::APInt(32, static_cast<const AST::IntegerLiteral*>(val)->value));
         case String: {
             // FIXME: Take a look at llvm::StringRef and llvm::Twine
@@ -102,7 +107,7 @@ llvm::Constant* Module::codegen_constant(const AST::Node* val) {
             // 4. Return a cast to an i8*
             return llvm::ConstantExpr::getBitCast(globalDeclaration, charType->getPointerTo());
         }
-        default: warn("LLVM Codegen: Unsupported constant value type '{}'.\n", val->value_type);
+        default: warn("LLVM Codegen: Unsupported constant value type '{}'.\n", *type);
     }
     return nullptr;
 }
@@ -152,23 +157,23 @@ llvm::Value* Module::codegen(const AST::Node* node) {
             if(!child)
                 return nullptr;
             // TODO: Handle child's type.
-            assert(node->value_type.is_primitive());
-            switch(node->value_type.primitive) {
+            assert(is_primitive(node->type_id));
+            switch(node->type_id) {
                 case PrimitiveType::Float: {
-                    assert(node->children[0]->value_type.primitive == PrimitiveType::Integer); // TEMP
+                    assert(node->children[0]->type_id == PrimitiveType::Integer); // TEMP
                     return _llvm_ir_builder.CreateSIToFP(child, llvm::Type::getFloatTy(*_llvm_context), "castSIToFP");
                 }
                 case PrimitiveType::Integer: {
-                    assert(node->children[0]->value_type.primitive == PrimitiveType::Float); // TEMP
+                    assert(node->children[0]->type_id == PrimitiveType::Float); // TEMP
                     return _llvm_ir_builder.CreateFPToSI(child, llvm::Type::getInt32Ty(*_llvm_context), "castFPToSI");
                 }
-                default: error("[LLVMCodegen] LLVM::Codegen: Cast from {} to {} not supported.\n", node->children[0]->value_type, node->value_type); return nullptr;
+                default: error("[LLVMCodegen] LLVM::Codegen: Cast from {} to {} not supported.\n", node->children[0]->type_id, node->type_id); return nullptr;
             }
         }
         case AST::Node::Type::TypeDeclaration: {
             std::vector<llvm::Type*> members;
             for(const auto c : node->children)
-                members.push_back(get_llvm_type(c->value_type));
+                members.push_back(get_llvm_type(c->type_id));
             std::string type_name(node->token.value);
             llvm::StructType::create(*_llvm_context, members, type_name);
             break;
@@ -184,11 +189,11 @@ llvm::Value* Module::codegen(const AST::Node* node) {
 
             std::vector<llvm::Type*> param_types;
             for(auto arg : function_declaration_node->arguments()) {
-                auto type = get_llvm_type(arg->value_type);
+                auto type = get_llvm_type(arg->type_id);
                 assert(type);
                 param_types.push_back(type);
             }
-            auto return_type = get_llvm_type(function_declaration_node->value_type);
+            auto return_type = get_llvm_type(function_declaration_node->type_id);
             auto function_types = llvm::FunctionType::get(return_type, param_types, false);
             auto flags = function_declaration_node->flags;
 
@@ -215,7 +220,7 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                 _generated_return = false;
                 auto function_body = codegen(function_declaration_node->body()); // Generate function body
                 if(!_generated_return) {
-                    _llvm_ir_builder.CreateRet(node->value_type == ValueType::void_t() ? nullptr : function_body);
+                    _llvm_ir_builder.CreateRet(node->type_id == PrimitiveType::Void ? nullptr : function_body);
                     _generated_return = false;
                 }
                 pop_scope();
@@ -272,9 +277,11 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                 // C Variadic functions promotes float to double (see https://stackoverflow.com/questions/63144506/printf-doesnt-work-for-floats-in-llvm-ir)
                 if(function_flags & AST::FunctionDeclaration::Flag::Variadic && v->getType()->isFloatTy())
                     v = _llvm_ir_builder.CreateFPExt(v, llvm::Type::getDoubleTy(*_llvm_context));
+                v->dump();
                 parameters.push_back(v);
             }
-            if(function_call_node->value_type == ValueType::void_t()) // "Cannot assign a name to void values!"
+            function->dump();
+            if(function_call_node->type_id == PrimitiveType::Void) // "Cannot assign a name to void values!"
                 return _llvm_ir_builder.CreateCall(function, parameters);
             else
                 return _llvm_ir_builder.CreateCall(function, parameters, mangled_function_name);
@@ -284,7 +291,7 @@ llvm::Value* Module::codegen(const AST::Node* node) {
             auto              parent_function = _llvm_ir_builder.GetInsertBlock()->getParent();
             if(!parent_function)
                 warn("TODO: Correctly handle global variables! ({}:{})\n", __FILE__, __LINE__);
-            auto type = get_llvm_type(node->value_type);
+            auto type = get_llvm_type(node->type_id);
             ret = create_entry_block_alloca(parent_function, type, std::string{node->token.value});
             if(!set(node->token.value, ret))
                 throw Exception(fmt::format("[LLVMCodegen] Variable '{}' already declared (line {}).\n", node->token.value, node->token.line));
@@ -318,14 +325,16 @@ llvm::Value* Module::codegen(const AST::Node* node) {
             //        These special cases should not be needed. I'm pretty sure.
             if(child->type == AST::Node::Type::BinaryOperator && child->token.type == Token::Type::MemberAccess) {
                 assert(value->getType()->isPointerTy());
-                return _llvm_ir_builder.CreateLoad(get_llvm_type(node->value_type), value, "l-to-rvalue");
+                return _llvm_ir_builder.CreateLoad(get_llvm_type(node->type_id), value, "l-to-rvalue");
             }
-            if(child->type == AST::Node::Type::BinaryOperator && child->token.type == Token::Type::OpenSubscript && child->children[0]->value_type.is_array) {
+            const auto& type = GlobalTypeRegistry::instance().get_type(child->children[0]->type_id).type;
+            if(child->type == AST::Node::Type::BinaryOperator && child->token.type == Token::Type::OpenSubscript && type->is_array()) {
                 assert(value->getType()->isPointerTy());
-                auto element_type = get_llvm_type(node->value_type.get_element_type());
+                auto arr_type = static_cast<const ArrayType*>(type.get());
+                auto element_type = get_llvm_type(arr_type->element_type);
                 return _llvm_ir_builder.CreateLoad(element_type, value, "l-to-rvalue");
             }
-            if(child->type == AST::Node::Type::BinaryOperator && child->token.type == Token::Type::OpenSubscript && child->children[0]->value_type == ValueType::string()) {
+            if(child->type == AST::Node::Type::BinaryOperator && child->token.type == Token::Type::OpenSubscript && child->children[0]->type_id == PrimitiveType::String) {
                 assert(value->getType()->isPointerTy());
                 auto charType = llvm::IntegerType::get(*_llvm_context, 8);
                 return _llvm_ir_builder.CreateLoad(charType, value, "l-to-rvalue");
@@ -350,11 +359,13 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                     return val;
                 }
                 default: {
-                    if(unary_ops[node->token.type].find(node->children[0]->value_type.primitive) == unary_ops[node->token.type].end()) {
-                        error("[LLVMCodegen] Unsupported type {} for unary operator {}.\n", node->children[0]->value_type, node->token.type);
+                    assert(is_primitive(node->children[0]->type_id));
+                    auto primitive_type = static_cast<PrimitiveType>(node->children[0]->type_id);
+                    if(unary_ops[node->token.type].find(primitive_type) == unary_ops[node->token.type].end()) {
+                        error("[LLVMCodegen] Unsupported type {} for unary operator {}.\n", primitive_type, node->token.type);
                         return nullptr;
                     }
-                    return unary_ops[node->token.type][node->children[0]->value_type.primitive](_llvm_ir_builder, val);
+                    return unary_ops[node->token.type][primitive_type](_llvm_ir_builder, val);
                 }
             }
         }
@@ -380,13 +391,15 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                 case Token::Type::LesserOrEqual: [[fallthrough]];
                 case Token::Type::Greater: [[fallthrough]];
                 case Token::Type::GreaterOrEqual: {
-                    assert(node->children[0]->value_type == node->children[1]->value_type);
-                    if(binary_ops[node->token.type].find(node->children[0]->value_type.primitive) == binary_ops[node->token.type].end()) {
-                        error("[LLVMCodegen] Unsupported types {} and {} for binary operator {}.\n", node->children[0]->value_type, node->children[1]->value_type,
+                    assert(node->children[0]->type_id == node->children[1]->type_id);
+                    assert(is_primitive(node->children[0]->type_id));
+                    auto primitive_type = static_cast<PrimitiveType>(node->children[0]->type_id);
+                    if(binary_ops[node->token.type].find(primitive_type) == binary_ops[node->token.type].end()) {
+                        error("[LLVMCodegen] Unsupported types {} and {} for binary operator {}.\n", node->children[0]->type_id, node->children[1]->type_id,
                               node->token.type);
                         return nullptr;
                     }
-                    return binary_ops[node->token.type][node->children[0]->value_type.primitive](_llvm_ir_builder, lhs, rhs);
+                    return binary_ops[node->token.type][primitive_type](_llvm_ir_builder, lhs, rhs);
                 }
                 case Token::Type::And: {
                     return _llvm_ir_builder.CreateAnd(lhs, rhs, "and");
@@ -394,11 +407,12 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                 case Token::Type::OpenSubscript: {
                     // FIXME: Remove these checks
                     assert(node->children[0]->type == AST::Node::Type::Variable);
-                    assert(node->children[0]->value_type.is_array || node->children[0]->value_type == ValueType::string());
-                    if(node->children[0]->value_type.is_array) {
-                        auto type = get_llvm_type(node->children[0]->value_type);
+                    const auto& type_record = GlobalTypeRegistry::instance().get_type(node->children[0]->type_id);
+                    assert(type_record.type->is_array() || node->children[0]->type_id == PrimitiveType::String);
+                    if(type_record.type->is_array()) {
+                        auto type = get_llvm_type(node->children[0]->type_id);
                         return _llvm_ir_builder.CreateGEP(type, lhs, {llvm::ConstantInt::get(*_llvm_context, llvm::APInt(32, 0)), rhs}, "ArrayGEP");
-                    } else {
+                    } else { // FIXME: Remove this String special case? 
                         auto charType = llvm::IntegerType::get(*_llvm_context, 8);
                         auto load = _llvm_ir_builder.CreateLoad(charType->getPointerTo(), lhs);
                         return _llvm_ir_builder.CreateGEP(charType, load, {rhs}, "StringGEP"); // FIXME: Should not be there (Or should it?)
@@ -411,10 +425,11 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                 case Token::Type::MemberAccess: {
                     auto allocaInst = static_cast<llvm::AllocaInst*>(lhs);
                     // FIXME: Just a quick hack, I don't think this is the real solution.
-                    if(node->children[0]->value_type.is_reference || node->children[0]->value_type.is_pointer) {
-                        auto type = get_llvm_type(node->children[0]->value_type.get_pointed_type());
+                    const auto& type = GlobalTypeRegistry::instance().get_type(node->children[0]->type_id).type;
+                    if(type->is_pointer()) {
+                        auto pointee_type = get_llvm_type(dynamic_cast<const PointerType*>(type.get())->pointee_type);
                         auto load = _llvm_ir_builder.CreateLoad(allocaInst->getAllocatedType(), lhs);
-                        return _llvm_ir_builder.CreateGEP(type, load, {llvm::ConstantInt::get(*_llvm_context, llvm::APInt(32, 0)), rhs}, "memberptr");
+                        return _llvm_ir_builder.CreateGEP(pointee_type, load, {llvm::ConstantInt::get(*_llvm_context, llvm::APInt(32, 0)), rhs}, "memberptr");
                     }
                     return _llvm_ir_builder.CreateGEP(allocaInst->getAllocatedType(), lhs, {llvm::ConstantInt::get(*_llvm_context, llvm::APInt(32, 0)), rhs}, "memberptr");
                 }
@@ -512,21 +527,40 @@ llvm::Value* Module::codegen(const AST::Node* node) {
     return nullptr;
 }
 
-llvm::Type* Module::get_llvm_type(const ValueType& type) const {
-    if(type.is_pointer || type.is_reference) {
-        auto llvm_type = get_llvm_type(type.get_pointed_type());
+llvm::Type* Module::get_llvm_type(TypeID type_id) const {
+    const auto& record = GlobalTypeRegistry::instance().get_type(type_id);
+    if(record.type->is_pointer()) {
+        auto llvm_type = get_llvm_type(dynamic_cast<const PointerType*>(record.type.get())->pointee_type);
         return llvm_type->getPointerTo(0);
     }
-    if(type.is_array) {
-        auto llvm_type = get_llvm_type(type.get_element_type());
-        return llvm::ArrayType::get(llvm_type, type.capacity);
+    if(record.type->is_array()) {
+        auto arr_type = dynamic_cast<const ArrayType*>(record.type.get());
+        auto llvm_type = get_llvm_type(arr_type->element_type);
+        return llvm::ArrayType::get(llvm_type, arr_type->capacity);
     }
-    if(type.is_composite()) {
-        std::string type_name(GlobalTypeRegistry::instance().get_type(type.type_id)->name()); // FIXME: Internalize the string and remove this
-        auto        structType = llvm::StructType::getTypeByName(*_llvm_context, type_name);
-        if(!structType)
-            throw Exception(fmt::format("[LLVMCodegen] Could not find struct with name '{}'.\n", type_name));
-        return structType;
+    if(is_primitive(type_id)) {
+        switch(type_id) {
+            case Void: return llvm::Type::getVoidTy(*_llvm_context);
+            case Char: return llvm::Type::getInt8Ty(*_llvm_context);
+            case Boolean: return llvm::Type::getInt1Ty(*_llvm_context); 
+            case U8: return llvm::Type::getInt8Ty(*_llvm_context);
+            case U16: return llvm::Type::getInt16Ty(*_llvm_context);
+            case U32: return llvm::Type::getInt32Ty(*_llvm_context);
+            case U64: return llvm::Type::getInt64Ty(*_llvm_context);
+            case I8: return llvm::Type::getInt8Ty(*_llvm_context);
+            case I16: return llvm::Type::getInt16Ty(*_llvm_context);
+            case I32: return llvm::Type::getInt32Ty(*_llvm_context);
+            case I64: return llvm::Type::getInt64Ty(*_llvm_context);
+            case Integer: return llvm::Type::getInt32Ty(*_llvm_context);
+            case Float: return llvm::Type::getFloatTy(*_llvm_context);
+            case Double: return llvm::Type::getDoubleTy(*_llvm_context);
+            case String: return llvm::Type::getInt8PtrTy(*_llvm_context); // FIXME
+            default: throw(fmt::format("[Module] get_llvm_type: Unhandled primitive type '{}'.", type_id));
+        }
     }
-    return get_llvm_type(type.primitive);
+
+    auto structType = llvm::StructType::getTypeByName(*_llvm_context, record.type->designation);
+    if(!structType)
+        throw Exception(fmt::format("[LLVMCodegen] Could not find struct with name '{}'.\n", record.type->designation));
+    return structType;
 }

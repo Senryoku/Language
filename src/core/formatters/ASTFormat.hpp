@@ -15,6 +15,23 @@ struct fmt::formatter<AST> {
 };
 
 template<>
+struct fmt::formatter<TypeID> {
+    constexpr auto parse(format_parse_context& ctx) {
+        auto it = ctx.begin(), end = ctx.end();
+        if(it != end && *it != '}')
+            throw format_error("Invalid format for TypeID");
+        return it;
+    }
+    template<typename FormatContext>
+    auto format(TypeID type_id, FormatContext& ctx) const -> decltype(ctx.out()) {
+        if(type_id == InvalidTypeID)
+            return fmt::format_to(ctx.out(), "InvalidTypeID");
+        auto type_name = GlobalTypeRegistry::instance().get_type(type_id).type->designation;
+        return fmt::format_to(ctx.out(), "{}", type_name);
+    }
+};
+
+template<>
 struct fmt::formatter<AST::Node> {
     constexpr static bool is_digit(char c) { return c >= '0' && c <= '9'; }
 
@@ -51,17 +68,19 @@ struct fmt::formatter<AST::Node> {
             }
         }
 
+        auto type_name = GlobalTypeRegistry::instance().get_type(t.type_id).type->designation;
+
         switch(t.type) {
-            case AST::Node::Type::ConstantValue: r = fmt::format_to(ctx.out(), "{}:{}", t.type, t.value_type); break;
-            case AST::Node::Type::ReturnStatement: r = fmt::format_to(ctx.out(), "{}:{}", t.type, t.value_type); break;
+            case AST::Node::Type::ConstantValue: r = fmt::format_to(ctx.out(), "{}:{}", t.type, type_name); break;
+            case AST::Node::Type::ReturnStatement: r = fmt::format_to(ctx.out(), "{}:{}", t.type, type_name); break;
             case AST::Node::Type::WhileStatement: r = fmt::format_to(ctx.out(), "{}", t.type); break;
-            case AST::Node::Type::Variable: r = fmt::format_to(ctx.out(), "{} {}:{}", t.type, t.token.value, t.value_type); break;
-            case AST::Node::Type::FunctionDeclaration: r = fmt::format_to(ctx.out(), "{} {}():", t.type, t.token.value, t.value_type); break;
-            case AST::Node::Type::FunctionCall: r = fmt::format_to(ctx.out(), "{}:{}():{}", t.type, t.token.value, t.value_type); break;
-            case AST::Node::Type::VariableDeclaration: r = fmt::format_to(ctx.out(), "{} {}:{}", t.type, t.token.value, t.value_type); break;
-            case AST::Node::Type::Cast: r = fmt::format_to(ctx.out(), "{}:{}", t.type, t.value_type); break;
+            case AST::Node::Type::Variable: r = fmt::format_to(ctx.out(), "{} {}:{}", t.type, t.token.value, type_name); break;
+            case AST::Node::Type::FunctionDeclaration: r = fmt::format_to(ctx.out(), "{} {}():", t.type, t.token.value, type_name); break;
+            case AST::Node::Type::FunctionCall: r = fmt::format_to(ctx.out(), "{}:{}():{}", t.type, t.token.value, type_name); break;
+            case AST::Node::Type::VariableDeclaration: r = fmt::format_to(ctx.out(), "{} {}:{}", t.type, t.token.value, type_name); break;
+            case AST::Node::Type::Cast: r = fmt::format_to(ctx.out(), "{}:{}", t.type, type_name); break;
             case AST::Node::Type::BinaryOperator:
-                r = fmt::format_to(ctx.out(), "{} {}:{}", fmt::format(fmt::emphasis::bold | fg(fmt::color::black) | bg(fmt::color::dim_gray), t.token.value), t.type, t.value_type);
+                r = fmt::format_to(ctx.out(), "{} {}:{}", fmt::format(fmt::emphasis::bold | fg(fmt::color::black) | bg(fmt::color::dim_gray), t.token.value), t.type, type_name);
                 break;
             default: r = fmt::format_to(ctx.out(), "{}", t.type);
         }
@@ -125,7 +144,7 @@ struct fmt::formatter<AST::Node::Type> {
         }
     }
 };
-
+/*
 template<>
 struct fmt::formatter<PrimitiveType> {
     constexpr auto parse(format_parse_context& ctx) -> decltype(ctx.begin()) {
@@ -149,3 +168,4 @@ struct fmt::formatter<PrimitiveType> {
         }
     }
 };
+*/

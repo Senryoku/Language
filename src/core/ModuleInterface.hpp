@@ -34,6 +34,6 @@ class ModuleInterface {
     std::filesystem::path resolve_dependency(const std::string& dep) const;
 
     static auto get_cache_filename(const std::filesystem::path& path) {
-        return path.stem().concat("_").concat(fmt::format("{:x}", std::hash<std::filesystem::path>{}(std::filesystem::absolute(path))));
+        return path.stem().concat("_").concat(std::to_string(std::hash<std::filesystem::path>{}(std::filesystem::absolute(path))));
     }
 };
