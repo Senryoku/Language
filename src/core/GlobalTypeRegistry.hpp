@@ -27,6 +27,8 @@ class GlobalTypeRegistry {
     const TypeRecord& get_type(TypeID id) const;
     const TypeRecord& get_type(const std::string& name) const;
 
+    const TypeRecord& get_or_register_type(const std::string& name);
+
     TypeID get_pointer_to(TypeID id);
     TypeID get_array_of(TypeID id, uint32_t capacity);
 

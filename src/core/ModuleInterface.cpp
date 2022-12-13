@@ -63,11 +63,11 @@ std::tuple<bool, std::span<AST::TypeDeclaration*>, std::span<AST::FunctionDeclar
         auto func_dec_node = external_nodes.emplace_back(new AST::FunctionDeclaration(token)).get(); // Keep it out of the AST
         imports.push_back(func_dec_node);
         func_dec_node->flags |= AST::FunctionDeclaration::Flag::Imported;
-        func_dec_node->type_id = GlobalTypeRegistry::instance().get_type(type).type->type_id;
+        func_dec_node->type_id = GlobalTypeRegistry::instance().get_or_register_type(type).type->type_id;
 
         while(iss >> type) {
             auto arg = func_dec_node->add_child(new AST::Node(AST::Node::Type::VariableDeclaration));
-            arg->type_id = GlobalTypeRegistry::instance().get_type(type).type->type_id;
+            arg->type_id = GlobalTypeRegistry::instance().get_or_register_type(type).type->type_id;
         }
     }
 

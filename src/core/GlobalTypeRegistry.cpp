@@ -15,6 +15,17 @@ const TypeRecord& GlobalTypeRegistry::get_type(const std::string& name) const {
     return get_type(_types_by_designation.at(name));
 }
 
+const TypeRecord& GlobalTypeRegistry::get_or_register_type(const std::string& name) {
+    if(_types_by_designation.contains(name))
+        return get_type(name);
+    // Try to register unknown pointer to existing type.
+    if (name.ends_with("*")) {
+        const auto& base_type = get_or_register_type(name.substr(0, name.size() - 1));
+        return get_type(get_pointer_to(base_type.type->type_id));
+    }
+    throw fmt::format("[GlobalTypeRegistry::get_or_register_type] Unknown type {}.", name);
+}
+
 TypeID GlobalTypeRegistry::get_pointer_to(TypeID id) {
     if(_pointers_to.contains(id))
         return _pointers_to.at(id);

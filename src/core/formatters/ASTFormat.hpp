@@ -68,7 +68,7 @@ struct fmt::formatter<AST::Node> {
             }
         }
 
-        auto type_name = GlobalTypeRegistry::instance().get_type(t.type_id).type->designation;
+        auto type_name = t.type_id != InvalidTypeID ? GlobalTypeRegistry::instance().get_type(t.type_id).type->designation : "InvalidTypeID";
 
         switch(t.type) {
             case AST::Node::Type::ConstantValue: r = fmt::format_to(ctx.out(), "{}:{}", t.type, type_name); break;

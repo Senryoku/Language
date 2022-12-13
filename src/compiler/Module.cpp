@@ -331,17 +331,19 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                 assert(value->getType()->isPointerTy());
                 return _llvm_ir_builder.CreateLoad(get_llvm_type(node->type_id), value, "l-to-rvalue");
             }
-            const auto& type = GlobalTypeRegistry::instance().get_type(child->children[0]->type_id).type;
-            if(child->type == AST::Node::Type::BinaryOperator && child->token.type == Token::Type::OpenSubscript && type->is_array()) {
-                assert(value->getType()->isPointerTy());
-                auto arr_type = static_cast<const ArrayType*>(type.get());
-                auto element_type = get_llvm_type(arr_type->element_type);
-                return _llvm_ir_builder.CreateLoad(element_type, value, "l-to-rvalue");
-            }
-            if(child->type == AST::Node::Type::BinaryOperator && child->token.type == Token::Type::OpenSubscript && child->children[0]->type_id == PrimitiveType::String) {
-                assert(value->getType()->isPointerTy());
-                auto charType = llvm::IntegerType::get(*_llvm_context, 8);
-                return _llvm_ir_builder.CreateLoad(charType, value, "l-to-rvalue");
+            if(child->type == AST::Node::Type::BinaryOperator && child->token.type == Token::Type::OpenSubscript) {
+                const auto& type = GlobalTypeRegistry::instance().get_type(child->children[0]->type_id).type;
+                if(type->is_array()) {
+                    assert(value->getType()->isPointerTy());
+                    auto arr_type = static_cast<const ArrayType*>(type.get());
+                    auto element_type = get_llvm_type(arr_type->element_type);
+                    return _llvm_ir_builder.CreateLoad(element_type, value, "l-to-rvalue");
+                }
+                if(child->children[0]->type_id == PrimitiveType::String) {
+                    assert(value->getType()->isPointerTy());
+                    auto charType = llvm::IntegerType::get(*_llvm_context, 8);
+                    return _llvm_ir_builder.CreateLoad(charType, value, "l-to-rvalue");
+                }
             }
             // warn("[LLVMCodegen] LValueToRValue without effect:\n{}", *node);
             return value;

@@ -299,14 +299,18 @@ bool Parser::parse_next_scope(const std::span<Token>& tokens, std::span<Token>::
             Token destructor_token = end != tokens.end() ? *end : Token();
             destructor_token.type = Token::Type::Identifier;
             destructor_token.value = *internalize_string("destructor");
-            auto destructor_node = new AST::Variable(destructor_token); // FIXME: Still using the token to get the function...
             auto call_node = new AST::FunctionCall(destructor_token);
             call_node->type_id = destructor->type_id;
             call_node->flags = destructor->flags;
 
             scope->defer->add_child(call_node);
+            // Destructor method designation
+            auto destructor_node = new AST::Variable(destructor_token); // FIXME: Still using the token to get the function...
             call_node->add_child(destructor_node);
-            auto var_node = call_node->add_child(new AST::Variable(dec->token));
+            // Destructor argument (pointer to the object)
+            auto get_pointer_node = call_node->add_child(new AST::Node(AST::Node::Type::GetPointer, dec->token));
+            get_pointer_node->type_id = GlobalTypeRegistry::instance().get_pointer_to(dec->type_id);
+            auto var_node = get_pointer_node->add_child(new AST::Variable(dec->token));
             var_node->type_id = dec->type_id;
 
             check_function_call(call_node, destructor);
@@ -950,10 +954,8 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
         auto        type_id = prev_expr->type_id;
         const auto& type_record = &GlobalTypeRegistry::instance().get_type(type_id);
         // Automatic cast to pointee type (Could be a separate Node)
-        if(type_record->type->is_pointer()) {
-            type_id = dynamic_cast<const PointerType*>(type_record->type.get())->pointee_type;
-        }
-        const auto      type_node = GlobalTypeRegistry::instance().get_type(type_id).type_node;
+        const auto type_node =
+            GlobalTypeRegistry::instance().get_type(type_record->type->is_pointer() ? dynamic_cast<const PointerType*>(type_record->type.get())->pointee_type  : type_id).type_node;
         bool             member_exists = false;
         int32_t          member_index = 0;
         const AST::Node* member_node = nullptr;
@@ -986,14 +988,16 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
 
             // Search for a corresponding method
             const auto method = get_function(identifier_name, call_node->arguments());
-            if(method && method->arguments().size() > 0 && !is_primitive(method->arguments()[0]->type_id) && method->arguments()[0]->type_id == type_id) {
+            // Allow using the dot operator on pointers and directly on an object                
+            if(!type_record->type->is_pointer()) {
                 auto first_arg = call_node->arguments()[0];
                 auto get_pointer_node = new AST::Node(AST::Node::Type::GetPointer, first_arg->token);
                 call_node->set_argument(0, nullptr);
                 get_pointer_node->add_child(first_arg);
                 get_pointer_node->type_id = GlobalTypeRegistry::instance().get_pointer_to(first_arg->type_id);
                 call_node->set_argument(0, get_pointer_node);
-                
+            }
+            if(method && method->arguments().size() > 0 && !is_primitive(method->arguments()[0]->type_id) && call_node->arguments()[0]->type_id == method->arguments()[0]->type_id) {
                 call_node->type_id = method->type_id;
                 call_node->flags = method->flags;
 
