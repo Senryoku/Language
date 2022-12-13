@@ -4,6 +4,12 @@
 
 #include <GlobalTypeRegistry.hpp>
 
+static void dump(auto llvm_object) {
+#ifndef NDEBUG // dump is not available in release builds of LLVM
+    llvm_object->dump();
+#endif
+}
+
 // FIXME: We should not use maps here actually. Find another way to manage the nested switch cases.
 
 #define OP(VALUETYPE, FUNC)                                                                    \
@@ -228,9 +234,7 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                 _llvm_ir_builder.SetInsertPoint(current_block);
                 if(verifyFunction(*function, &llvm::errs())) {
                     error("\n[LLVMCodegen] Error verifying function '{}'.\n", function_name);
-#ifndef NDEBUG // dump is not available in release builds of LLVM
-                    function->dump();
-#endif
+                    dump(function);
                     function->eraseFromParent();
                     return nullptr;
                 }
@@ -277,10 +281,10 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                 // C Variadic functions promotes float to double (see https://stackoverflow.com/questions/63144506/printf-doesnt-work-for-floats-in-llvm-ir)
                 if(function_flags & AST::FunctionDeclaration::Flag::Variadic && v->getType()->isFloatTy())
                     v = _llvm_ir_builder.CreateFPExt(v, llvm::Type::getDoubleTy(*_llvm_context));
-                v->dump();
+                dump(v);
                 parameters.push_back(v);
             }
-            function->dump();
+            dump(function);
             if(function_call_node->type_id == PrimitiveType::Void) // "Cannot assign a name to void values!"
                 return _llvm_ir_builder.CreateCall(function, parameters);
             else
