@@ -486,8 +486,11 @@ bool Parser::parse_identifier(const std::span<Token>& tokens, std::span<Token>::
         access_operator_node->add_child(curr_node->pop_child());
         curr_node->add_child(access_operator_node);
 
-        // FIXME: Won't work for string. But we'll probably get rid of it anyway.
-        access_operator_node->type_id = dynamic_cast<const ArrayType*>(GlobalTypeRegistry::instance().get_type(variable.type_id).type.get())->element_type;
+        // FIXME: Get rid of this special case? (And the string type?)
+        if(variable.type_id == PrimitiveType::String)
+            access_operator_node->type_id = PrimitiveType::Char;
+        else // FIXME: Won't work for string. But we'll probably get rid of it anyway.
+            access_operator_node->type_id = dynamic_cast<const ArrayType*>(GlobalTypeRegistry::instance().get_type(variable.type_id).type.get())->element_type;
 
         it += 2;
         // Get the index and add it as a child.
