@@ -45,7 +45,8 @@ std::tuple<bool, std::span<AST::TypeDeclaration*>, std::span<AST::FunctionDeclar
                 member->token.value = *internalize_string(std::string(member->token.value));
             }
 
-            print("[ModuleInterface] Debug: Imported type '{}': \n{}", type_node->token.value, *type_node);
+            // FIXME: Move this to a log level of debug once we have that.
+            // print("[ModuleInterface] Debug: Imported type '{}': \n{}", type_node->token.value, *type_node);
             external_type_nodes.emplace_back(dynamic_cast<AST::TypeDeclaration*>(type_node));
             type_imports.push_back(dynamic_cast<AST::TypeDeclaration*>(type_node));
         }
@@ -121,7 +122,8 @@ std::filesystem::path ModuleInterface::resolve_dependency(const std::string& dep
         const auto stdlib_candidate = (stdlib_folder / (dep + ".lang")).lexically_normal();
         if(std::filesystem::exists(stdlib_candidate)) {
             fullpath = stdlib_candidate;
-            print("[ModuleInterface] Note: Import '{}' resolved to stdlib file '{}'.\n", dep, stdlib_candidate.string());
+            // FIXME: Move this to a log level of debug once we have that.
+            // print("[ModuleInterface] Note: Import '{}' resolved to stdlib file '{}'.\n", dep, stdlib_candidate.string());
         }
     }
 

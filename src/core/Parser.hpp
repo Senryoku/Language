@@ -52,8 +52,9 @@ class Parser : public Scoped {
         op_node->type_id = rhs;
 
         if(op_node->type_id == InvalidTypeID) {
-            warn("[Parser] Couldn't resolve operator return type (Missing impl.) on line {}. Node:\n", op_node->token.line);
+            error("[Parser] Couldn't resolve operator return type (Missing impl.) on line {}. Node:\n", op_node->token.line);
             fmt::print("{}\n", *static_cast<AST::Node*>(op_node));
+            throw Exception(fmt::format("[Parser] Couldn't resolve operator return type (Missing impl.) on line {}.", op_node->token.line));
         }
     }
 
@@ -79,8 +80,9 @@ class Parser : public Scoped {
         op_node->type_id = resolve_operator_type(op_node->token.type, lhs, rhs);
 
         if(op_node->type_id == InvalidTypeID) {
-            warn("[Parser] Couldn't resolve operator return type (Missing impl.) on line {}. Node:\n", op_node->token.line);
+            error("[Parser] Couldn't resolve operator return type (Missing impl.) on line {}. Node:\n", op_node->token.line);
             fmt::print("{}\n", *static_cast<AST::Node*>(op_node));
+            throw Exception(fmt::format("[Parser] Couldn't resolve operator return type (Missing impl.) on line {}.", op_node->token.line));
         }
     }
 

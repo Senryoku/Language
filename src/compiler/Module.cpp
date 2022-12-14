@@ -160,7 +160,7 @@ llvm::Value* Module::codegen(const AST::Node* node) {
         case AST::Node::Type::ConstantValue: return codegen_constant(node);
         case AST::Node::Type::Cast: {
             assert(node->children.size() == 1);
-            auto&& child = codegen(node->children[0]);
+            auto child = codegen(node->children[0]);
             if(!child)
                 return nullptr;
             // TODO: Handle child's type.

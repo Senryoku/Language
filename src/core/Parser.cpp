@@ -817,11 +817,8 @@ bool Parser::parse_function_arguments(const std::span<Token>& tokens, std::span<
     while(it != tokens.end() && it->type != Token::Type::CloseParenthesis) {
         auto arg_index = curr_node->children.size();
         parse_next_expression(tokens, it, curr_node);
-        // FIXME: Don't insert this cast for references.
-        // if(!function_declaration_node->arguments()[arg_index]->value_type.is_reference) {
         auto to_rvalue = curr_node->insert_between(arg_index, new AST::Node(AST::Node::Type::LValueToRValue, curr_node->token));
         to_rvalue->type_id = to_rvalue->children[0]->type_id;
-        //}
         skip(tokens, it, Token::Type::Comma);
     }
     expect(tokens, it, Token::Type::CloseParenthesis);
