@@ -48,7 +48,7 @@ class Tokenizer {
     static constexpr std::string_view operators_chars = ".=*/+-^!<>&|%()[]";
 
     static inline bool    is_allowed_in_operators(char c) { return operators_chars.find(c) != operators_chars.npos; }
-    static constexpr char escaped_char[] = {'?', '\'', '\"', '\?', '\a', '\b', '\f', '\n', '\r', '\t', '\v'};
+    static constexpr char escaped_char[] = {'?', '\'', '\"', '\?', '\a', '\b', '\f', '\n', '\r', '\t', '\v', '\0'};
 
     const het_unordered_map<Token::Type> operators{
         {"=", Token::Type::Assignment},

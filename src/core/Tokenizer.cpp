@@ -50,6 +50,7 @@ Token Tokenizer::search_next() {
                         case 'r': c = 8; break;
                         case 't': c = 9; break;
                         case 'v': c = 10; break;
+                        case '0': c = 11; break;
                         default: throw Exception(fmt::format("[Tokenizer] Error: Unknown escape sequence \\'{}'.", peek()), point_error(_current_pos, _current_line, begin));
                     }
                     advance();
