@@ -31,7 +31,7 @@ auto mangle_name(const std::string_view& name, auto arguments, AST::FunctionDecl
     if((flags & AST::FunctionDeclaration::Flag::Variadic) || (flags & AST::FunctionDeclaration::Flag::Extern) || (flags & AST::FunctionDeclaration::Flag::BuiltIn))
         return r;
     for(auto arg : arguments)
-        r += std::string("_") + GlobalTypeRegistry::instance().get_type(arg->type_id).type->designation;
+        r += std::string("_") + GlobalTypeRegistry::instance().get_type(arg->type_id)->designation;
     return r;
 }
 

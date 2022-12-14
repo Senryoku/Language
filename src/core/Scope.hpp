@@ -151,7 +151,11 @@ class Scoped {
     const AST::FunctionDeclaration* get_function(const std::string_view& name, const std::span<AST::Node*>& arguments) const;
 
     const AST::TypeDeclaration* get_type(const std::string_view& name) const;
-    const AST::TypeDeclaration* get_type(TypeID id) const { return GlobalTypeRegistry::instance().get_type(id).type_node; }
+    const AST::TypeDeclaration* get_type_node(TypeID id) const {
+        const auto& struct_type = GlobalTypeRegistry::instance().get_type(id);
+        assert(struct_type->is_struct());
+        return dynamic_cast<const StructType*>(struct_type)->type_node;
+    }
     bool                        is_type(const std::string_view& name) const;
 
     AST::VariableDeclaration* get(const std::string_view& name);

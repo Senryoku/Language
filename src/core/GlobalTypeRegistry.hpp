@@ -4,6 +4,7 @@
 #include <unordered_map>
 
 #include <AST.hpp>
+#include <ValueType.hpp>
 
 typedef std::tuple<TypeID, size_t> key_t;
 
@@ -11,23 +12,12 @@ struct key_hash {
     std::size_t operator()(const key_t& k) const { return std::get<0>(k) ^ std::get<1>(k); }
 };
 
-class TypeRecord {
-  public:
-    TypeRecord() = default;
-    TypeRecord(Type* t, AST::TypeDeclaration* t_node = nullptr) : type(t), type_node(t_node) {}
-    TypeRecord(TypeRecord&&) = default;
-    TypeRecord& operator = (TypeRecord &&) = default;
-
-    std::unique_ptr<Type> type;
-    AST::TypeDeclaration* type_node = nullptr;
-};
-
 class GlobalTypeRegistry {
   public:
-    const TypeRecord& get_type(TypeID id) const;
-    const TypeRecord& get_type(const std::string& name) const;
+    const Type* get_type(TypeID id) const;
+    const Type* get_type(const std::string& name) const;
 
-    const TypeRecord& get_or_register_type(const std::string& name);
+    const Type* get_or_register_type(const std::string& name);
 
     TypeID get_pointer_to(TypeID id);
     TypeID get_array_of(TypeID id, uint32_t capacity);
@@ -40,7 +30,7 @@ class GlobalTypeRegistry {
     }
 
   private:
-    std::vector<TypeRecord> _types;
+    std::vector<std::unique_ptr<Type>> _types;
     // Cache Lookup
     std::unordered_map<std::string, TypeID> _types_by_designation;
     std::unordered_map<TypeID, TypeID>      _pointers_to;

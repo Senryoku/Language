@@ -8,7 +8,7 @@
 #include <vector>
 
 #include <Tokenizer.hpp>
-#include <ValueType.hpp>
+#include <PrimitiveType.hpp>
 
 class AST {
   public:

@@ -3,6 +3,7 @@
 #include <cassert>
 
 #include <PrimitiveType.hpp>
+#include <AST.hpp>
 
 class Type {
   public:
@@ -13,11 +14,21 @@ class Type {
 
     virtual bool        is_array() const { return false; }
     virtual bool        is_pointer() const { return false; }
+    virtual bool        is_struct() const { return false; }
 };
 
 class ScalarType : public Type {
   public:
     ScalarType(std::string _designation, TypeID _type_id) : Type(_designation, _type_id) {}
+};
+
+class StructType : public Type {
+  public:
+    StructType(std::string _designation, TypeID _type_id, const AST::TypeDeclaration* _type_node) : Type(_designation, _type_id), type_node(_type_node) {}
+
+    const AST::TypeDeclaration* type_node = nullptr;
+
+    bool is_struct() const override { return true; }
 };
 
 class PointerType : public Type {

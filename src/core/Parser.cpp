@@ -15,9 +15,9 @@ TypeID Parser::resolve_operator_type(Token::Type op, TypeID lhs, TypeID rhs) {
         return PrimitiveType::Boolean;
 
     if(op == OpenSubscript) {
-        const auto& lhs_type = GlobalTypeRegistry::instance().get_type(lhs).type;
+        auto lhs_type = GlobalTypeRegistry::instance().get_type(lhs);
         if(lhs_type->is_array())
-            return dynamic_cast<const ArrayType*>(lhs_type.get())->element_type;
+            return dynamic_cast<const ArrayType*>(lhs_type)->element_type;
     }
 
     if(lhs == rhs && is_primitive(lhs))
@@ -114,7 +114,7 @@ bool Parser::parse(const std::span<Token>& tokens, AST::Node* curr_node) {
                     get_scope().set_return_type(returnNode->type_id);
                 } else if(scope_return_type != returnNode->type_id) {
                     throw Exception(fmt::format("[Parser] Syntax error: Incoherent return types, got {}, expected {}.\n",
-                                                GlobalTypeRegistry::instance().get_type(returnNode->type_id).type->designation, scope_return_type),
+                                                GlobalTypeRegistry::instance().get_type(returnNode->type_id)->designation, scope_return_type),
                                     point_error(returnNode->token));
                 }
                 break;
@@ -478,7 +478,7 @@ bool Parser::parse_identifier(const std::span<Token>& tokens, std::span<Token>::
     variable_node->type_id = variable.type_id;
 
     if(peek(tokens, it, Token::Type::OpenSubscript)) { // Array accessor
-        if(!(variable.type_id == PrimitiveType::String) && !GlobalTypeRegistry::instance().get_type(variable.type_id).type->is_array())
+        if(!(variable.type_id == PrimitiveType::String) && !GlobalTypeRegistry::instance().get_type(variable.type_id)->is_array())
             throw Exception(fmt::format("[Parser] Syntax Error: Subscript operator on variable '{}' which is neither a string nor an array.\n", it->value), point_error(*it));
         auto access_operator_node = new AST::BinaryOperator(*(it + 1));
         access_operator_node->add_child(curr_node->pop_child());
@@ -488,7 +488,7 @@ bool Parser::parse_identifier(const std::span<Token>& tokens, std::span<Token>::
         if(variable.type_id == PrimitiveType::String)
             access_operator_node->type_id = PrimitiveType::Char;
         else // FIXME: Won't work for string. But we'll probably get rid of it anyway.
-            access_operator_node->type_id = dynamic_cast<const ArrayType*>(GlobalTypeRegistry::instance().get_type(variable.type_id).type.get())->element_type;
+            access_operator_node->type_id = dynamic_cast<const ArrayType*>(GlobalTypeRegistry::instance().get_type(variable.type_id))->element_type;
 
         it += 2;
         // Get the index and add it as a child.
@@ -834,13 +834,12 @@ void Parser::check_function_call(AST::FunctionCall* call_node, const AST::Functi
             if(call_node->arguments()[i]->type_id != function->arguments()[i]->type_id) {
                 // FIXME: Exception for string -> char* conversion since we don't have a concrete plan for the string type yet.
                 if(call_node->arguments()[i]->type_id == PrimitiveType::String) {
-                    const auto& func_type = GlobalTypeRegistry::instance().get_type(function->arguments()[i]->type_id).type;
-                    if(func_type->is_pointer() && dynamic_cast<const PointerType*>(func_type.get())->pointee_type == PrimitiveType::Char)
+                    const auto& func_type = GlobalTypeRegistry::instance().get_type(function->arguments()[i]->type_id);
+                    if(func_type->is_pointer() && dynamic_cast<const PointerType*>(func_type)->pointee_type == PrimitiveType::Char)
                         continue;
                 }
                 throw Exception(fmt::format("[Parser] Function '{}' expects an argument of type {} on position #{}, got {}.\n", function->name(),
-                                            GlobalTypeRegistry::instance().get_type(function->arguments()[i]->type_id).type->designation, i, GlobalTypeRegistry::instance().get_type(call_node->arguments()[i]->type_id)
-                                    .type->designation,
+                                            GlobalTypeRegistry::instance().get_type(function->arguments()[i]->type_id)->designation, i, GlobalTypeRegistry::instance().get_type(call_node->arguments()[i]->type_id)->designation,
                                 point_error(call_node->arguments()[i]->token)));
             }
         }
@@ -926,11 +925,11 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
         this_node->type_id = t->type_id;
         curr_node->add_child(this_node);
 
-        const auto& type_record = &GlobalTypeRegistry::instance().get_type(t->type_id);
+        auto type = GlobalTypeRegistry::instance().get_type(t->type_id);
         // Allow using the dot operator on pointers and directly on an object
-        if(type_record->type->is_pointer()) {
+        if(type->is_pointer()) {
             auto ltor = new AST::Node(AST::Node::Type::Dereference);
-            ltor->type_id = dynamic_cast<const PointerType*>(type_record->type.get())->pointee_type;
+            ltor->type_id = dynamic_cast<const PointerType*>(type)->pointee_type;
             curr_node->insert_between(0, ltor);
         }
     }
@@ -961,10 +960,11 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
             throw Exception("[Parser] Syntax error: Expected identifier on the right side of '.' operator.\n", point_error(*it));
         const auto  identifier_name = it->value;
         auto        type_id = prev_expr->type_id;
-        const auto& type_record = &GlobalTypeRegistry::instance().get_type(type_id);
+        auto        type = GlobalTypeRegistry::instance().get_type(type_id);
         // Automatic cast to pointee type (Could be a separate Node)
-        const auto& base_type = GlobalTypeRegistry::instance().get_type(type_record->type->is_pointer() ? dynamic_cast<const PointerType*>(type_record->type.get())->pointee_type  : type_id);
-        const auto       type_node = base_type.type_node;
+        auto             base_type = GlobalTypeRegistry::instance().get_type(type->is_pointer() ? dynamic_cast<const PointerType*>(type)->pointee_type : type_id);
+        assert(base_type->is_struct());
+        auto             type_node = dynamic_cast<const StructType*>(base_type)->type_node;
         bool             member_exists = false;
         int32_t          member_index = 0;
         const AST::Node* member_node = nullptr;
@@ -996,7 +996,7 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
             parse_function_arguments(tokens, it, call_node);
 
             // Allow using the dot operator on pointers and directly on an object
-            if(!type_record->type->is_pointer()) {
+            if(!type->is_pointer()) {
                 auto first_arg = call_node->arguments()[0];
                 // FIXME: if(first_arg->type == AST::Node::Type::Dereference)
                 //        We could simply remove the redundant Dereference node, or, even better, not generate it in the first place.
@@ -1009,10 +1009,7 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
 
             // Search for a corresponding method
             const auto method = get_function(identifier_name, call_node->arguments());
-            if(method && method->arguments().size() > 0 && !is_primitive(method->arguments()[0]->type_id) &&
-               GlobalTypeRegistry::instance().get_pointer_to(base_type.type->type_id) == method->arguments()[0]->type_id) {
-
-                
+            if(method && method->arguments().size() > 0 && !is_primitive(method->arguments()[0]->type_id) && GlobalTypeRegistry::instance().get_pointer_to(base_type->type_id) == method->arguments()[0]->type_id) {
                 call_node->type_id = method->type_id;
                 call_node->flags = method->flags;
 
@@ -1147,20 +1144,20 @@ TypeID Parser::parse_type(const std::span<Token>& tokens, std::span<Token>::iter
     // FIXME: Should I get rid of this?
     auto scoped_type = get_type(token.value);
     auto type_id = InvalidTypeID;
-    const TypeRecord* type_record = nullptr;
+    const Type* type = nullptr;
 
     // Primitive Types won't show up in the scope.
     if (scoped_type == nullptr) {
-        type_record = &GlobalTypeRegistry::instance().get_type(std::string(token.value));
-        type_id = type_record->type->type_id;
+        type = GlobalTypeRegistry::instance().get_type(std::string(token.value));
+        type_id = type->type_id;
     } else {
         type_id = scoped_type->type_id;
-        type_record = &GlobalTypeRegistry::instance().get_type(type_id);
+        type = GlobalTypeRegistry::instance().get_type(type_id);
     }
 
     while(it->type == Token::Type::Multiplication) {
         const auto pointer_type_id = GlobalTypeRegistry::instance().get_pointer_to(type_id);
-        type_record = &GlobalTypeRegistry::instance().get_type(pointer_type_id);
+        type = GlobalTypeRegistry::instance().get_type(pointer_type_id);
         ++it;
     }
 
@@ -1174,10 +1171,10 @@ TypeID Parser::parse_type(const std::span<Token>& tokens, std::span<Token>::iter
         expect(tokens, it, Token::Type::CloseSubscript);
         
         const auto arr_type_id = GlobalTypeRegistry::instance().get_array_of(type_id, capacity);
-        type_record = &GlobalTypeRegistry::instance().get_type(arr_type_id);
+        type = GlobalTypeRegistry::instance().get_type(arr_type_id);
     }
 
-    return type_record->type->type_id;
+    return type->type_id;
 }
 
 bool Parser::write_export_interface(const std::filesystem::path& path) const {

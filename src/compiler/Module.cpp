@@ -57,10 +57,10 @@ static std::unordered_map<Token::Type, std::unordered_map<PrimitiveType, std::fu
 
 
 llvm::Constant* Module::codegen_constant(const AST::Node* val) {
-    const auto& type = GlobalTypeRegistry::instance().get_type(val->type_id).type;
+    auto type = GlobalTypeRegistry::instance().get_type(val->type_id);
     assert(type);
     if(type->is_array()) {
-        const auto* type_arr = static_cast<const ArrayType*>(type.get());
+        const auto* type_arr = static_cast<const ArrayType*>(type);
         auto                         element_type = get_llvm_type(type_arr->element_type);
         std::vector<llvm::Constant*> values(type_arr->capacity);
         for(unsigned int i = 0; i < type_arr->capacity; i++)
@@ -330,10 +330,10 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                 return _llvm_ir_builder.CreateLoad(get_llvm_type(node->type_id), value, "l-to-rvalue");
             }
             if(child->type == AST::Node::Type::BinaryOperator && child->token.type == Token::Type::OpenSubscript) {
-                const auto& type = GlobalTypeRegistry::instance().get_type(child->children[0]->type_id).type;
+                auto type = GlobalTypeRegistry::instance().get_type(child->children[0]->type_id);
                 if(type->is_array()) {
                     assert(value->getType()->isPointerTy());
-                    auto arr_type = static_cast<const ArrayType*>(type.get());
+                    auto arr_type = static_cast<const ArrayType*>(type);
                     auto element_type = get_llvm_type(arr_type->element_type);
                     return _llvm_ir_builder.CreateLoad(element_type, value, "l-to-rvalue");
                 }
@@ -411,9 +411,9 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                 case Token::Type::OpenSubscript: {
                     // FIXME: Remove these checks
                     assert(node->children[0]->type == AST::Node::Type::Variable);
-                    const auto& type_record = GlobalTypeRegistry::instance().get_type(node->children[0]->type_id);
-                    assert(type_record.type->is_array() || node->children[0]->type_id == PrimitiveType::String);
-                    if(type_record.type->is_array()) {
+                    auto type_record = GlobalTypeRegistry::instance().get_type(node->children[0]->type_id);
+                    assert(type_record->is_array() || node->children[0]->type_id == PrimitiveType::String);
+                    if(type_record->is_array()) {
                         auto type = get_llvm_type(node->children[0]->type_id);
                         return _llvm_ir_builder.CreateGEP(type, lhs, {llvm::ConstantInt::get(*_llvm_context, llvm::APInt(32, 0)), rhs}, "ArrayGEP");
                     } else { // FIXME: Remove this String special case? 
@@ -438,9 +438,9 @@ llvm::Value* Module::codegen(const AST::Node* node) {
         case AST::Node::Type::Dereference: {
             auto lhs = codegen(node->children[0]);
             auto allocaInst = static_cast<llvm::AllocaInst*>(lhs);
-            const auto& type = GlobalTypeRegistry::instance().get_type(node->children[0]->type_id).type;
+            auto type = GlobalTypeRegistry::instance().get_type(node->children[0]->type_id);
             assert(type->is_pointer());
-            auto pointee_type = get_llvm_type(dynamic_cast<const PointerType*>(type.get())->pointee_type);
+            auto pointee_type = get_llvm_type(dynamic_cast<const PointerType*>(type)->pointee_type);
             return _llvm_ir_builder.CreateLoad(allocaInst->getAllocatedType(), lhs);
         }
         case AST::Node::Type::WhileStatement: {
@@ -534,13 +534,13 @@ llvm::Value* Module::codegen(const AST::Node* node) {
 }
 
 llvm::Type* Module::get_llvm_type(TypeID type_id) const {
-    const auto& record = GlobalTypeRegistry::instance().get_type(type_id);
-    if(record.type->is_pointer()) {
-        auto llvm_type = get_llvm_type(dynamic_cast<const PointerType*>(record.type.get())->pointee_type);
+    auto type = GlobalTypeRegistry::instance().get_type(type_id);
+    if(type->is_pointer()) {
+        auto llvm_type = get_llvm_type(dynamic_cast<const PointerType*>(type)->pointee_type);
         return llvm_type->getPointerTo(0);
     }
-    if(record.type->is_array()) {
-        auto arr_type = dynamic_cast<const ArrayType*>(record.type.get());
+    if(type->is_array()) {
+        auto arr_type = dynamic_cast<const ArrayType*>(type);
         auto llvm_type = get_llvm_type(arr_type->element_type);
         return llvm::ArrayType::get(llvm_type, arr_type->capacity);
     }
@@ -565,8 +565,8 @@ llvm::Type* Module::get_llvm_type(TypeID type_id) const {
         }
     }
 
-    auto structType = llvm::StructType::getTypeByName(*_llvm_context, record.type->designation);
+    auto structType = llvm::StructType::getTypeByName(*_llvm_context, type->designation);
     if(!structType)
-        throw Exception(fmt::format("[LLVMCodegen] Could not find struct with name '{}'.\n", record.type->designation));
+        throw Exception(fmt::format("[LLVMCodegen] Could not find struct with name '{}'.\n", type->designation));
     return structType;
 }

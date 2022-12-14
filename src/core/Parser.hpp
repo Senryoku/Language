@@ -59,12 +59,13 @@ class Parser : public Scoped {
 
     void resolve_operator_type(AST::BinaryOperator* op_node) {
         if(op_node->token.type == Token::Type::MemberAccess) {
-            const auto& type_record = GlobalTypeRegistry::instance().get_type(op_node->children[0]->type_id);
-            const AST::TypeDeclaration* type_node = type_record.type_node;
+            auto type = GlobalTypeRegistry::instance().get_type(op_node->children[0]->type_id);
             // Automatic dereferencing of pointers (Should this be a separate AST Node?)
-            if (type_record.type->is_pointer()) {
-                type_node = GlobalTypeRegistry::instance().get_type(dynamic_cast<const PointerType*>(type_record.type.get())->pointee_type).type_node;
-            }
+            // FIXME: May not be needed anymore
+            if(type->is_pointer())
+                type = GlobalTypeRegistry::instance().get_type(dynamic_cast<const PointerType*>(type)->pointee_type);
+            assert(type->is_struct());
+            const AST::TypeDeclaration* type_node = dynamic_cast<const StructType*>(type)->type_node;
             for(const auto& c : type_node->members())
                 if(c->token.value == op_node->children[1]->token.value) {
                     op_node->type_id = c->type_id;

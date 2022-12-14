@@ -77,7 +77,7 @@ const AST::VariableDeclaration* Scoped::get(const std::string_view& name) const 
 }
 
 bool Scoped::is_type(const std::string_view& name) const {
-    auto builtin = GlobalTypeRegistry::instance().get_type(std::string(name)).type->type_id;
+    auto builtin = GlobalTypeRegistry::instance().get_type(std::string(name))->type_id;
     if(builtin != InvalidTypeID)
         return true;
     // FIXME: Should be useless right now, but we may need to reintroduce some form of scoping for types, idk.
