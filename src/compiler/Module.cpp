@@ -238,7 +238,6 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                     function->eraseFromParent();
                     return nullptr;
                 }
-                dump(function);
                 return function;
             } else {
                 assert(((flags & AST::FunctionDeclaration::Flag::Extern) || (flags & AST::FunctionDeclaration::Flag::Imported)) && "Functions without a body should be marked as 'extern' or imported.");
@@ -249,7 +248,6 @@ llvm::Value* Module::codegen(const AST::Node* node) {
         }
         case AST::Node::Type::FunctionCall: {
             auto function_call_node = static_cast<const AST::FunctionCall*>(node);
-            fmt::print("function_call_node: {}\n", *node);
             auto mangled_function_name = function_call_node->mangled_name();
             auto function = _llvm_module->getFunction(mangled_function_name);
             if(!function) {
@@ -283,12 +281,8 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                 // C Variadic functions promotes float to double (see https://stackoverflow.com/questions/63144506/printf-doesnt-work-for-floats-in-llvm-ir)
                 if(function_flags & AST::FunctionDeclaration::Flag::Variadic && v->getType()->isFloatTy())
                     v = _llvm_ir_builder.CreateFPExt(v, llvm::Type::getDoubleTy(*_llvm_context));
-                fmt::print("Node: {}\n", *arg_node);
-                dump(v);
                 parameters.push_back(v);
             }
-            fmt::print("Function: {}\n", mangled_function_name);
-            dump(function);
             if(function_call_node->type_id == PrimitiveType::Void) // "Cannot assign a name to void values!"
                 return _llvm_ir_builder.CreateCall(function, parameters);
             else

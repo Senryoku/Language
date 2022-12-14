@@ -290,12 +290,10 @@ bool Parser::parse_next_scope(const std::span<Token>& tokens, std::span<Token>::
     while (!ordered_variable_declarations.empty()) {
         auto dec = ordered_variable_declarations.top();
         ordered_variable_declarations.pop();
-        print("Checking for {}'s destructor...\n", dec->token.value);
         std::vector<AST::Node*> span;
         span.push_back(dec);
         auto                  destructor = get_function("destructor", span);
         if(destructor) {
-            print("Found a destructor!\n");
             Token destructor_token = end != tokens.end() ? *end : Token();
             destructor_token.type = Token::Type::Identifier;
             destructor_token.value = *internalize_string("destructor");
