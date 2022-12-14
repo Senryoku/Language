@@ -939,7 +939,10 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
     }
 
     // Implicit 'this'
-    if(curr_node->children.empty() && operator_type == Token::Type::MemberAccess) {
+    // FIXME: This probably shouldn't work this way.
+    //        We have to check the return type of the last child node to not try to apply the MemberAccess operator to a Statement, for example, which is pretty wack.
+    if((curr_node->children.empty() || curr_node->children.back()->type_id == InvalidTypeID || curr_node->children.back()->type_id == Void) &&
+       operator_type == Token::Type::MemberAccess) {
         auto t = get_this();
         if(!t)
             throw Exception(fmt::format("[Parser] Syntax error: Implicit 'this' access, but 'this' is not defined here.\n", *it), point_error(*it));
@@ -954,7 +957,7 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
         if(type->is_pointer()) {
             auto ltor = new AST::Node(AST::Node::Type::Dereference);
             ltor->type_id = dynamic_cast<const PointerType*>(type)->pointee_type;
-            curr_node->insert_between(0, ltor);
+            curr_node->insert_between(curr_node->children.size() - 1, ltor);
         }
     }
 
