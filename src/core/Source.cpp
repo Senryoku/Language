@@ -51,13 +51,18 @@ std::string point_error(const std::string_view& source, size_t at, size_t line, 
     // Display the source line containing the error
     return_value += fmt::format("{}{}\n", line_info, std::string_view{source.begin() + line_start, source.begin() + line_end});
     // Point at it
+    // FIXME: Why? I don't remember...
     if(from != std::numeric_limits<size_t>::max() && to != std::numeric_limits<size_t>::max()) {
-        auto point = fmt::format("{}{:>{}s}\n", padding, "^", at - line_start);
+        std::string point;
+        point.resize(std::max(at, static_cast<size_t>(std::max(to, from)) - line_start) + 1, ' ');
+        for(size_t i = from - line_start + 1; i < std::min(to - line_start, point.size()) + 1; ++i)
+            point[i] = '~';
+        point[at - line_start + 1] = '^';
         // Handle tabulations in input line by copying them.
-        for(auto i = padding.size(); i < point.size() && i - padding.size() < source.size(); ++i)
-            if(source[i - padding.size()] == '\t' && point[i] == ' ')
-                point[i] = '\t';
-        return_value += point;
+        //for(auto i = padding.size(); i < point.size() && i - padding.size() < source.size(); ++i)
+        //  if(source[i - padding.size()] == '\t' && point[i] == ' ')
+        //      point[i] = '\t';
+        return_value += padding + point + '\n';
     } else {
         if(from == std::numeric_limits<size_t>::max())
             from = at;
@@ -65,7 +70,7 @@ std::string point_error(const std::string_view& source, size_t at, size_t line, 
             to = at;
         std::string str = "";
         for(size_t i = 0; i < std::max(at, static_cast<size_t>(std::max(to, from))) - line_start + 1; ++i)
-            if(source[i] == '\t')
+            if(source[i + line_start] == '\t')
                 str += '\t';
             else
                 str += ' ';
