@@ -15,6 +15,8 @@ TypeID Parser::resolve_operator_type(Token::Type op, TypeID lhs, TypeID rhs) {
         return PrimitiveType::Boolean;
 
     if(op == OpenSubscript) {
+        if(lhs == PrimitiveType::CString)
+            return PrimitiveType::Char;
         auto lhs_type = GlobalTypeRegistry::instance().get_type(lhs);
         if(lhs_type->is_array())
             return dynamic_cast<const ArrayType*>(lhs_type)->element_type;
@@ -478,22 +480,27 @@ bool Parser::parse_identifier(const std::span<Token>& tokens, std::span<Token>::
     variable_node->type_id = variable.type_id;
 
     if(peek(tokens, it, Token::Type::OpenSubscript)) { // Array accessor
-        if(!(variable.type_id == PrimitiveType::String) && !GlobalTypeRegistry::instance().get_type(variable.type_id)->is_array())
+        if(!(variable.type_id == PrimitiveType::CString) && !GlobalTypeRegistry::instance().get_type(variable.type_id)->is_array())
             throw Exception(fmt::format("[Parser] Syntax Error: Subscript operator on variable '{}' which is neither a string nor an array.\n", it->value), point_error(*it));
         auto access_operator_node = new AST::BinaryOperator(*(it + 1));
         access_operator_node->add_child(curr_node->pop_child());
         curr_node->add_child(access_operator_node);
 
         // FIXME: Get rid of this special case? (And the string type?)
-        if(variable.type_id == PrimitiveType::String)
+        if(variable.type_id == PrimitiveType::CString)
             access_operator_node->type_id = PrimitiveType::Char;
         else // FIXME: Won't work for string. But we'll probably get rid of it anyway.
             access_operator_node->type_id = dynamic_cast<const ArrayType*>(GlobalTypeRegistry::instance().get_type(variable.type_id))->element_type;
 
+        auto ltor = new AST::Node(AST::Node::Type::LValueToRValue);
+        access_operator_node->add_child(ltor);
+
         it += 2;
         // Get the index and add it as a child.
         // FIXME: Search the matching ']' here?
-        parse_next_expression(tokens, it, access_operator_node, max_precedence, false);
+        parse_next_expression(tokens, it, ltor, max_precedence, false);
+
+        ltor->type_id = ltor->children[0]->type_id;
 
         // TODO: Make sure this is an integer?
         if(access_operator_node->children.back()->type_id != PrimitiveType::Integer) {
@@ -833,7 +840,7 @@ void Parser::check_function_call(AST::FunctionCall* call_node, const AST::Functi
         for(auto i = 0; i < call_node->arguments().size(); ++i) {
             if(call_node->arguments()[i]->type_id != function->arguments()[i]->type_id) {
                 // FIXME: Exception for string -> char* conversion since we don't have a concrete plan for the string type yet.
-                if(call_node->arguments()[i]->type_id == PrimitiveType::String) {
+                if(call_node->arguments()[i]->type_id == PrimitiveType::CString) {
                     const auto& func_type = GlobalTypeRegistry::instance().get_type(function->arguments()[i]->type_id);
                     if(func_type->is_pointer() && dynamic_cast<const PointerType*>(func_type)->pointee_type == PrimitiveType::Char)
                         continue;

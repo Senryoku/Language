@@ -234,7 +234,7 @@ class AST {
     };
 
     struct StringLiteral : public Literal<std::string_view> {
-        StringLiteral(Token t) : Literal(t) { type_id = PrimitiveType::String; }
+        StringLiteral(Token t) : Literal(t) { type_id = PrimitiveType::CString; }
     };
 
     inline Node&       get_root() { return _root; }

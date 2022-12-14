@@ -86,7 +86,7 @@ llvm::Constant* Module::codegen_constant(const AST::Node* val) {
         case Float: return llvm::ConstantFP::get(*_llvm_context, llvm::APFloat(static_cast<const AST::FloatLiteral*>(val)->value));
         case I32: [[fallthrough]];
         case Integer: return llvm::ConstantInt::get(*_llvm_context, llvm::APInt(32, static_cast<const AST::IntegerLiteral*>(val)->value));
-        case String: {
+        case CString: {
             // FIXME: Take a look at llvm::StringRef and llvm::Twine
             auto        str_node = static_cast<const AST::StringLiteral*>(val);
             const auto& str = str_node->value;
@@ -338,7 +338,7 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                     auto element_type = get_llvm_type(arr_type->element_type);
                     return _llvm_ir_builder.CreateLoad(element_type, value, "l-to-rvalue");
                 }
-                if(child->children[0]->type_id == PrimitiveType::String) {
+                if(child->children[0]->type_id == PrimitiveType::CString) {
                     assert(value->getType()->isPointerTy());
                     auto charType = llvm::IntegerType::get(*_llvm_context, 8);
                     return _llvm_ir_builder.CreateLoad(charType, value, "l-to-rvalue");
@@ -413,22 +413,22 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                     // FIXME: Remove these checks
                     assert(node->children[0]->type == AST::Node::Type::Variable);
                     auto type_record = GlobalTypeRegistry::instance().get_type(node->children[0]->type_id);
-                    assert(type_record->is_array() || node->children[0]->type_id == PrimitiveType::String);
+                    assert(type_record->is_array() || node->children[0]->type_id == PrimitiveType::CString);
                     if(type_record->is_array()) {
                         auto type = get_llvm_type(node->children[0]->type_id);
                         return _llvm_ir_builder.CreateGEP(type, lhs, {llvm::ConstantInt::get(*_llvm_context, llvm::APInt(32, 0)), rhs}, "ArrayGEP");
-                    } else { // FIXME: Remove this String special case? 
+                    } else if(node->children[0]->type_id == PrimitiveType::CString) { // FIXME: Remove this String special case? 
                         auto charType = llvm::IntegerType::get(*_llvm_context, 8);
                         auto load = _llvm_ir_builder.CreateLoad(charType->getPointerTo(), lhs);
-                        return _llvm_ir_builder.CreateGEP(charType, load, {rhs}, "StringGEP"); // FIXME: Should not be there (Or should it?)
+                        return _llvm_ir_builder.CreateGEP(charType, load, {rhs}, "CStringGEP"); // FIXME: Should not be there (Or should it?)
                     }
+                    assert(false);
                 }
                 case Token::Type::Assignment: {
                     _llvm_ir_builder.CreateStore(rhs, lhs);
                     return lhs;
                 }
                 case Token::Type::MemberAccess: {
-                    auto allocaInst = static_cast<llvm::AllocaInst*>(lhs);
                     return _llvm_ir_builder.CreateGEP(get_llvm_type(node->children[0]->type_id), lhs, {llvm::ConstantInt::get(*_llvm_context, llvm::APInt(32, 0)), rhs},
                                                       "memberptr");
                 }
@@ -558,9 +558,10 @@ llvm::Type* Module::get_llvm_type(TypeID type_id) const {
             case I32: return llvm::Type::getInt32Ty(*_llvm_context);
             case I64: return llvm::Type::getInt64Ty(*_llvm_context);
             case Integer: return llvm::Type::getInt32Ty(*_llvm_context);
+            case Pointer: return llvm::Type::getInt64Ty(*_llvm_context); // FIXME ?
             case Float: return llvm::Type::getFloatTy(*_llvm_context);
             case Double: return llvm::Type::getDoubleTy(*_llvm_context);
-            case String: return llvm::Type::getInt8PtrTy(*_llvm_context); // FIXME
+            case CString: return llvm::Type::getInt8PtrTy(*_llvm_context); 
             default: throw(fmt::format("[Module] get_llvm_type: Unhandled primitive type '{}'.", type_id));
         }
     }

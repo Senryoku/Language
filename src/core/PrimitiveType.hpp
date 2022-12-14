@@ -23,7 +23,7 @@ enum PrimitiveType : TypeID {
     Pointer, // Same as U64, not sure if it's useful.
     Float,
     Double,
-    String, // Remove?
+    CString,
 
     Count, // Max. TypeID for Primitive Types
 };

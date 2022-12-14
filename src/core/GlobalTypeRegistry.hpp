@@ -76,7 +76,7 @@ class GlobalTypeRegistry {
         add_type(new ScalarType("pointer", PrimitiveType::Pointer));
         add_type(new ScalarType("float",   PrimitiveType::Float));
         add_type(new ScalarType("double",  PrimitiveType::Double));
-        add_type(new ScalarType("string",  PrimitiveType::String));
+        add_type(new PointerType("cstr",  PrimitiveType::CString, PrimitiveType::Char));
     }
 };
 

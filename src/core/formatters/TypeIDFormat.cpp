@@ -30,7 +30,7 @@ std::string type_id_to_string(TypeID type_id) {
             case Integer: out_color = fmt::color::golden_rod; break;
             case Float: out_color = fmt::color::golden_rod; break;
             case Double: out_color = fmt::color::golden_rod; break;
-            case String: out_color = fmt::color::burly_wood; break;
+            case CString: out_color = fmt::color::burly_wood; break;
         }
         return fmt::format(fg(out_color), "{}", type_name);
     }
