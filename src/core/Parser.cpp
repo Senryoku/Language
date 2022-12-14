@@ -1007,6 +1007,7 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
             auto member_identifier_node = new AST::MemberIdentifier(*it);
             binary_operator_node->add_child(member_identifier_node);
             member_identifier_node->index = member_index;
+            member_identifier_node->type_id = type_node->children[member_index]->type_id;
             ++it;
         } else if(peek(tokens, it, Token::Type::OpenParenthesis)) {
             auto binary_node = curr_node->pop_child();
