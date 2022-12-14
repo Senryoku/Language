@@ -116,13 +116,6 @@ class Scoped {
         
         register_builtin("put", PrimitiveType::Integer, {"character"}, {PrimitiveType::Char});        
         register_builtin("printf", PrimitiveType::Integer, {}, {}, AST::FunctionDeclaration::Flag::Variadic);
-
-        register_builtin("__socket_init", PrimitiveType::Integer);
-        register_builtin("__socket_create", PrimitiveType::Integer);
-        register_builtin("__socket_connect", PrimitiveType::Integer, {"sockfd", "addr", "port"}, {PrimitiveType::Integer, PrimitiveType::String, PrimitiveType::Integer});
-        register_builtin("__socket_send", PrimitiveType::Integer, {"sockfd", "data"}, {PrimitiveType::Integer, PrimitiveType::String});
-        register_builtin("__socket_recv", PrimitiveType::String, {"sockfd"}, {PrimitiveType::Integer});
-        register_builtin("__socket_close", PrimitiveType::Integer, {"sockfd"}, {PrimitiveType::Integer});
     }
 
     const AST::VariableDeclaration* get_this() const {

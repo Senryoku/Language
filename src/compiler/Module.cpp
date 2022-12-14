@@ -281,9 +281,11 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                 // C Variadic functions promotes float to double (see https://stackoverflow.com/questions/63144506/printf-doesnt-work-for-floats-in-llvm-ir)
                 if(function_flags & AST::FunctionDeclaration::Flag::Variadic && v->getType()->isFloatTy())
                     v = _llvm_ir_builder.CreateFPExt(v, llvm::Type::getDoubleTy(*_llvm_context));
+                fmt::print("Node: {}\n", *arg_node);
                 dump(v);
                 parameters.push_back(v);
             }
+            fmt::print("Function: {}\n", mangled_function_name);
             dump(function);
             if(function_call_node->type_id == PrimitiveType::Void) // "Cannot assign a name to void values!"
                 return _llvm_ir_builder.CreateCall(function, parameters);
