@@ -925,8 +925,16 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
         Token token = *it;
         token.value = *internalize_string("this");
         auto this_node = new AST::Variable(token);
-        curr_node->add_child(this_node);
         this_node->type_id = t->type_id;
+        curr_node->add_child(this_node);
+
+        const auto& type_record = &GlobalTypeRegistry::instance().get_type(t->type_id);
+        // Allow using the dot operator on pointers and directly on an object
+        if(type_record->type->is_pointer()) {
+            auto ltor = new AST::Node(AST::Node::Type::Dereference);
+            ltor->type_id = dynamic_cast<const PointerType*>(type_record->type.get())->pointee_type;
+            curr_node->insert_between(0, ltor);
+        }
     }
 
     if(curr_node->children.empty())
@@ -957,8 +965,8 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
         auto        type_id = prev_expr->type_id;
         const auto& type_record = &GlobalTypeRegistry::instance().get_type(type_id);
         // Automatic cast to pointee type (Could be a separate Node)
-        const auto type_node =
-            GlobalTypeRegistry::instance().get_type(type_record->type->is_pointer() ? dynamic_cast<const PointerType*>(type_record->type.get())->pointee_type  : type_id).type_node;
+        const auto& base_type = GlobalTypeRegistry::instance().get_type(type_record->type->is_pointer() ? dynamic_cast<const PointerType*>(type_record->type.get())->pointee_type  : type_id);
+        const auto       type_node = base_type.type_node;
         bool             member_exists = false;
         int32_t          member_index = 0;
         const AST::Node* member_node = nullptr;
@@ -989,22 +997,29 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
 
             parse_function_arguments(tokens, it, call_node);
 
-            // Search for a corresponding method
-            const auto method = get_function(identifier_name, call_node->arguments());
-            // Allow using the dot operator on pointers and directly on an object                
+            // Allow using the dot operator on pointers and directly on an object
             if(!type_record->type->is_pointer()) {
                 auto first_arg = call_node->arguments()[0];
+                // FIXME: if(first_arg->type == AST::Node::Type::Dereference)
+                //        We could simply remove the redundant Dereference node, or, even better, not generate it in the first place.
                 auto get_pointer_node = new AST::Node(AST::Node::Type::GetPointer, first_arg->token);
                 call_node->set_argument(0, nullptr);
                 get_pointer_node->add_child(first_arg);
                 get_pointer_node->type_id = GlobalTypeRegistry::instance().get_pointer_to(first_arg->type_id);
                 call_node->set_argument(0, get_pointer_node);
             }
-            if(method && method->arguments().size() > 0 && !is_primitive(method->arguments()[0]->type_id) && call_node->arguments()[0]->type_id == method->arguments()[0]->type_id) {
+
+            // Search for a corresponding method
+            const auto method = get_function(identifier_name, call_node->arguments());
+            if(method && method->arguments().size() > 0 && !is_primitive(method->arguments()[0]->type_id) &&
+               GlobalTypeRegistry::instance().get_pointer_to(base_type.type->type_id) == method->arguments()[0]->type_id) {
+
+                
                 call_node->type_id = method->type_id;
                 call_node->flags = method->flags;
 
                 check_function_call(call_node, method);
+
                 return true;
             } else {
                 throw Exception(fmt::format("[Parser] Syntax error: Method '{}' does not exists on type {}.\n", identifier_name, type_node->token.value), point_error(*it));

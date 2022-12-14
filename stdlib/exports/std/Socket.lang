@@ -32,3 +32,7 @@ export function recv(this: Socket*) : string {
 export function close(this: Socket*) {
 	__socket_close(.fd);
 }
+
+export function destructor(this: Socket*) {
+	.close();
+}

@@ -13,9 +13,6 @@ export function close(this: File*) {
 	if(.fd != 0) __close_file(.fd);
 }
 
-// Crashes for some reason
 export function destructor(this: File*) {
-	// When calling a method on a struct, we do not handle the case where it's actually a pointer correctly. I think.
-	// Basically, calling a method from a method doesn't work.
 	.close();
 }

@@ -1,11 +1,19 @@
-import "std/File"
+// Pass: Received: HTTP/1.1 200 OK
+
+import "std/Socket"
 
 function main() : int {
-	printf("Trying to open a file...\n");
-	let file : File;
-	printf("File Descriptor: %d.\n", file.fd);
-	file.open("H:/Source/Lang/.gitignore", "r");
-	printf("File Descriptor: %d.\n", file.fd);
-	//file.close();
+	socket_init(); // How should we handle that?
+
+	let socket : Socket;
+
+	socket.create();
+
+	printf("Got socket: %d\n", socket.fd);
+
+	socket.connect("httpbin.org", 80);
+	socket.send("GET /get HTTP/1.0\r\n\r\n");
+	printf("Received: %s\n", socket.recv());
+
 	return 0;
 }

@@ -36,6 +36,7 @@ class AST {
             ConstantValue,
             UnaryOperator,
             BinaryOperator,
+            Dereference,
 
             Undefined
         };

@@ -82,7 +82,7 @@ struct fmt::formatter<AST::Node> {
             case AST::Node::Type::BinaryOperator:
                 r = fmt::format_to(ctx.out(), "{} {}:{}", fmt::format(fmt::emphasis::bold | fg(fmt::color::black) | bg(fmt::color::dim_gray), t.token.value), t.type, type_name);
                 break;
-            default: r = fmt::format_to(ctx.out(), "{}", t.type);
+            default: r = fmt::format_to(ctx.out(), "{}: {}", t.type, type_name);
         }
 
         auto token_str = t.token.type == Token::Type::Unknown ? "None" : fmt::format("{}", t.token);
@@ -137,6 +137,7 @@ struct fmt::formatter<AST::Node::Type> {
             case AST::Node::Type::Cast: return fmt::format_to(ctx.out(), "{}", "Cast");
             case AST::Node::Type::LValueToRValue: return fmt::format_to(ctx.out(), fg(fmt::color::dim_gray), "{}", "LValueToRValueCast");
             case AST::Node::Type::GetPointer: return fmt::format_to(ctx.out(), fg(fmt::color::dim_gray), "{}", "GetPointer");
+            case AST::Node::Type::Dereference: return fmt::format_to(ctx.out(), fg(fmt::color::dim_gray), "{}", "Dereference");
             case AST::Node::Type::ConstantValue: return fmt::format_to(ctx.out(), "{}", "ConstantValue");
             case AST::Node::Type::UnaryOperator: return fmt::format_to(ctx.out(), "{}", "UnaryOperator");
             case AST::Node::Type::BinaryOperator: return fmt::format_to(ctx.out(), "{}", "BinaryOperator");

@@ -238,6 +238,7 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                     function->eraseFromParent();
                     return nullptr;
                 }
+                dump(function);
                 return function;
             } else {
                 assert(((flags & AST::FunctionDeclaration::Flag::Extern) || (flags & AST::FunctionDeclaration::Flag::Imported)) && "Functions without a body should be marked as 'extern' or imported.");
@@ -248,6 +249,7 @@ llvm::Value* Module::codegen(const AST::Node* node) {
         }
         case AST::Node::Type::FunctionCall: {
             auto function_call_node = static_cast<const AST::FunctionCall*>(node);
+            fmt::print("function_call_node: {}\n", *node);
             auto mangled_function_name = function_call_node->mangled_name();
             auto function = _llvm_module->getFunction(mangled_function_name);
             if(!function) {
@@ -432,18 +434,20 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                 }
                 case Token::Type::MemberAccess: {
                     auto allocaInst = static_cast<llvm::AllocaInst*>(lhs);
-                    // FIXME: Just a quick hack, I don't think this is the real solution.
-                    const auto& type = GlobalTypeRegistry::instance().get_type(node->children[0]->type_id).type;
-                    if(type->is_pointer()) {
-                        auto pointee_type = get_llvm_type(dynamic_cast<const PointerType*>(type.get())->pointee_type);
-                        auto load = _llvm_ir_builder.CreateLoad(allocaInst->getAllocatedType(), lhs);
-                        return _llvm_ir_builder.CreateGEP(pointee_type, load, {llvm::ConstantInt::get(*_llvm_context, llvm::APInt(32, 0)), rhs}, "memberptr");
-                    }
-                    return _llvm_ir_builder.CreateGEP(allocaInst->getAllocatedType(), lhs, {llvm::ConstantInt::get(*_llvm_context, llvm::APInt(32, 0)), rhs}, "memberptr");
+                    return _llvm_ir_builder.CreateGEP(get_llvm_type(node->children[0]->type_id), lhs, {llvm::ConstantInt::get(*_llvm_context, llvm::APInt(32, 0)), rhs},
+                                                      "memberptr");
                 }
                 default: warn("[LLVMCodegen] Unimplemented Binary Operator '{}'.\n", node->token.value); break;
             }
             break;
+        }
+        case AST::Node::Type::Dereference: {
+            auto lhs = codegen(node->children[0]);
+            auto allocaInst = static_cast<llvm::AllocaInst*>(lhs);
+            const auto& type = GlobalTypeRegistry::instance().get_type(node->children[0]->type_id).type;
+            assert(type->is_pointer());
+            auto pointee_type = get_llvm_type(dynamic_cast<const PointerType*>(type.get())->pointee_type);
+            return _llvm_ir_builder.CreateLoad(allocaInst->getAllocatedType(), lhs);
         }
         case AST::Node::Type::WhileStatement: {
             llvm::Function* current_function = _llvm_ir_builder.GetInsertBlock()->getParent();
