@@ -32,6 +32,7 @@ configure_file(
 
 # Define sources
 aux_source_directory("src/core" SOURCES)
+aux_source_directory("src/core/formatters" SOURCES)
 aux_source_directory("test/" TEST_FILES)
 file(GLOB HEADERS src/**/*.hpp)
 

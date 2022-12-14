@@ -274,3 +274,4 @@ inline AST::FunctionDeclaration::Flag operator&(AST::FunctionDeclaration::Flag l
                                                        static_cast<std::underlying_type_t<AST::FunctionDeclaration::Flag>>(rhs));
 }
 
+#include <formatters/ASTFormat.hpp>

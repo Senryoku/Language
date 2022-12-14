@@ -94,5 +94,3 @@ struct fmt::formatter<Type> {
         return fmt::format_to(ctx.out(), "{}", t.designation);
     }
 };
-
-#include <formatters/ASTFormat.hpp>
