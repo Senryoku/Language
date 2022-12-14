@@ -93,11 +93,6 @@ class Module {
         llvm::FunctionType*      put_type = llvm::FunctionType::get(llvm::Type::getInt32Ty(*_llvm_context), put_args_types, false);
         auto                     put_func = _llvm_module->getOrInsertFunction("put", put_type);
 
-        const auto integer_t = llvm::Type::getInt32Ty(*_llvm_context);
-        const auto void_t = llvm::Type::getVoidTy(*_llvm_context);
-        const auto str_t = llvm::Type::getInt8PtrTy(*_llvm_context);
-
-
         // Actual codegen
         auto r = codegen(&ast.get_root());
         // Add a return to our generated main (from constructor) if needed (FIXME?)

@@ -440,7 +440,6 @@ llvm::Value* Module::codegen(const AST::Node* node) {
             auto allocaInst = static_cast<llvm::AllocaInst*>(lhs);
             auto type = GlobalTypeRegistry::instance().get_type(node->children[0]->type_id);
             assert(type->is_pointer());
-            auto pointee_type = get_llvm_type(dynamic_cast<const PointerType*>(type)->pointee_type);
             return _llvm_ir_builder.CreateLoad(allocaInst->getAllocatedType(), lhs);
         }
         case AST::Node::Type::WhileStatement: {
