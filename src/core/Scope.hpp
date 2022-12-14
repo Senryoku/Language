@@ -34,6 +34,8 @@ class Scope {
     bool is_valid(const het_unordered_map<std::vector<AST::FunctionDeclaration*>>::iterator & it) const { return it != _functions.end(); }
     bool is_valid(const het_unordered_map<std::vector<AST::FunctionDeclaration*>>::const_iterator & it) const { return it != _functions.cend(); }
     [[nodiscard]] const AST::FunctionDeclaration* resolve_function(const std::string_view& name, const std::span<AST::Node*>& arguments) const;
+    inline [[nodiscard]] const std::vector<AST::FunctionDeclaration*>& get_functions(const std::string_view& name) const { return _functions.find(name)->second; };
+    inline [[nodiscard]] bool                                          has_functions(const std::string_view& name) const { return is_valid(_functions.find(name)); };
 
     bool is_valid(const het_unordered_map<AST::TypeDeclaration*>::iterator& it) const { return it != _types.end(); }
     bool is_valid(const het_unordered_map<AST::TypeDeclaration*>::const_iterator& it) const { return it != _types.cend(); }
@@ -76,9 +78,9 @@ class Scope {
 
   private:
     // FIXME: At some point we'll have ton consolidate these string_view to their final home... Maybe the lexer should have done it already.
-    het_unordered_map<AST::VariableDeclaration*> _variables;
+    het_unordered_map<AST::VariableDeclaration*>              _variables;
     het_unordered_map<std::vector<AST::FunctionDeclaration*>> _functions;
-    het_unordered_map<AST::TypeDeclaration*>     _types;
+    het_unordered_map<AST::TypeDeclaration*>                  _types;
 
     std::stack<AST::VariableDeclaration*> _ordered_variable_declarations;
 
@@ -149,6 +151,8 @@ class Scoped {
     void pop_scope() { _scopes.pop_back(); }
 
     const AST::FunctionDeclaration* get_function(const std::string_view& name, const std::span<AST::Node*>& arguments) const;
+    // Debug helper, gets all functions with the given name.
+    std::vector<const AST::FunctionDeclaration*> get_functions(const std::string_view& name) const;
 
     const AST::TypeDeclaration* get_type(const std::string_view& name) const;
     const AST::TypeDeclaration* get_type_node(TypeID id) const {

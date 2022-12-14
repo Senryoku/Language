@@ -908,11 +908,26 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
 
         auto resolved_function = get_function(function_name, call_node->arguments());
         if(!resolved_function) {
-            throw Exception(fmt::format("[Parser] Call to undefined function '{}'.\n", function_name), point_error(*it));
-            // TODO: Better error message in the case when functions with the given name exists, but the argument types do not match.
-            //       Display supplied arguments types and descriptions of the candidates.
-            throw Exception(fmt::format("[Parser] Call to undefined function '{}', no candidate matches the arguments types.\n", function_name), point_error(*it));
+            auto candidates = get_functions(function_name);
+            if(candidates.size() == 0) 
+                throw Exception(fmt::format("[Parser] Call to undefined function '{}'.\n", function_name), point_error(call_node->token));
+            else {
+                std::string candidates_display = "Candidates are:\n";
+                for (const auto& func : candidates) {
+                    candidates_display += "\t" + func->mangled_name() + "\n"; // TODO: We can probably do better.
+                }
+                throw Exception(fmt::format("[Parser] Call to undefined function '{}', no candidate matches the arguments types.\n", function_name),
+                                point_error(call_node->token) + candidates_display);
+            }
+        }
 
+        // Automatically cast any pointer to 'opaque' pointer type for interfacing with C++
+        for(auto i = 0; i < call_node->arguments().size(); ++i) {
+            if(resolved_function->arguments()[i]->type_id == PrimitiveType::Pointer && GlobalTypeRegistry::instance().get_type(call_node->arguments()[i]->type_id)->is_pointer()) {
+                auto cast_node = new AST::Node(AST::Node::Type::Cast);
+                cast_node->type_id = PrimitiveType::Pointer;
+                call_node->insert_before_argument(i, cast_node);
+            }
         }
 
         call_node->type_id = resolved_function->type_id;

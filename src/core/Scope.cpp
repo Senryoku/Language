@@ -41,6 +41,20 @@ const AST::FunctionDeclaration* Scoped::get_function(const std::string_view& nam
     return ret;
 }
 
+
+std::vector<const AST::FunctionDeclaration*> Scoped::get_functions(const std::string_view& name) const {
+    auto                                         it = _scopes.rbegin();
+    std::vector<const AST::FunctionDeclaration*> r;
+    while(it != _scopes.rend()) {
+        if(it->has_functions(name)) {
+            const auto& candidates = it->get_functions(name);
+            r.insert(r.end(), candidates.begin(), candidates.end());
+        }
+        it++;
+    }
+    return r;
+}
+
 const AST::TypeDeclaration* Scoped::get_type(const std::string_view& name) const {
     auto it = _scopes.rbegin();
     auto val = it->find_type(name);
