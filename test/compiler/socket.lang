@@ -3,7 +3,7 @@
 import "std/Socket"
 
 function main() : int {
-	__socket_init(); // How should we handle that?
+	socket_init(); // How should we handle that?
 
 	let socket : Socket;
 
