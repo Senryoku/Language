@@ -212,10 +212,15 @@ bool Parser::parse(const std::span<Token>& tokens, AST::Node* curr_node) {
             }
             case Token::Type::Export: {
                 ++it;
+                auto function_flags = AST::FunctionDeclaration::Flag::Exported;
                 // TODO: Handle exported variables too.
                 switch(it->type) {
+                    case Token::Type::Extern:
+                        ++it;
+                        function_flags |= AST::FunctionDeclaration::Flag::Extern;
+                        [[fallthrough]];
                     case Token::Type::Function: {
-                        parse_function_declaration(tokens, it, curr_node, AST::FunctionDeclaration::Flag::Exported);
+                        parse_function_declaration(tokens, it, curr_node, function_flags);
                         _module_interface.exports.push_back(static_cast<AST::FunctionDeclaration*>(curr_node->children.back()));
                         break;
                     }
