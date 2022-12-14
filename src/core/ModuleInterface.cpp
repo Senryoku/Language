@@ -103,8 +103,8 @@ bool ModuleInterface::save(const std::filesystem::path& path) const {
     // Functions
     for(const auto& n : exports) {
         interface_file << n->token.value << " " << GlobalTypeRegistry::instance().get_type(n->type_id)->designation;
-        for(auto i = 0u; i < n->children.size() - 1; ++i) {
-            interface_file << " " << GlobalTypeRegistry::instance().get_type(n->children[i]->type_id)->designation;
+        for(auto i = 0u; i < n->arguments().size(); ++i) {
+            interface_file << " " << GlobalTypeRegistry::instance().get_type(n->arguments()[i]->type_id)->designation;
         }
         interface_file << std::endl;
     }
