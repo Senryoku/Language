@@ -174,7 +174,16 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                     assert(node->children[0]->type_id == PrimitiveType::Float); // TEMP
                     return _llvm_ir_builder.CreateFPToSI(child, llvm::Type::getInt32Ty(*_llvm_context), "castFPToSI");
                 }
-                default: error("[LLVMCodegen] LLVM::Codegen: Cast from {} to {} not supported.\n", node->children[0]->type_id, node->type_id); return nullptr;
+                case PrimitiveType::Pointer: {
+                    auto type = GlobalTypeRegistry::instance().get_type(node->children[0]->type_id);
+                    assert(type->is_pointer());
+                    auto as_int = _llvm_ir_builder.CreatePtrToInt(child, llvm::Type::getInt64Ty(*_llvm_context), "castToU64");
+                    return _llvm_ir_builder.CreateIntToPtr(as_int, get_llvm_type(node->type_id), "castToVoidPtr");
+                    //return _llvm_ir_builder.CreateBitCast(child, get_llvm_type(node->type_id), "castToVoidPtr");
+                }
+                default:
+                    error("[LLVMCodegen] LLVM::Codegen: Cast from {} to {} not supported.\n", type_id_to_string(node->children[0]->type_id), type_id_to_string(node->type_id));
+                    return nullptr;
             }
         }
         case AST::Node::Type::TypeDeclaration: {
@@ -400,7 +409,9 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                     assert(is_primitive(node->children[0]->type_id));
                     auto primitive_type = static_cast<PrimitiveType>(node->children[0]->type_id);
                     if(binary_ops[node->token.type].find(primitive_type) == binary_ops[node->token.type].end()) {
-                        error("[LLVMCodegen] Unsupported types {} and {} for binary operator {}.\n", node->children[0]->type_id, node->children[1]->type_id,
+                        error("[LLVMCodegen] Unsupported types {} and {} for binary operator {}.\n",
+                              GlobalTypeRegistry::instance().get_type(node->children[0]->type_id)->designation,
+                              GlobalTypeRegistry::instance().get_type(node->children[1]->type_id)->designation,
                               node->token.type);
                         return nullptr;
                     }
