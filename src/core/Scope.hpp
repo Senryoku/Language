@@ -25,13 +25,14 @@ class Scope {
         auto sv = node.token.value;
         if(is_valid(find_type(sv)))
             return false;
-        GlobalTypeRegistry::instance().register_type(node);
+        auto type_id = GlobalTypeRegistry::instance().register_type(node);
+        node.type_id = type_id;
         _types.emplace(std::string{sv}, &node);
         return true;
     }
 
-    bool is_valid(const het_unordered_map < std::vector<AST::FunctionDeclaration*>>::iterator & it) const { return it != _functions.end(); }
-    bool is_valid(const het_unordered_map < std::vector<AST::FunctionDeclaration*>>::const_iterator & it) const { return it != _functions.cend(); }
+    bool is_valid(const het_unordered_map<std::vector<AST::FunctionDeclaration*>>::iterator & it) const { return it != _functions.end(); }
+    bool is_valid(const het_unordered_map<std::vector<AST::FunctionDeclaration*>>::const_iterator & it) const { return it != _functions.cend(); }
     [[nodiscard]] const AST::FunctionDeclaration* resolve_function(const std::string_view& name, const std::span<AST::Node*>& arguments) const;
 
     bool is_valid(const het_unordered_map<AST::TypeDeclaration*>::iterator& it) const { return it != _types.end(); }
@@ -63,8 +64,8 @@ class Scope {
     bool is_valid(const het_unordered_map<AST::VariableDeclaration*>::iterator& it) const { return it != _variables.end(); }
     bool is_valid(const het_unordered_map<AST::VariableDeclaration*>::const_iterator& it) const { return it != _variables.end(); }
 
-    const ValueType& get_return_type() const { return _return_type; }
-    void             set_return_type(ValueType t) { _return_type = t; }
+    TypeID get_return_type() const { return _return_type; }
+    void   set_return_type(TypeID t) { _return_type = t; }
 
     void                            set_this(AST::VariableDeclaration* var) { _this = var; }
     const AST::VariableDeclaration* get_this() const { return _this; }
@@ -83,8 +84,8 @@ class Scope {
 
     AST::VariableDeclaration* _this = nullptr;
 
-    // Return Type for type checking. FIXME: Handle composite types.
-    ValueType _return_type;
+    // Return Type for type checking.
+    TypeID _return_type = InvalidTypeID;
 };
 
 // TODO: Fetch variables from others scopes
@@ -93,36 +94,28 @@ class Scoped {
     Scoped() {
         push_scope(); // TODO: Push an empty scope for now.
 
-        const auto register_builtin = [&](const std::string& name, ValueType type = ValueType::void_t(), std::vector<std::string> args_names = {},
-                                          std::vector<ValueType> args_types = {},
+        const auto register_builtin = [&](const std::string& name, TypeID type = PrimitiveType::Void, std::vector<std::string> args_names = {}, std::vector<TypeID> args_types = {},
                                           AST::FunctionDeclaration::Flag flags = AST::FunctionDeclaration::Flag::None) {
             if(!s_builtins[name]) {
                 Token token;
                 token.value = *internalize_string(name); // We have to provide a name via the token.
                 s_builtins[name].reset(new AST::FunctionDeclaration(token));
-                s_builtins[name]->value_type = type;
+                s_builtins[name]->type_id = type;
                 s_builtins[name]->flags = flags | AST::FunctionDeclaration::Flag::BuiltIn;
 
                 for(size_t i = 0; i < args_names.size(); ++i) {
                     Token arg_token;
                     arg_token.value = *internalize_string(args_names[i]);
                     auto arg = s_builtins[name]->add_child(new AST::VariableDeclaration(arg_token));
-                    arg->value_type = args_types[i];
+                    arg->type_id = args_types[i];
                 }
             }
             get_scope().declare_function(*s_builtins[name]);
             return s_builtins[name].get();
         };
         
-        register_builtin("put", ValueType::integer(), {"character"}, {ValueType::character()});        
-        register_builtin("printf", ValueType::integer(), {}, {}, AST::FunctionDeclaration::Flag::Variadic);
-
-        register_builtin("__socket_init", ValueType::void_t());
-        register_builtin("__socket_create", ValueType::integer());
-        register_builtin("__socket_connect", ValueType::integer(), {"sockfd", "addr", "port"}, {ValueType::integer() , ValueType::string(), ValueType::integer()});
-        register_builtin("__socket_send", ValueType::integer(), {"sockfd", "data"}, {ValueType::integer(), ValueType::string()});
-        register_builtin("__socket_recv", ValueType::string(), {"sockfd"}, {ValueType::integer()});
-        register_builtin("__socket_close", ValueType::integer(), {"sockfd"}, {ValueType::integer()});
+        register_builtin("put", PrimitiveType::Integer, {"character"}, {PrimitiveType::Char});        
+        register_builtin("printf", PrimitiveType::Integer, {}, {}, AST::FunctionDeclaration::Flag::Variadic);
     }
 
     const AST::VariableDeclaration* get_this() const {
@@ -158,7 +151,11 @@ class Scoped {
     const AST::FunctionDeclaration* get_function(const std::string_view& name, const std::span<AST::Node*>& arguments) const;
 
     const AST::TypeDeclaration* get_type(const std::string_view& name) const;
-    const AST::TypeDeclaration* get_type(TypeID id) const { return GlobalTypeRegistry::instance().get_type(id); }
+    const AST::TypeDeclaration* get_type_node(TypeID id) const {
+        const auto& struct_type = GlobalTypeRegistry::instance().get_type(id);
+        assert(struct_type->is_struct());
+        return dynamic_cast<const StructType*>(struct_type)->type_node;
+    }
     bool                        is_type(const std::string_view& name) const;
 
     AST::VariableDeclaration* get(const std::string_view& name);

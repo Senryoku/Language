@@ -93,17 +93,6 @@ class Module {
         llvm::FunctionType*      put_type = llvm::FunctionType::get(llvm::Type::getInt32Ty(*_llvm_context), put_args_types, false);
         auto                     put_func = _llvm_module->getOrInsertFunction("put", put_type);
 
-        const auto integer_t = llvm::Type::getInt32Ty(*_llvm_context);
-        const auto void_t = llvm::Type::getVoidTy(*_llvm_context);
-        const auto str_t = llvm::Type::getInt8PtrTy(*_llvm_context);
-
-        _llvm_module->getOrInsertFunction("__socket_init", llvm::FunctionType::get(void_t, {}, false));
-        _llvm_module->getOrInsertFunction("__socket_create", llvm::FunctionType::get(integer_t, {}, false));
-        _llvm_module->getOrInsertFunction("__socket_connect", llvm::FunctionType::get(integer_t, {integer_t, str_t, integer_t}, false));
-        _llvm_module->getOrInsertFunction("__socket_send", llvm::FunctionType::get(integer_t, {integer_t, str_t}, false));
-        _llvm_module->getOrInsertFunction("__socket_recv", llvm::FunctionType::get(str_t, {integer_t}, false));
-        _llvm_module->getOrInsertFunction("__socket_close", llvm::FunctionType::get(integer_t, {integer_t}, false));
-
         // Actual codegen
         auto r = codegen(&ast.get_root());
         // Add a return to our generated main (from constructor) if needed (FIXME?)
@@ -126,19 +115,6 @@ class Module {
     llvm::Constant* codegen_constant(const AST::Node* val);
     llvm::Value*    codegen(const AST::Node* node);
 
-    llvm::Type* get_llvm_type(PrimitiveType type) const {
-        switch(type) {
-            using enum PrimitiveType;
-            case Integer: return llvm::Type::getInt32Ty(*_llvm_context);
-            case Float: return llvm::Type::getFloatTy(*_llvm_context);
-            case Char: return llvm::Type::getInt8Ty(*_llvm_context);
-            case String: return llvm::Type::getInt8PtrTy(*_llvm_context); // FIXME
-            case Void: return llvm::Type::getVoidTy(*_llvm_context);
-            default: error("[Module::get_llvm_type] GenericValue Type '{}' not mapped to a LLVM Type.\n", type); assert(false);
-        }
-        return nullptr;
-    }
-
-    llvm::Type* get_llvm_type(const ValueType& type) const;
+    llvm::Type* get_llvm_type(TypeID type_id) const;
     void insert_defer_block(const AST::Node* node);
 };

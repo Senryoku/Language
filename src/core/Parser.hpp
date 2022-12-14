@@ -45,39 +45,13 @@ class Parser : public Scoped {
         return type == Token::Type::Addition || type == Token::Type::Substraction || type == Token::Type::Increment || type == Token::Type::Decrement;
     }
 
-    ValueType resolve_operator_type(Token::Type op, const ValueType& lhs, const ValueType& rhs) {
-        using enum Token::Type;
-        if(op == MemberAccess)
-            return rhs;
-        if(op == Assignment)
-            return lhs;
-        if(op == Equal || op == Different || op == Lesser || op == Greater || op == GreaterOrEqual || op == LesserOrEqual || op == And || op == Or)
-            return ValueType::boolean();
-
-        if(lhs.is_array && op == OpenSubscript) {
-            auto type = lhs;
-            type.is_array = false;
-            return type;
-        }
-
-        if(lhs == rhs && lhs.is_primitive())
-            return lhs;
-
-        // Promote integer to Float
-        if(lhs.is_primitive() && rhs.is_primitive() &&
-           ((lhs.primitive == PrimitiveType::Float && rhs.primitive == PrimitiveType::Integer) ||
-            (lhs.primitive == PrimitiveType::Integer && rhs.primitive == PrimitiveType::Float))) {
-            return ValueType::floating_point();
-        }
-
-        return ValueType::undefined();
-    }
+    static TypeID resolve_operator_type(Token::Type op, TypeID lhs, TypeID rhs);
 
     void resolve_operator_type(AST::UnaryOperator* op_node) {
-        auto rhs = op_node->children[0]->value_type;
-        op_node->value_type = rhs;
+        auto rhs = op_node->children[0]->type_id;
+        op_node->type_id = rhs;
 
-        if(op_node->value_type.is_undefined()) {
+        if(op_node->type_id == InvalidTypeID) {
             warn("[Parser] Couldn't resolve operator return type (Missing impl.) on line {}. Node:\n", op_node->token.line);
             fmt::print("{}\n", *static_cast<AST::Node*>(op_node));
         }
@@ -85,23 +59,26 @@ class Parser : public Scoped {
 
     void resolve_operator_type(AST::BinaryOperator* op_node) {
         if(op_node->token.type == Token::Type::MemberAccess) {
-            assert(op_node->children[0]->value_type.is_composite());
-            auto type_node = get_type(op_node->children[0]->value_type.type_id);
+            auto type = GlobalTypeRegistry::instance().get_type(op_node->children[0]->type_id);
+            // Automatic dereferencing of pointers (Should this be a separate AST Node?)
+            // FIXME: May not be needed anymore
+            if(type->is_pointer())
+                type = GlobalTypeRegistry::instance().get_type(dynamic_cast<const PointerType*>(type)->pointee_type);
+            assert(type->is_struct());
+            const AST::TypeDeclaration* type_node = dynamic_cast<const StructType*>(type)->type_node;
             for(const auto& c : type_node->members())
                 if(c->token.value == op_node->children[1]->token.value) {
-                    op_node->value_type = c->value_type;
-                    if(op_node->value_type.is_composite())
-                        op_node->value_type.type_id = c->value_type.type_id;
+                    op_node->type_id = c->type_id;
                     return;
                 }
             assert(false);
         }
 
-        auto lhs = op_node->children[0]->value_type;
-        auto rhs = op_node->children[1]->value_type;
-        op_node->value_type = resolve_operator_type(op_node->token.type, lhs, rhs);
+        auto lhs = op_node->children[0]->type_id;
+        auto rhs = op_node->children[1]->type_id;
+        op_node->type_id = resolve_operator_type(op_node->token.type, lhs, rhs);
 
-        if(op_node->value_type.is_undefined()) {
+        if(op_node->type_id == InvalidTypeID) {
             warn("[Parser] Couldn't resolve operator return type (Missing impl.) on line {}. Node:\n", op_node->token.line);
             fmt::print("{}\n", *static_cast<AST::Node*>(op_node));
         }
@@ -167,7 +144,7 @@ class Parser : public Scoped {
                                                     AST::FunctionDeclaration::Flag flags = AST::FunctionDeclaration::Flag::None);
     bool                 parse_function_arguments(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
     bool                 parse_type_declaration(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
-    ValueType            parse_type(const std::span<Token>& tokens, std::span<Token>::iterator& it);
+    TypeID               parse_type(const std::span<Token>& tokens, std::span<Token>::iterator& it);
     AST::BoolLiteral*    parse_boolean(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
     AST::IntegerLiteral* parse_digits(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
     AST::FloatLiteral*   parse_float(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);

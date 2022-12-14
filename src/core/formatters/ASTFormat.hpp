@@ -14,6 +14,38 @@ struct fmt::formatter<AST> {
     }
 };
 
+inline static const std::string _INVALID_TYPE_ID_STR_(fmt::format(fg(fmt::color::gray), "InvalidTypeID"));
+
+inline auto type_id_to_string(TypeID type_id) {
+    if(type_id == InvalidTypeID)
+        return _INVALID_TYPE_ID_STR_;
+
+    auto type_name = GlobalTypeRegistry::instance().get_type(type_id)->designation;
+    if(type_id < PrimitiveType::Count) {
+        auto out_color = fmt::color::red;
+        switch(type_id) {                
+            using enum PrimitiveType;
+            case Void: out_color = fmt::color::gray; break;
+            case Char: out_color = fmt::color::burly_wood; break;
+            case Boolean: out_color = fmt::color::royal_blue; break;
+            case U8:  [[fallthrough]];
+            case U16: [[fallthrough]];
+            case U32: [[fallthrough]];
+            case U64: [[fallthrough]];
+            case I8:  [[fallthrough]];
+            case I16: [[fallthrough]];
+            case I32: [[fallthrough]];
+            case I64: [[fallthrough]];
+            case Integer: out_color = fmt::color::golden_rod; break;
+            case Float: out_color = fmt::color::golden_rod; break;
+            case Double: out_color = fmt::color::golden_rod; break;
+            case String: out_color = fmt::color::burly_wood; break;
+        }
+        return fmt::format(fg(out_color), "{}", type_name);
+    }
+    return type_name;
+}
+
 template<>
 struct fmt::formatter<AST::Node> {
     constexpr static bool is_digit(char c) { return c >= '0' && c <= '9'; }
@@ -51,19 +83,20 @@ struct fmt::formatter<AST::Node> {
             }
         }
 
+        auto type_name = type_id_to_string(t.type_id);
         switch(t.type) {
-            case AST::Node::Type::ConstantValue: r = fmt::format_to(ctx.out(), "{}:{}", t.type, t.value_type); break;
-            case AST::Node::Type::ReturnStatement: r = fmt::format_to(ctx.out(), "{}:{}", t.type, t.value_type); break;
+            case AST::Node::Type::ConstantValue: r = fmt::format_to(ctx.out(), "{}:{}", t.type, type_name); break;
+            case AST::Node::Type::ReturnStatement: r = fmt::format_to(ctx.out(), "{}:{}", t.type, type_name); break;
             case AST::Node::Type::WhileStatement: r = fmt::format_to(ctx.out(), "{}", t.type); break;
-            case AST::Node::Type::Variable: r = fmt::format_to(ctx.out(), "{} {}:{}", t.type, t.token.value, t.value_type); break;
-            case AST::Node::Type::FunctionDeclaration: r = fmt::format_to(ctx.out(), "{} {}():", t.type, t.token.value, t.value_type); break;
-            case AST::Node::Type::FunctionCall: r = fmt::format_to(ctx.out(), "{}:{}():{}", t.type, t.token.value, t.value_type); break;
-            case AST::Node::Type::VariableDeclaration: r = fmt::format_to(ctx.out(), "{} {}:{}", t.type, t.token.value, t.value_type); break;
-            case AST::Node::Type::Cast: r = fmt::format_to(ctx.out(), "{}:{}", t.type, t.value_type); break;
+            case AST::Node::Type::Variable: r = fmt::format_to(ctx.out(), "{} {}:{}", t.type, t.token.value, type_name); break;
+            case AST::Node::Type::FunctionDeclaration: r = fmt::format_to(ctx.out(), "{} {}():", t.type, t.token.value, type_name); break;
+            case AST::Node::Type::FunctionCall: r = fmt::format_to(ctx.out(), "{}:{}():{}", t.type, t.token.value, type_name); break;
+            case AST::Node::Type::VariableDeclaration: r = fmt::format_to(ctx.out(), "{} {}:{}", t.type, t.token.value, type_name); break;
+            case AST::Node::Type::Cast: r = fmt::format_to(ctx.out(), "{}:{}", t.type, type_name); break;
             case AST::Node::Type::BinaryOperator:
-                r = fmt::format_to(ctx.out(), "{} {}:{}", fmt::format(fmt::emphasis::bold | fg(fmt::color::black) | bg(fmt::color::dim_gray), t.token.value), t.type, t.value_type);
+                r = fmt::format_to(ctx.out(), "{} {}:{}", fmt::format(fmt::emphasis::bold | fg(fmt::color::black) | bg(fmt::color::dim_gray), t.token.value), t.type, type_name);
                 break;
-            default: r = fmt::format_to(ctx.out(), "{}", t.type);
+            default: r = fmt::format_to(ctx.out(), "{}: {}", t.type, type_name);
         }
 
         auto token_str = t.token.type == Token::Type::Unknown ? "None" : fmt::format("{}", t.token);
@@ -118,34 +151,11 @@ struct fmt::formatter<AST::Node::Type> {
             case AST::Node::Type::Cast: return fmt::format_to(ctx.out(), "{}", "Cast");
             case AST::Node::Type::LValueToRValue: return fmt::format_to(ctx.out(), fg(fmt::color::dim_gray), "{}", "LValueToRValueCast");
             case AST::Node::Type::GetPointer: return fmt::format_to(ctx.out(), fg(fmt::color::dim_gray), "{}", "GetPointer");
+            case AST::Node::Type::Dereference: return fmt::format_to(ctx.out(), fg(fmt::color::dim_gray), "{}", "Dereference");
             case AST::Node::Type::ConstantValue: return fmt::format_to(ctx.out(), "{}", "ConstantValue");
             case AST::Node::Type::UnaryOperator: return fmt::format_to(ctx.out(), "{}", "UnaryOperator");
             case AST::Node::Type::BinaryOperator: return fmt::format_to(ctx.out(), "{}", "BinaryOperator");
             default: assert(false); return fmt::format_to(ctx.out(), "{}", "MissingFormat for AST::Node::Type!");
-        }
-    }
-};
-
-template<>
-struct fmt::formatter<PrimitiveType> {
-    constexpr auto parse(format_parse_context& ctx) -> decltype(ctx.begin()) {
-        auto it = ctx.begin(), end = ctx.end();
-        if(it != end && *it != '}')
-            throw format_error("Invalid format for ValueType::PrimitiveType");
-        return it;
-    }
-    template<typename FormatContext>
-    auto format(const PrimitiveType& t, FormatContext& ctx) -> decltype(ctx.out()) {
-        switch(t) {
-            using enum PrimitiveType;
-            case Integer: return fmt::format_to(ctx.out(), fg(fmt::color::golden_rod), "{}", "int");
-            case Float: return fmt::format_to(ctx.out(), fg(fmt::color::golden_rod), "{}", "float");
-            case Char: return fmt::format_to(ctx.out(), fg(fmt::color::burly_wood), "{}", "char");
-            case Boolean: return fmt::format_to(ctx.out(), fg(fmt::color::royal_blue), "{}", "bool");
-            case String: return fmt::format_to(ctx.out(), fg(fmt::color::burly_wood), "{}", "string");
-            case Void: return fmt::format_to(ctx.out(), fg(fmt::color::gray), "{}", "void");
-            case Undefined: return fmt::format_to(ctx.out(), fg(fmt::color::gray), "{}", "undefined");
-            default: return fmt::format_to(ctx.out(), fg(fmt::color::red), "{}: {}", "Unknown ValueType PrimitiveType [by the formatter]", static_cast<int>(t));
         }
     }
 };

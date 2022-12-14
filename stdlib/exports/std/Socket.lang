@@ -1,3 +1,14 @@
+extern function __socket_init() : void;
+extern function __socket_create() : int;
+extern function __socket_connect(sockfd: int, addr: char*, port: int) : int;
+extern function __socket_send(sockfd: int, data: string) : int; 
+extern function __socket_recv(sockfd: int) : string;
+extern function __socket_close(sockfd: int) : int;
+
+export function socket_init() {
+	__socket_init();
+}
+
 export type Socket {
 	let fd: int = 0;
 }
@@ -20,4 +31,8 @@ export function recv(this: Socket*) : string {
 
 export function close(this: Socket*) {
 	__socket_close(.fd);
+}
+
+export function destructor(this: Socket*) {
+	.close();
 }

@@ -13,7 +13,6 @@ export function close(this: File*) {
 	if(.fd != 0) __close_file(.fd);
 }
 
-// Crashes for some reason
-//export function destructor(this: File*) {
-//	.close();
-//}
+export function destructor(this: File*) {
+	.close();
+}
