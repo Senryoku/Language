@@ -296,17 +296,18 @@ bool handle_all() {
         const auto end = std::chrono::high_resolution_clock::now();
         success("Compiled successfully to {} in {:.2} (clang: {:.2}).\n", final_outputfile, std::chrono::duration<double, std::milli>(end - start),
                 std::chrono::duration<double, std::milli>(clang_end - clang_start));
-    }
-    // Run the generated program. FIXME: Handy, but dangerous.
-    if(args['r'].set) {
-        auto run_command = final_outputfile;
-        for(const auto& arg : args['r'].values)
-            run_command += " " + arg;
-        print("Running {}...\n", run_command);
-        const auto execution_start = std::chrono::high_resolution_clock::now();
-        auto       retval = std::system(run_command.c_str());
-        const auto execution_end = std::chrono::high_resolution_clock::now();
-        print("\n > {} returned {} after {}.\n", final_outputfile, retval, std::chrono::duration<double, std::milli>(execution_end - execution_start));
+
+        // Run the generated program. FIXME: Handy, but dangerous.
+        if(args['r'].set) {
+            auto run_command = final_outputfile;
+            for(const auto& arg : args['r'].values)
+                run_command += " " + arg;
+            print("Running {}...\n", run_command);
+            const auto execution_start = std::chrono::high_resolution_clock::now();
+            auto       retval = std::system(run_command.c_str());
+            const auto execution_end = std::chrono::high_resolution_clock::now();
+            print("\n > {} returned {} after {}.\n", final_outputfile, retval, std::chrono::duration<double, std::milli>(execution_end - execution_start));
+        }
     }
     return true;
 }
