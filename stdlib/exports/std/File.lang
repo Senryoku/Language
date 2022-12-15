@@ -5,7 +5,8 @@ export type File {
 	let fd : int = 0;
 }
 
-export function open(this: File*, path: string, mode: string) {
+// FIXME: Change these to string
+export function open(this: File*, path: cstr, mode: cstr) {
 	.fd = __open_file(path, mode);
 }
 
