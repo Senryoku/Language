@@ -18,7 +18,7 @@ export function from_c_string(this: String*, value: cstr) : void {
 	.ptr = malloc(.length);
 	let idx : u64 = 0;
 	while(idx < .length) {
-		.ptr[idx] = value[idx];
+		.ptr[idx] = value[idx]; // Doesn't work yet.
 		++idx;
 	}
 }
