@@ -922,7 +922,7 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
         }
 
         // Automatically cast any pointer to 'opaque' pointer type for interfacing with C++
-        for(auto i = 0; i < call_node->arguments().size(); ++i) {
+        for(auto i = 0; i < std::min(resolved_function->arguments().size(),  call_node->arguments().size()); ++i) {
             if(resolved_function->arguments()[i]->type_id == PrimitiveType::Pointer && GlobalTypeRegistry::instance().get_type(call_node->arguments()[i]->type_id)->is_pointer()) {
                 auto cast_node = new AST::Node(AST::Node::Type::Cast);
                 cast_node->type_id = PrimitiveType::Pointer;

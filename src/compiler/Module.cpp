@@ -75,9 +75,9 @@ llvm::Constant* Module::codegen_constant(const AST::Node* val) {
         global_declaration->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Global);
         return llvm::ConstantExpr::getBitCast(global_declaration, array_type->getPointerTo());
     }
-    if (type->is_pointer()) {
+    if(type->is_pointer() && val->type_id != PrimitiveType::CString) {
         // Doesn't make sense, does it?
-        throw "Literal pointer? What?";
+        throw Exception("Literal pointer? What?");
     }
     switch(val->type_id) {
         using enum PrimitiveType;
