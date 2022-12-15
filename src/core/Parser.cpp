@@ -508,7 +508,9 @@ bool Parser::parse_identifier(const std::span<Token>& tokens, std::span<Token>::
         ltor->type_id = ltor->children[0]->type_id;
 
         // TODO: Make sure this is an integer?
-        if(access_operator_node->children.back()->type_id != PrimitiveType::Integer) {
+        if(access_operator_node->children.back()->type_id != PrimitiveType::Integer &&
+           !(access_operator_node->children.back()->type_id >= PrimitiveType::U8 && access_operator_node->children.back()->type_id <= PrimitiveType::I64)) {
+            warn("[Parser] Subscript operator called with a non integer argument: {}", point_error(access_operator_node->token));
             auto cast_node = access_operator_node->insert_between(access_operator_node->children.size() - 1, new AST::Node(AST::Node::Type::Cast));
             cast_node->type_id = PrimitiveType::Integer;
         }
@@ -841,12 +843,6 @@ void Parser::check_function_call(AST::FunctionCall* call_node, const AST::Functi
     if(!(function_flags & AST::FunctionDeclaration::Flag::Variadic))
         for(auto i = 0; i < call_node->arguments().size(); ++i) {
             if(call_node->arguments()[i]->type_id != function->arguments()[i]->type_id) {
-                // FIXME: Exception for string -> char* conversion since we don't have a concrete plan for the string type yet.
-                if(call_node->arguments()[i]->type_id == PrimitiveType::CString) {
-                    const auto& func_type = GlobalTypeRegistry::instance().get_type(function->arguments()[i]->type_id);
-                    if(func_type->is_pointer() && dynamic_cast<const PointerType*>(func_type)->pointee_type == PrimitiveType::Char)
-                        continue;
-                }
                 throw Exception(fmt::format("[Parser] Function '{}' expects an argument of type {} on position #{}, got {}.\n", function->name(),
                                             GlobalTypeRegistry::instance().get_type(function->arguments()[i]->type_id)->designation, i, GlobalTypeRegistry::instance().get_type(call_node->arguments()[i]->type_id)->designation,
                                 point_error(call_node->arguments()[i]->token)));
@@ -922,12 +918,33 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
         }
 
         // Automatically cast any pointer to 'opaque' pointer type for interfacing with C++
+        // Automatically cast to larger types (always safe)
         for(auto i = 0; i < std::min(resolved_function->arguments().size(),  call_node->arguments().size()); ++i) {
             if(resolved_function->arguments()[i]->type_id == PrimitiveType::Pointer && GlobalTypeRegistry::instance().get_type(call_node->arguments()[i]->type_id)->is_pointer()) {
                 auto cast_node = new AST::Node(AST::Node::Type::Cast);
                 cast_node->type_id = PrimitiveType::Pointer;
                 call_node->insert_before_argument(i, cast_node);
             }
+
+            // FIXME: Consolidate these automatic casts
+            const auto allow_automatic_cast = [&](PrimitiveType to, const std::vector<PrimitiveType>& from) {
+                if(resolved_function->arguments()[i]->type_id == to) {
+                    for(auto type_id : from) {
+                        if(call_node->arguments()[i]->type_id == type_id) {
+                            auto cast_node = new AST::Node(AST::Node::Type::Cast);
+                            cast_node->type_id = to;
+                            call_node->insert_before_argument(i, cast_node);
+                            break;
+                        }
+                    }
+                }
+            };
+            allow_automatic_cast(PrimitiveType::U64, {PrimitiveType::Integer, PrimitiveType::U32, PrimitiveType::U16, PrimitiveType::U8});
+            allow_automatic_cast(PrimitiveType::U32, {PrimitiveType::Integer, PrimitiveType::U16, PrimitiveType::U8});
+            allow_automatic_cast(PrimitiveType::U16, {PrimitiveType::U8});
+            allow_automatic_cast(PrimitiveType::I64, {PrimitiveType::Integer, PrimitiveType::I32, PrimitiveType::I16, PrimitiveType::I8});
+            allow_automatic_cast(PrimitiveType::I32, {PrimitiveType::Integer, PrimitiveType::I16, PrimitiveType::I8});
+            allow_automatic_cast(PrimitiveType::I16, {PrimitiveType::I8});
         }
 
         call_node->type_id = resolved_function->type_id;
@@ -1056,6 +1073,34 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
     }
 
     // TODO: Test if types are compatible (with the operator and between each other)
+
+    if(operator_type == Token::Type::Assignment) {
+        // FIXME: Consolidate these automatic casts
+        const auto allow_automatic_cast = [&](PrimitiveType to, const std::vector<PrimitiveType>& from) {
+            if(binary_operator_node->children[0]->type_id == to) {
+                for(auto type_id : from) {
+                    if(binary_operator_node->children[1]->type_id == type_id) {
+                        auto cast = binary_operator_node->insert_between(1, new AST::Node(AST::Node::Type::Cast));
+                        cast->type_id = to;
+                        break;
+                    }
+                }
+            }
+        };
+        allow_automatic_cast(PrimitiveType::U64, {PrimitiveType::Integer, PrimitiveType::U32, PrimitiveType::U16, PrimitiveType::U8});
+        allow_automatic_cast(PrimitiveType::U32, {PrimitiveType::Integer, PrimitiveType::U16, PrimitiveType::U8});
+        allow_automatic_cast(PrimitiveType::U16, {PrimitiveType::U8});
+        allow_automatic_cast(PrimitiveType::I64, {PrimitiveType::Integer, PrimitiveType::I32, PrimitiveType::I16, PrimitiveType::I8});
+        allow_automatic_cast(PrimitiveType::I32, {PrimitiveType::Integer, PrimitiveType::I16, PrimitiveType::I8});
+        allow_automatic_cast(PrimitiveType::I16, {PrimitiveType::I8});
+
+        // Allow assignement of pointer to any pointer type.
+        // FIXME: Should this be explicit in user code?
+        if(binary_operator_node->children[1]->type_id == PrimitiveType::Pointer && binary_operator_node->children[0]->type_id != binary_operator_node->children[1]->type_id) {
+            auto cast = binary_operator_node->insert_between(1, new AST::Node(AST::Node::Type::Cast));
+            cast->type_id = binary_operator_node->children[0]->type_id;
+        }
+    }
 
     // Convert l-values to r-values when necessary (will generate a Load on the LLVM backend)
     // Left side of Assignement and MemberAcces should always be a l-value.
