@@ -1,0 +1,36 @@
+import "std/memory"
+
+export type String {
+	let length: u64 = 0;
+	let ptr: char*;
+}
+
+export function strlen(value: cstr) : u64 {
+	let idx : u64 = 0;
+	while(value[idx] != '\0') {
+		++idx;
+	}
+	return idx;
+}
+
+export function from_c_string(this: String*, value: cstr) : void {
+	.length = strlen(value);
+	.ptr = malloc(.length);
+	let idx : u64 = 0;
+	while(idx < .length) {
+		.ptr[idx] = value[idx];
+		++idx;
+	}
+}
+
+export function clear(this: String*) : void {
+	if(.length > 0) {
+		.length = 0;
+		free(.ptr);
+		.ptr = 0;
+	}
+}
+
+export function destructor(this: String*) : void {
+	.clear();
+}
