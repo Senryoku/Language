@@ -1,5 +1,11 @@
-export extern function malloc(size: u64): pointer;
-export extern function free(ptr: pointer): void;
+extern function __malloc(size: u64): pointer;
+extern function __free(ptr: pointer): void;
+export extern function null_pointer(): pointer;
 
-// Generate something just so the module isn't empty.
-function __something() : void {}
+export function malloc(size: u64) : pointer {
+	return __malloc(size);
+}
+
+export function free(ptr: pointer) : void {
+	__free(ptr);
+}

@@ -8,4 +8,8 @@ extern "C" {
 	void __free(void* ptr) {
         free(ptr);
 	}
+
+    void* null_pointer() {
+        return nullptr;
+    }
 }

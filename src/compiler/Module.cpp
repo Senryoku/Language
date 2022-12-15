@@ -43,10 +43,10 @@ static std::unordered_map<Token::Type, std::unordered_map<PrimitiveType, std::fu
       OP(Float, return ir_builder.CreateFCmp(llvm::CmpInst::Predicate::FCMP_ONE, lhs, rhs, "FCMP_ONE");)}},
     {Token::Type::Lesser,
      {OP(Integer, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_SLT, lhs, rhs, "ICMP_SLT");),
-      OP(U8,  return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_ULT, lhs, rhs, "ICMP_SLT");),
-      OP(U16, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_ULT, lhs, rhs, "ICMP_SLT");),
-      OP(U32, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_ULT, lhs, rhs, "ICMP_SLT");),
-      OP(U64, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_ULT, lhs, rhs, "ICMP_SLT");),
+      OP(U8,  return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_ULT, lhs, rhs, "ICMP_ULT");),
+      OP(U16, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_ULT, lhs, rhs, "ICMP_ULT");),
+      OP(U32, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_ULT, lhs, rhs, "ICMP_ULT");),
+      OP(U64, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_ULT, lhs, rhs, "ICMP_ULT");),
       OP(I8,  return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_SLT, lhs, rhs, "ICMP_SLT");),
       OP(I16, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_SLT, lhs, rhs, "ICMP_SLT");),
       OP(I32, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_SLT, lhs, rhs, "ICMP_SLT");),
@@ -57,6 +57,14 @@ static std::unordered_map<Token::Type, std::unordered_map<PrimitiveType, std::fu
       OP(Float, return ir_builder.CreateFCmp(llvm::CmpInst::Predicate::FCMP_OLE, lhs, rhs, "FCMP_OLE");)}},
     {Token::Type::Greater,
      {OP(Integer, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_SGT, lhs, rhs, "ICMP_SGT");),
+      OP(U8,  return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_UGT, lhs, rhs, "ICMP_UGT");),
+      OP(U16, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_UGT, lhs, rhs, "ICMP_UGT");),
+      OP(U32, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_UGT, lhs, rhs, "ICMP_UGT");),
+      OP(U64, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_UGT, lhs, rhs, "ICMP_UGT");),
+      OP(I8,  return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_SGT, lhs, rhs, "ICMP_SGT");),
+      OP(I16, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_SGT, lhs, rhs, "ICMP_SGT");),
+      OP(I32, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_SGT, lhs, rhs, "ICMP_SGT");),
+      OP(I64, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_SGT, lhs, rhs, "ICMP_SGT");),
       OP(Float, return ir_builder.CreateFCmp(llvm::CmpInst::Predicate::FCMP_OGT, lhs, rhs, "FCMP_OGT");)}},
     {Token::Type::GreaterOrEqual,
      {OP(Integer, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_SGE, lhs, rhs, "ICMP_SGE");),
@@ -369,7 +377,7 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                 }
                 if(child->children[0]->type_id == PrimitiveType::CString) {
                     assert(value->getType()->isPointerTy());
-                    auto charType = llvm::IntegerType::get(*_llvm_context, 8);
+                    auto charType = get_llvm_type(PrimitiveType::Char);
                     return _llvm_ir_builder.CreateLoad(charType, value, "l-to-rvalue");
                 }
             }
@@ -398,7 +406,7 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                     assert(is_primitive(node->children[0]->type_id));
                     auto primitive_type = static_cast<PrimitiveType>(node->children[0]->type_id);
                     if(unary_ops[node->token.type].find(primitive_type) == unary_ops[node->token.type].end()) {
-                        error("[LLVMCodegen] Unsupported type {} for unary operator {}.\n", primitive_type, node->token.type);
+                        error("[LLVMCodegen] Unsupported type {} for unary operator {}.\n", type_id_to_string(primitive_type), node->token.type);
                         return nullptr;
                     }
                     return unary_ops[node->token.type][primitive_type](_llvm_ir_builder, val);
@@ -427,13 +435,13 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                 case Token::Type::LesserOrEqual: [[fallthrough]];
                 case Token::Type::Greater: [[fallthrough]];
                 case Token::Type::GreaterOrEqual: {
-                    assert(node->children[0]->type_id == node->children[1]->type_id);
+                    //assert(node->children[0]->type_id == node->children[1]->type_id);
                     assert(is_primitive(node->children[0]->type_id));
                     auto primitive_type = static_cast<PrimitiveType>(node->children[0]->type_id);
                     if(binary_ops[node->token.type].find(primitive_type) == binary_ops[node->token.type].end()) {
                         error("[LLVMCodegen] Unsupported types {} and {} for binary operator {}.\n",
-                              GlobalTypeRegistry::instance().get_type(node->children[0]->type_id)->designation,
-                              GlobalTypeRegistry::instance().get_type(node->children[1]->type_id)->designation,
+                              type_id_to_string(node->children[0]->type_id),
+                              type_id_to_string(node->children[1]->type_id),
                               node->token.type);
                         return nullptr;
                     }
@@ -452,8 +460,13 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                         return _llvm_ir_builder.CreateGEP(type, lhs, {llvm::ConstantInt::get(*_llvm_context, llvm::APInt(32, 0)), rhs}, "ArrayGEP");
                     } else if(node->children[0]->type_id == PrimitiveType::CString) { // FIXME: Remove this String special case? 
                         auto charType = get_llvm_type(PrimitiveType::Char);
-                        auto load = _llvm_ir_builder.CreateLoad(charType->getPointerTo(), lhs);
-                        return _llvm_ir_builder.CreateGEP(charType, load, {rhs}, "CStringGEP"); // FIXME: Should not be there (Or should it?)
+                        // FIXME: This is extremely hackish... I guess we should just make sure to insert a LValueToRValue node when necessary.
+                        if(node->children[0]->type == AST::Node::Type::LValueToRValue) {
+                            return _llvm_ir_builder.CreateGEP(charType, lhs, {rhs}, "CStringGEP");
+                        } else {
+                            auto load = _llvm_ir_builder.CreateLoad(charType->getPointerTo(), lhs);
+                            return _llvm_ir_builder.CreateGEP(charType, load, {rhs}, "CStringGEP"); // FIXME: Should not be there (Or should it?)
+                        }
                     }
                     assert(false);
                 }

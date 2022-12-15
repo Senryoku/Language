@@ -1074,32 +1074,30 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
 
     // TODO: Test if types are compatible (with the operator and between each other)
 
-    if(operator_type == Token::Type::Assignment) {
-        // FIXME: Consolidate these automatic casts
-        const auto allow_automatic_cast = [&](PrimitiveType to, const std::vector<PrimitiveType>& from) {
-            if(binary_operator_node->children[0]->type_id == to) {
-                for(auto type_id : from) {
-                    if(binary_operator_node->children[1]->type_id == type_id) {
-                        auto cast = binary_operator_node->insert_between(1, new AST::Node(AST::Node::Type::Cast));
-                        cast->type_id = to;
-                        break;
-                    }
+    // FIXME: Consolidate these automatic casts
+    const auto allow_automatic_cast = [&](PrimitiveType to, const std::vector<PrimitiveType>& from) {
+        if(binary_operator_node->children[0]->type_id == to) {
+            for(auto type_id : from) {
+                if(binary_operator_node->children[1]->type_id == type_id) {
+                    auto cast = binary_operator_node->insert_between(1, new AST::Node(AST::Node::Type::Cast));
+                    cast->type_id = to;
+                    break;
                 }
             }
-        };
-        allow_automatic_cast(PrimitiveType::U64, {PrimitiveType::Integer, PrimitiveType::U32, PrimitiveType::U16, PrimitiveType::U8});
-        allow_automatic_cast(PrimitiveType::U32, {PrimitiveType::Integer, PrimitiveType::U16, PrimitiveType::U8});
-        allow_automatic_cast(PrimitiveType::U16, {PrimitiveType::U8});
-        allow_automatic_cast(PrimitiveType::I64, {PrimitiveType::Integer, PrimitiveType::I32, PrimitiveType::I16, PrimitiveType::I8});
-        allow_automatic_cast(PrimitiveType::I32, {PrimitiveType::Integer, PrimitiveType::I16, PrimitiveType::I8});
-        allow_automatic_cast(PrimitiveType::I16, {PrimitiveType::I8});
-
-        // Allow assignement of pointer to any pointer type.
-        // FIXME: Should this be explicit in user code?
-        if(binary_operator_node->children[1]->type_id == PrimitiveType::Pointer && binary_operator_node->children[0]->type_id != binary_operator_node->children[1]->type_id) {
-            auto cast = binary_operator_node->insert_between(1, new AST::Node(AST::Node::Type::Cast));
-            cast->type_id = binary_operator_node->children[0]->type_id;
         }
+    };
+    allow_automatic_cast(PrimitiveType::U64, {PrimitiveType::Integer, PrimitiveType::U32, PrimitiveType::U16, PrimitiveType::U8});
+    allow_automatic_cast(PrimitiveType::U32, {PrimitiveType::Integer, PrimitiveType::U16, PrimitiveType::U8});
+    allow_automatic_cast(PrimitiveType::U16, {PrimitiveType::U8});
+    allow_automatic_cast(PrimitiveType::I64, {PrimitiveType::Integer, PrimitiveType::I32, PrimitiveType::I16, PrimitiveType::I8});
+    allow_automatic_cast(PrimitiveType::I32, {PrimitiveType::Integer, PrimitiveType::I16, PrimitiveType::I8});
+    allow_automatic_cast(PrimitiveType::I16, {PrimitiveType::I8});
+
+    // Allow assignement of pointer to any pointer type.
+    // FIXME: Should this be explicit in user code?
+    if(binary_operator_node->children[1]->type_id == PrimitiveType::Pointer && binary_operator_node->children[0]->type_id != binary_operator_node->children[1]->type_id) {
+        auto cast = binary_operator_node->insert_between(1, new AST::Node(AST::Node::Type::Cast));
+        cast->type_id = binary_operator_node->children[0]->type_id;
     }
 
     // Convert l-values to r-values when necessary (will generate a Load on the LLVM backend)

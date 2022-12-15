@@ -27,7 +27,7 @@ export function clear(this: String*) : void {
 	if(.length > 0) {
 		.length = 0;
 		free(.ptr);
-		.ptr = 0;
+		.ptr = null_pointer();
 	}
 }
 
