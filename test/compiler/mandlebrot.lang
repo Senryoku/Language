@@ -4,6 +4,7 @@ function main() {
 	const sx : int = 192 / 2;
 	const sy : int = 64 / 2;
 	const max_iteration : int = 69;
+	// FIXME: Turn this into a string.
 	const grey : cstr = "$@B%8&WM#*oahkbdpqwmZO0QLCJUYXzcvunxrjft/\\|()1{}[]?-_+~<>i!lI;:,^`'. ";
 
 	// FIXME: Since we got rid of the interpreter we can't resolve "sx * sy" at compile time.

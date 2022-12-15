@@ -5,11 +5,11 @@ type NewType {
 	let f : float;
 }
 
-function get_i(t : NewType*) {
+function get_i(this : NewType*) {
 	return .i;
 }
 
-function set_i(t : NewType*, i : int) {
+function set_i(this : NewType*, i : int) {
 	.i = i;
 }
 
