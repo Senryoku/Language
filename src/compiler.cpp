@@ -54,25 +54,27 @@ bool handle_file(const std::filesystem::path& path) {
     o_filepath += cache_filename.replace_extension(".o");
     object_files.insert(o_filepath);
     if(!args['t'].set && !args['a'].set && !args['i'].set && !args['b'].set) {
-        const auto o_file_last_write = std::filesystem::last_write_time(o_filepath);
-        if(!args["bypass-cache"].set && std::filesystem::exists(o_filepath) && o_file_last_write > std::filesystem::last_write_time(path)) {
-            print_subtle(" * Using cached compilation result for {}.\n", path.string());
-            // Check if any dependency is newer than our cached result.
-            ModuleInterface module_interface;
-            module_interface.working_directory = path.parent_path();
-            module_interface.import_module(o_filepath.replace_extension(".int"));
-            bool updated_deps = false;
-            for(const auto& dep : module_interface.dependencies) {
-                auto dep_path = std::filesystem::absolute(module_interface.resolve_dependency(dep));
-                if(o_file_last_write < std::filesystem::last_write_time(dep_path)) {
-                    updated_deps = true;
-                    break;
+        if(!args["bypass-cache"].set && std::filesystem::exists(o_filepath)) {
+            const auto o_file_last_write = std::filesystem::last_write_time(o_filepath);
+            if(o_file_last_write > std::filesystem::last_write_time(path)) {
+                print_subtle(" * Using cached compilation result for {}.\n", path.string());
+                // Check if any dependency is newer than our cached result.
+                ModuleInterface module_interface;
+                module_interface.working_directory = path.parent_path();
+                module_interface.import_module(o_filepath.replace_extension(".int"));
+                bool updated_deps = false;
+                for(const auto& dep : module_interface.dependencies) {
+                    auto dep_path = std::filesystem::absolute(module_interface.resolve_dependency(dep));
+                    if(o_file_last_write < std::filesystem::last_write_time(dep_path)) {
+                        updated_deps = true;
+                        break;
+                    }
                 }
+                if(!updated_deps)
+                    return false;
+                // Some dependencies were re-generated, continue processing anyway.
+                print_subtle(" * * Cache for {} is outdated, re-processing...\n", path.string());
             }
-            if(!updated_deps)
-                return false;
-            // Some dependencies were re-generated, continue processing anyway.
-            print_subtle(" * * Cache for {} is outdated, re-processing...\n", path.string());
         }
     }
     print("Processing {}... \n", path.string());
