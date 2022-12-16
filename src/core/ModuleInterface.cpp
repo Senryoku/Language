@@ -18,7 +18,7 @@ std::tuple<bool, std::span<AST::TypeDeclaration*>, std::span<AST::FunctionDeclar
         dependencies.push_back(line);
     }
     
-    auto   type_begin = imports.size();
+    auto type_begin = type_imports.size();
     {
         AST    type_ast;
         Parser type_parser;
