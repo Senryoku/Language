@@ -891,7 +891,7 @@ void Parser::check_function_call(AST::FunctionCall* call_node, const AST::Functi
         for(auto i = 0; i < call_node->arguments().size(); ++i) {
             if(call_node->arguments()[i]->type_id != function->arguments()[i]->type_id) {
                 throw Exception(fmt::format("[Parser] Function '{}' expects an argument of type {} on position #{}, got {}.\n", function->name(),
-                                            GlobalTypeRegistry::instance().get_type(function->arguments()[i]->type_id)->designation, i, GlobalTypeRegistry::instance().get_type(call_node->arguments()[i]->type_id)->designation,
+                                            type_id_to_string(function->arguments()[i]->type_id), i, type_id_to_string(call_node->arguments()[i]->type_id),
                                             point_error(call_node->arguments()[i]->token)),
                                 point_error(call_node->token));
             }

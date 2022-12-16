@@ -13,32 +13,37 @@ const AST::TypeDeclaration* Scope::get_type(const std::string_view& name) const 
     if(candidate_functions == _functions.end())
         return nullptr;
 
-    const AST::FunctionDeclaration* resolved_function = nullptr;
     for(const auto function : candidate_functions->second) {
         // TODO: Correctly handle vargs functions 
         if(!(function->flags & AST::FunctionDeclaration::Flag::Variadic)) {
             // TODO: Handle default values
             if(arguments.size() != function->arguments().size())
                 continue;
+            bool args_types_match = true;
             for(auto idx = 0; idx < arguments.size(); ++idx) {
-                if(arguments[idx]->type_id != function->arguments()[idx]->type_id)
-                    continue;
+                if(arguments[idx]->type_id != function->arguments()[idx]->type_id) {
+                    args_types_match = false;
+                    break;
+                }
             }
+            if(!args_types_match)
+                continue;
         }
-        resolved_function = function;
-        break;
+        // We found a match.
+        return function;
     }
-    return resolved_function;
+    return nullptr;
 }
 
 const AST::FunctionDeclaration* Scoped::get_function(const std::string_view& name, const std::span<AST::Node*>& arguments) const {
     auto                      it = _scopes.rbegin();
-    const AST::FunctionDeclaration* ret = nullptr;
-    while(it != _scopes.rend() && ret == nullptr) {
-        ret = it->resolve_function(name, arguments);
+    while(it != _scopes.rend()) {
+        auto ret = it->resolve_function(name, arguments);
+        if(ret)
+            return ret;
         it++;
     }
-    return ret;
+    return nullptr;
 }
 
 
