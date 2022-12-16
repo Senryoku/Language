@@ -15,6 +15,8 @@
 // FIXME: Correctly set this path.
 static const std::filesystem::path stdlib_folder(STDLIB_BASE_FOLDER);
 
+std::filesystem::path resolve_dependency(const std::filesystem::path& working_directory, const std::string& dep);
+
 class ModuleInterface {
   public:
     std::filesystem::path working_directory;

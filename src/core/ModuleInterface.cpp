@@ -112,7 +112,7 @@ bool ModuleInterface::save(const std::filesystem::path& path) const {
     return true;
 }
 
-std::filesystem::path ModuleInterface::resolve_dependency(const std::string& dep) const {
+std::filesystem::path resolve_dependency(const std::filesystem::path& working_directory, const std::string& dep) {
     // TODO: TEMP, define where (and how) we'll actually search for dependencies
     auto fullpath = working_directory / (dep + ".lang");
 
@@ -128,4 +128,8 @@ std::filesystem::path ModuleInterface::resolve_dependency(const std::string& dep
     }
 
     return fullpath.lexically_normal();
+}
+
+std::filesystem::path ModuleInterface::resolve_dependency(const std::string& dep) const {
+    return ::resolve_dependency(working_directory, dep);
 }

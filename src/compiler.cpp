@@ -13,9 +13,11 @@
 #include <fmt/color.h>
 #include <fmt/format.h>
 #include <fmt/os.h>
+#include <fmt/std.h>
 
 #include <Parser.hpp>
 #include <Tokenizer.hpp>
+#include <compiler/DependencyTree.hpp>
 #include <compiler/Module.hpp>
 #include <utils/CLIArg.hpp>
 
@@ -36,27 +38,10 @@
 CLIArg args;
 
 const std::filesystem::path     cache_folder("./lang_cache/");
-std::set<std::filesystem::path> input_files;
-std::set<std::filesystem::path> object_files;
+std::set<std::filesystem::path> input_files;                   // Original files passed to the CLI.
+std::set<std::filesystem::path> object_files;                  // List of all generated object files for linking.
 
-std::set<std::filesystem::path> processed_files; // Cleared at the start of a run, makes sure we don't end up in a loop.
-
-bool handle_file(const std::filesystem::path& path);
-
-// Returns true if some new files were processed
-bool handle_file_dependencies(const ModuleInterface& module_interface) {
-    bool r = false;
-    for(const auto& dep : module_interface.dependencies) {
-        auto dep_path = std::filesystem::absolute(module_interface.resolve_dependency(dep));
-        // Make sure the dependencies are up-to-date.
-        if(!input_files.contains(dep_path) && !processed_files.contains(dep_path)) {
-            print("Found new dependency to {} (resolved to {}).\n", dep, dep_path.string());
-            if(handle_file(dep_path))
-                r = true;
-        }
-    }
-    return r;
-}
+std::set<std::filesystem::path> processed_files; // Cleared at the start of a run, makes sure we don't end up in a loop. FIXME: Shouldn't be useful anymore.
 
 // Returns true if new file were generated.
 bool handle_file(const std::filesystem::path& path) {
@@ -69,16 +54,25 @@ bool handle_file(const std::filesystem::path& path) {
     o_filepath += cache_filename.replace_extension(".o");
     object_files.insert(o_filepath);
     if(!args['t'].set && !args['a'].set && !args['i'].set && !args['b'].set) {
-        if(!args["bypass-cache"].set && std::filesystem::exists(o_filepath) && std::filesystem::last_write_time(o_filepath) > std::filesystem::last_write_time(path)) {
+        const auto o_file_last_write = std::filesystem::last_write_time(o_filepath);
+        if(!args["bypass-cache"].set && std::filesystem::exists(o_filepath) && o_file_last_write > std::filesystem::last_write_time(path)) {
             print_subtle(" * Using cached compilation result for {}.\n", path.string());
-            // We still need to check dependencies.
+            // Check if any dependency is newer than our cached result.
             ModuleInterface module_interface;
             module_interface.working_directory = path.parent_path();
             module_interface.import_module(o_filepath.replace_extension(".int"));
-            if(!handle_file_dependencies(module_interface))
+            bool updated_deps = false;
+            for(const auto& dep : module_interface.dependencies) {
+                auto dep_path = std::filesystem::absolute(module_interface.resolve_dependency(dep));
+                if(o_file_last_write < std::filesystem::last_write_time(dep_path)) {
+                    updated_deps = true;
+                    break;
+                }
+            }
+            if(!updated_deps)
                 return false;
             // Some dependencies were re-generated, continue processing anyway.
-            print_subtle(" * * Cache for {} is outdated, re-process.\n", path.string());
+            print_subtle(" * * Cache for {} is outdated, re-processing...\n", path.string());
         }
     }
     print("Processing {}... \n", path.string());
@@ -124,10 +118,6 @@ bool handle_file(const std::filesystem::path& path) {
     parser.set_cache_folder(cache_folder);
     auto       ast = parser.parse(tokens);
     const auto parsing_end = std::chrono::high_resolution_clock::now();
-    if(handle_file_dependencies(parser.get_module_interface())) {
-        // Dependencies updated, re-process from the start.
-        return handle_file(path);
-    }
     if(ast.has_value()) {
         parser.write_export_interface(cache_filename.replace_extension(".int"));
         if(args['a'].set) {
@@ -278,37 +268,50 @@ bool link(const std::string& final_outputfile) {
 
 // Returns true on success
 bool handle_all() {
+    DependencyTree dependency_tree;
+    for(const auto& path : input_files)
+        dependency_tree.construct(path);
+
+    auto processing_stages_or_error = dependency_tree.generate_processing_stages();
+    if(processing_stages_or_error.is_error()) {
+        error(processing_stages_or_error.get_error().string());
+        return false;
+    }
+    auto processing_stages = processing_stages_or_error.get();
+
     processed_files = {};
     const auto start = std::chrono::high_resolution_clock::now();
-    // FIXME: We should generate a dependency tree to
-    //  1. Pull all the required dependencies if they're not explicitly passed as argmument
-    //  2. Recompile only the necessary files.
-    //  3. Recompile in the correct order. (< Most important)
-    bool file_generated = false;
-    for(const auto& file : input_files)
-        file_generated = handle_file(file) || file_generated;
+
+    // TODO: We could parallelize here.
+    for(const auto& stage : processing_stages)
+        for(const auto& file : stage)
+            if(!handle_file(file)) {
+                error("An error occured while processing {}. Compilation stopped.", file);
+                return false;
+            }
+
     const auto clang_start = std::chrono::high_resolution_clock::now();
     auto       final_outputfile = args['o'].set ? args['o'].value() : input_files.size() == 1 ? (*input_files.begin()).filename().replace_extension(".exe").string() : "a.out";
-    if(file_generated) {
-        if(!link(final_outputfile))
-            return false;
-        const auto clang_end = std::chrono::high_resolution_clock::now();
-        const auto end = std::chrono::high_resolution_clock::now();
-        success("Compiled successfully to {} in {:.2} (clang: {:.2}).\n", final_outputfile, std::chrono::duration<double, std::milli>(end - start),
-                std::chrono::duration<double, std::milli>(clang_end - clang_start));
 
-        // Run the generated program. FIXME: Handy, but dangerous.
-        if(args['r'].set) {
-            auto run_command = final_outputfile;
-            for(const auto& arg : args['r'].values)
-                run_command += " " + arg;
-            print("Running {}...\n", run_command);
-            const auto execution_start = std::chrono::high_resolution_clock::now();
-            auto       retval = std::system(run_command.c_str());
-            const auto execution_end = std::chrono::high_resolution_clock::now();
-            print("\n > {} returned {} after {}.\n", final_outputfile, retval, std::chrono::duration<double, std::milli>(execution_end - execution_start));
-        }
+    if(!link(final_outputfile))
+        return false;
+    const auto clang_end = std::chrono::high_resolution_clock::now();
+    const auto end = std::chrono::high_resolution_clock::now();
+    success("Compiled successfully to {} in {:.2} (clang: {:.2}).\n", final_outputfile, std::chrono::duration<double, std::milli>(end - start),
+            std::chrono::duration<double, std::milli>(clang_end - clang_start));
+
+    // Run the generated program. FIXME: Handy, but dangerous.
+    if(args['r'].set) {
+        auto run_command = final_outputfile;
+        for(const auto& arg : args['r'].values)
+            run_command += " " + arg;
+        print("Running {}...\n", run_command);
+        const auto execution_start = std::chrono::high_resolution_clock::now();
+        auto       retval = std::system(run_command.c_str());
+        const auto execution_end = std::chrono::high_resolution_clock::now();
+        print("\n > {} returned {} after {}.\n", final_outputfile, retval, std::chrono::duration<double, std::milli>(execution_end - execution_start));
     }
+
     return true;
 }
 
@@ -337,8 +340,10 @@ int main(int argc, char* argv[]) {
     if(!std::filesystem::exists(cache_folder))
         std::filesystem::create_directory(cache_folder);
 
-    for(const auto& arg : args.get_default_args())
-        input_files.insert(std::filesystem::absolute(std::filesystem::path(arg)));
+    for(const auto& arg : args.get_default_args()) {
+        const auto abs_path = std::filesystem::absolute(std::filesystem::path(arg));
+        input_files.insert(abs_path);
+    }
 
     auto r = handle_all();
     if(args['w'].set) {

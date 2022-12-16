@@ -30,7 +30,9 @@ class Parser : public Scoped {
 
     std::optional<AST> parse(const std::span<Token>& tokens);
     // Append to an existing AST and return the added children
-    AST::Node* parse(const std::span<Token>& tokens, AST& ast);
+    AST::Node*         parse(const std::span<Token>& tokens, AST& ast);
+
+    std::vector<std::string> parse_dependencies(const std::span<Token>& tokens);
 
     // Returns true if the next token exists and matches the supplied type and value.
     // Doesn't advance the iterator.

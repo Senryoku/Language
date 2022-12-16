@@ -33,6 +33,23 @@ AST::Node* Parser::parse(const std::span<Token>& tokens, AST& ast) {
     return root;
 }
 
+std::vector<std::string> Parser::parse_dependencies(const std::span<Token>& tokens) {
+    std::vector<std::string> dependencies;
+    
+    auto it = tokens.begin();
+    while(it != tokens.end()) {
+        if(it->type == Token::Type::Import) {
+            ++it;
+            if (it->type != Token::Type::StringLiteral)
+                throw Exception(fmt::format("[Parser] Error listing dependencies: Expected a StringLiteral after import statement, got {}.", *it), point_error(*it));
+            dependencies.push_back(std::string(it->value));
+        }
+        ++it;
+    }
+
+    return dependencies;
+}
+
 TypeID Parser::resolve_operator_type(Token::Type op, TypeID lhs, TypeID rhs) {
     using enum Token::Type;
     if(op == MemberAccess)
