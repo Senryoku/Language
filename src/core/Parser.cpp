@@ -743,9 +743,6 @@ bool Parser::parse_type_declaration(const std::span<Token>& tokens, std::span<To
     auto type_node = new AST::TypeDeclaration(*it);
     curr_node->add_child(type_node);
 
-    if(!get_scope().declare_type(*type_node))
-        throw Exception(fmt::format("[Parser] Syntax error: Type {} already declared in this scope.\n", type_node->token.value), point_error(type_node->token));
-
     ++it;
     if(it->type != Token::Type::OpenScope)
         throw Exception(fmt::format("Expected '{{' after type declaration, got {}.\n", it->value), point_error(*it));
@@ -784,6 +781,11 @@ bool Parser::parse_type_declaration(const std::span<Token>& tokens, std::span<To
         }
     }
     pop_scope();
+
+    // Note: Since we're declaring the type after parsing it (because we need the members to be established after the call to declare_type right now),
+    //       types cannot reference themselves.
+    if(!get_scope().declare_type(*type_node))
+        throw Exception(fmt::format("[Parser] Syntax error: Type {} already declared in this scope.\n", type_node->token.value), point_error(type_node->token));
 
     expect(tokens, it, Token::Type::CloseScope);
     return true;
@@ -1054,23 +1056,13 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
         // Automatic cast to pointee type (Could be a separate Node)
         auto             base_type = GlobalTypeRegistry::instance().get_type(type->is_pointer() ? dynamic_cast<const PointerType*>(type)->pointee_type : type_id);
         assert(base_type->is_struct());
-        auto             type_node = dynamic_cast<const StructType*>(base_type)->type_node;
-        bool             member_exists = false;
-        int32_t          member_index = 0;
-        const AST::Node* member_node = nullptr;
-        for(const auto& c : type_node->children) {
-            if(c->token.value == identifier_name) {
-                member_exists = true;
-                member_node = c;
-                break;
-            }
-            ++member_index;
-        }
-        if(member_exists) {
+        auto             as_struct_type = dynamic_cast<const StructType*>(base_type);
+        auto member_it = as_struct_type->members.find(std::string(identifier_name));
+        if(member_it != as_struct_type->members.end()) {
             auto member_identifier_node = new AST::MemberIdentifier(*it);
             binary_operator_node->add_child(member_identifier_node);
-            member_identifier_node->index = member_index;
-            member_identifier_node->type_id = type_node->children[member_index]->type_id;
+            member_identifier_node->index = member_it->second.index;
+            member_identifier_node->type_id = member_it->second.type_id;
             ++it;
         } else if(peek(tokens, it, Token::Type::OpenParenthesis)) {
             auto binary_node = curr_node->pop_child();
@@ -1108,10 +1100,10 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
 
                 return true;
             } else {
-                throw Exception(fmt::format("[Parser] Syntax error: Method '{}' does not exists on type {}.\n", identifier_name, type_node->token.value), point_error(*it));
+                throw Exception(fmt::format("[Parser] Syntax error: Method '{}' does not exists on type {}.\n", identifier_name, base_type->designation), point_error(*it));
             }
         } else {
-            throw Exception(fmt::format("[Parser] Syntax error: Member '{}' does not exists on type {}.\n", identifier_name, type_node->token.value), point_error(*it));
+            throw Exception(fmt::format("[Parser] Syntax error: Member '{}' does not exists on type {}.\n", identifier_name, base_type->designation), point_error(*it));
         }
     } else {
         // Lookahead for rhs
@@ -1320,12 +1312,13 @@ void Parser::resolve_operator_type(AST::BinaryOperator* op_node) {
         if(type->is_pointer())
             type = GlobalTypeRegistry::instance().get_type(dynamic_cast<const PointerType*>(type)->pointee_type);
         assert(type->is_struct());
-        const AST::TypeDeclaration* type_node = dynamic_cast<const StructType*>(type)->type_node;
-        for(const auto& c : type_node->members())
-            if(c->token.value == op_node->children[1]->token.value) {
-                op_node->type_id = c->type_id;
-                return;
-            }
+
+        auto struct_type = dynamic_cast<const StructType*>(type);
+        auto member_it = struct_type->members.find(std::string(op_node->children[1]->token.value));
+        if(member_it != struct_type->members.end()) {
+            op_node->type_id = member_it->second.type_id;
+            return;
+        }
         assert(false);
     }
 

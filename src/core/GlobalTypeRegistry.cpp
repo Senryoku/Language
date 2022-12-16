@@ -64,8 +64,14 @@ TypeID GlobalTypeRegistry::register_type(AST::TypeDeclaration& type_node) {
     }
 
     std::string type_designation(type_node.token.value);
-    const auto& tr = _types.emplace_back(new StructType{type_designation, next_id(), &type_node});
-    update_caches(tr.get());
+    StructType* tr = dynamic_cast<StructType*>(_types.emplace_back(new StructType{type_designation, next_id()}).get());
+    uint32_t    index = 0;
+    for (const auto child : type_node.children) {
+        StructType::Member member = {.name = std::string(child->token.value), .index = index, .type_id = child->type_id};
+        tr->members[std::string(child->token.value)] = member;
+        ++index;
+    }
+    update_caches(tr);
 
     return tr->type_id;
 }
