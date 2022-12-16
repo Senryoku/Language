@@ -956,12 +956,21 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
             if(candidates.size() == 0) 
                 throw Exception(fmt::format("[Parser] Call to undefined function '{}'.\n", function_name), point_error(call_node->token));
             else {
+                std::string used_types = "Called with: " + std::string(function_name) + "(";
+                for(auto i = 0; i < call_node->arguments().size(); ++i)
+                    used_types += (i > 0 ? ", " : "") + type_id_to_string(call_node->arguments()[i]->type_id);
+                used_types += ")\n";
                 std::string candidates_display = "Candidates are:\n";
                 for (const auto& func : candidates) {
-                    candidates_display += "\t" + func->mangled_name() + "\n"; // TODO: We can probably do better.
+                    candidates_display += "\t" + std::string(func->name()) + "("; // TODO: We can probably do better.
+                    for(auto i = 0; i < func->arguments().size(); ++i)
+                        candidates_display += (i > 0 ? ", " : "") + (func->arguments()[i]->token.value.size() > 0 ? std::string(func->arguments()[i]->token.value)
+                                                                                                                 : ("#" + std::to_string(i))) + " : " +
+                                              type_id_to_string(func->arguments()[i]->type_id);
+                    candidates_display += ") : " + type_id_to_string(func->type_id) + "\n";
                 }
                 throw Exception(fmt::format("[Parser] Call to undefined function '{}', no candidate matches the arguments types.\n", function_name),
-                                point_error(call_node->token) + candidates_display);
+                                point_error(call_node->token) + used_types + candidates_display);
             }
         }
 
