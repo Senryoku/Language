@@ -28,91 +28,9 @@ class Parser : public Scoped {
     void set_source(const std::string& src) { _source = &src; }
     void set_cache_folder(const std::filesystem::path& path) { _cache_folder = path; }
 
-    static const uint32_t max_precedence = static_cast<uint32_t>(-1);
-    // FIXME: Pre and postfix versions of --/++ should have different precedences
-    inline static const std::unordered_map<Token::Type, uint32_t> operator_precedence{
-        {Token::Type::Assignment, 16u},    {Token::Type::Or, 15u},          {Token::Type::And, 14u},
-        {Token::Type::Xor, 12u},           {Token::Type::Equal, 10u},       {Token::Type::Different, 10u},
-        {Token::Type::Greater, 9u},        {Token::Type::Lesser, 9u},       {Token::Type::GreaterOrEqual, 9u},
-        {Token::Type::LesserOrEqual, 9u},  {Token::Type::Substraction, 6u}, {Token::Type::Addition, 6u},
-        {Token::Type::Multiplication, 5u}, {Token::Type::Division, 5u},     {Token::Type::Modulus, 5u},
-        {Token::Type::Increment, 3u},      {Token::Type::Decrement, 3u},    {Token::Type::OpenParenthesis, 2u},
-        {Token::Type::OpenSubscript, 2u},  {Token::Type::MemberAccess, 2u}, {Token::Type::CloseParenthesis, 2u},
-        {Token::Type::CloseSubscript, 2u},
-    };
-
-    bool is_unary_operator(Token::Type type) {
-        return type == Token::Type::Addition || type == Token::Type::Substraction || type == Token::Type::Increment || type == Token::Type::Decrement;
-    }
-
-    static TypeID resolve_operator_type(Token::Type op, TypeID lhs, TypeID rhs);
-
-    void resolve_operator_type(AST::UnaryOperator* op_node) {
-        auto rhs = op_node->children[0]->type_id;
-        op_node->type_id = rhs;
-
-        if(op_node->type_id == InvalidTypeID) {
-            error("[Parser] Couldn't resolve operator return type (Missing impl.) on line {}. Node:\n", op_node->token.line);
-            fmt::print("{}\n", *static_cast<AST::Node*>(op_node));
-            throw Exception(fmt::format("[Parser] Couldn't resolve operator return type (Missing impl.) on line {}.", op_node->token.line));
-        }
-    }
-
-    void resolve_operator_type(AST::BinaryOperator* op_node) {
-        if(op_node->token.type == Token::Type::MemberAccess) {
-            auto type = GlobalTypeRegistry::instance().get_type(op_node->children[0]->type_id);
-            // Automatic dereferencing of pointers (Should this be a separate AST Node?)
-            // FIXME: May not be needed anymore
-            if(type->is_pointer())
-                type = GlobalTypeRegistry::instance().get_type(dynamic_cast<const PointerType*>(type)->pointee_type);
-            assert(type->is_struct());
-            const AST::TypeDeclaration* type_node = dynamic_cast<const StructType*>(type)->type_node;
-            for(const auto& c : type_node->members())
-                if(c->token.value == op_node->children[1]->token.value) {
-                    op_node->type_id = c->type_id;
-                    return;
-                }
-            assert(false);
-        }
-
-        auto lhs = op_node->children[0]->type_id;
-        auto rhs = op_node->children[1]->type_id;
-        op_node->type_id = resolve_operator_type(op_node->token.type, lhs, rhs);
-
-        if(op_node->type_id == InvalidTypeID) {
-            error("[Parser] Couldn't resolve operator return type (Missing impl.) on line {}. Node:\n", op_node->token.line);
-            fmt::print("{}\n", *static_cast<AST::Node*>(op_node));
-            throw Exception(fmt::format("[Parser] Couldn't resolve operator return type (Missing impl.) on line {}.", op_node->token.line));
-        }
-    }
-
-    std::optional<AST> parse(const std::span<Token>& tokens) {
-        std::optional<AST> ast(AST{});
-        try {
-            bool r = parse(tokens, &(*ast).get_root());
-            if(!r) {
-                error("Error while parsing!\n");
-                ast.reset();
-            }
-        } catch(const Exception& e) {
-            e.display();
-            ast.reset();
-        }
-        return ast;
-    }
-
+    std::optional<AST> parse(const std::span<Token>& tokens);
     // Append to an existing AST and return the added children
-    AST::Node* parse(const std::span<Token>& tokens, AST& ast) {
-        // Adds a dummy root node to easily get rid of it on error.
-        auto root = ast.get_root().add_child(new AST::Node{AST::Node::Type::Root});
-        bool r = parse(tokens, root);
-        if(!r) {
-            error("Error while parsing!\n");
-            delete ast.get_root().pop_child();
-            return nullptr;
-        }
-        return root;
-    }
+    AST::Node* parse(const std::span<Token>& tokens, AST& ast);
 
     // Returns true if the next token exists and matches the supplied type and value.
     // Doesn't advance the iterator.
@@ -178,6 +96,28 @@ class Parser : public Scoped {
         ++it;
         return token;
     }
+
+    static const uint32_t max_precedence = static_cast<uint32_t>(-1);
+    // FIXME: Pre and postfix versions of --/++ should have different precedences
+    inline static const std::unordered_map<Token::Type, uint32_t> operator_precedence{
+        {Token::Type::Assignment, 16u},    {Token::Type::Or, 15u},          {Token::Type::And, 14u},
+        {Token::Type::Xor, 12u},           {Token::Type::Equal, 10u},       {Token::Type::Different, 10u},
+        {Token::Type::Greater, 9u},        {Token::Type::Lesser, 9u},       {Token::Type::GreaterOrEqual, 9u},
+        {Token::Type::LesserOrEqual, 9u},  {Token::Type::Substraction, 6u}, {Token::Type::Addition, 6u},
+        {Token::Type::Multiplication, 5u}, {Token::Type::Division, 5u},     {Token::Type::Modulus, 5u},
+        {Token::Type::Increment, 3u},      {Token::Type::Decrement, 3u},    {Token::Type::OpenParenthesis, 2u},
+        {Token::Type::OpenSubscript, 2u},  {Token::Type::MemberAccess, 2u}, {Token::Type::CloseParenthesis, 2u},
+        {Token::Type::CloseSubscript, 2u},
+    };
+
+    bool is_unary_operator(Token::Type type) {
+        return type == Token::Type::Addition || type == Token::Type::Substraction || type == Token::Type::Increment || type == Token::Type::Decrement;
+    }
+
+    static TypeID resolve_operator_type(Token::Type op, TypeID lhs, TypeID rhs);
+
+    void resolve_operator_type(AST::UnaryOperator* op_node);
+    void resolve_operator_type(AST::BinaryOperator* op_node);
 
     void check_function_call(AST::FunctionCall*, const AST::FunctionDeclaration*);
 };

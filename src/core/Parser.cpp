@@ -5,6 +5,34 @@
 
 #include <ModuleInterface.hpp>
 
+std::optional<AST> Parser::parse(const std::span<Token>& tokens) {
+    std::optional<AST> ast(AST{});
+    try {
+        bool r = parse(tokens, &(*ast).get_root());
+        if(!r) {
+            error("Error while parsing!\n");
+            ast.reset();
+        }
+    } catch(const Exception& e) {
+        e.display();
+        ast.reset();
+    }
+    return ast;
+}
+
+// Append to an existing AST and return the added children
+AST::Node* Parser::parse(const std::span<Token>& tokens, AST& ast) {
+    // Adds a dummy root node to easily get rid of it on error.
+    auto root = ast.get_root().add_child(new AST::Node{AST::Node::Type::Root});
+    bool r = parse(tokens, root);
+    if(!r) {
+        error("Error while parsing!\n");
+        delete ast.get_root().pop_child();
+        return nullptr;
+    }
+    return root;
+}
+
 TypeID Parser::resolve_operator_type(Token::Type op, TypeID lhs, TypeID rhs) {
     using enum Token::Type;
     if(op == MemberAccess)
@@ -1254,4 +1282,43 @@ bool Parser::write_export_interface(const std::filesystem::path& path) const {
     cached_interface_file += path;
     _module_interface.save(cached_interface_file);
     return true;
+}
+
+void Parser::resolve_operator_type(AST::UnaryOperator* op_node) {
+    auto rhs = op_node->children[0]->type_id;
+    op_node->type_id = rhs;
+
+    if(op_node->type_id == InvalidTypeID) {
+        error("[Parser] Couldn't resolve operator return type (Missing impl.) on line {}. Node:\n", op_node->token.line);
+        fmt::print("{}\n", *static_cast<AST::Node*>(op_node));
+        throw Exception(fmt::format("[Parser] Couldn't resolve operator return type (Missing impl.) on line {}.", op_node->token.line));
+    }
+}
+
+void Parser::resolve_operator_type(AST::BinaryOperator* op_node) {
+    if(op_node->token.type == Token::Type::MemberAccess) {
+        auto type = GlobalTypeRegistry::instance().get_type(op_node->children[0]->type_id);
+        // Automatic dereferencing of pointers (Should this be a separate AST Node?)
+        // FIXME: May not be needed anymore
+        if(type->is_pointer())
+            type = GlobalTypeRegistry::instance().get_type(dynamic_cast<const PointerType*>(type)->pointee_type);
+        assert(type->is_struct());
+        const AST::TypeDeclaration* type_node = dynamic_cast<const StructType*>(type)->type_node;
+        for(const auto& c : type_node->members())
+            if(c->token.value == op_node->children[1]->token.value) {
+                op_node->type_id = c->type_id;
+                return;
+            }
+        assert(false);
+    }
+
+    auto lhs = op_node->children[0]->type_id;
+    auto rhs = op_node->children[1]->type_id;
+    op_node->type_id = resolve_operator_type(op_node->token.type, lhs, rhs);
+
+    if(op_node->type_id == InvalidTypeID) {
+        error("[Parser] Couldn't resolve operator return type (Missing impl.) on line {}. Node:\n", op_node->token.line);
+        fmt::print("{}\n", *static_cast<AST::Node*>(op_node));
+        throw Exception(fmt::format("[Parser] Couldn't resolve operator return type (Missing impl.) on line {}.", op_node->token.line));
+    }
 }

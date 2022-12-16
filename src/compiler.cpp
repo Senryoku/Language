@@ -58,7 +58,7 @@ bool handle_file_dependencies(const ModuleInterface& module_interface) {
     return r;
 }
 
-// Returns if new file were generated.
+// Returns true if new file were generated.
 bool handle_file(const std::filesystem::path& path) {
     if(processed_files.contains(path))
         return false;
