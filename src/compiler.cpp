@@ -47,6 +47,10 @@ std::set<std::filesystem::path> processed_files; // Cleared at the start of a ru
 bool handle_file(const std::filesystem::path& path) {
     if(processed_files.contains(path))
         return false;
+    if (!std::filesystem::exists(path)) {
+        error("Requested file {} does not exist.", path);
+        return false;
+    }
     auto filename = path.stem();
 
     auto cache_filename = ModuleInterface::get_cache_filename(path);
