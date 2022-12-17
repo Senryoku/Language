@@ -84,8 +84,8 @@ class Parser : public Scoped {
     template<typename... Args>
     std::string point_error(Args&&... args) {
         if(_source)
-            return ::point_error_find_line(*_source, args...);
-        return "";
+            return ::point_error(*_source, args...);
+        return "[Parser] _source not defined, cannot display the line.";
     }
 
     Token expect(const std::span<Token>& tokens, std::span<Token>::iterator& it, Token::Type token_type) {

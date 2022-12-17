@@ -30,13 +30,11 @@ Token Tokenizer::search_next() {
             case '\'': {
                 type = Token::Type::CharLiteral;
                 if(eof())
-                    throw Exception(fmt::format("[Tokenizer] Error: Reached end of file without matching ' on line {}.", _current_line),
-                                    point_error(begin, _current_line, begin, _source.length() - 1));
+                    throw Exception(fmt::format("[Tokenizer] Error: Reached end of file without matching ' on line {}.", _current_line), point_error(begin, _current_line, begin));
                 if(peek() == '\\') { // Escaped character
                     advance();
                     if(eof())
-                        throw Exception(fmt::format("[Tokenizer] Error: Expected escape sequence, got EOF on line {}.", _current_line),
-                                        point_error(begin, _current_line, begin, _source.length() - 1));
+                        throw Exception(fmt::format("[Tokenizer] Error: Expected escape sequence, got EOF on line {}.", _current_line), point_error(begin, _current_line, begin));
                     size_t c = 0;
                     switch(peek()) {
                         case '\'': c = 1; break;
@@ -56,14 +54,14 @@ Token Tokenizer::search_next() {
                     advance();
                     if(eof() || peek() != '\'')
                         throw Exception(fmt::format("[Tokenizer] Error: Reached end of file without matching ' on line {}.", _current_line),
-                                        point_error(begin, _current_line, begin, _source.length() - 1));
+                                        point_error(_current_column, _current_line));
                     advance(); // Skip '
                     return Token{type, std::string_view{escaped_char + c, escaped_char + c + 1}, _current_line, _current_column};
                 } else {
                     advance();
                     if(eof() || peek() != '\'')
                         throw Exception(fmt::format("[Tokenizer] Error: Reached end of file without matching ' on line {}.", _current_line),
-                                        point_error(begin, _current_line, begin, _source.length() - 1));
+                                        point_error(_current_column, _current_line));
                     advance(); // Skip '
                     return Token{type, std::string_view{_source.begin() + begin + 1, _source.begin() + (_current_pos - 1)}, _current_line, _current_column};
                 }
@@ -83,7 +81,7 @@ Token Tokenizer::search_next() {
                 }
                 if(eof())
                     throw Exception(fmt::format("[Tokenizer] Error: Reached end of file without matching \" on line {}.", _current_line),
-                                    point_error(begin, _current_line, begin, _source.length() - 1));
+                                    point_error(_current_column, _current_line));
                 advance(); // Skip '"'
                 type = Token::Type::StringLiteral;
                 return Token{type, std::string_view{_source.begin() + begin + 1, _source.begin() + (_current_pos - 1)}, _current_line, _current_column};
@@ -108,7 +106,7 @@ Token Tokenizer::search_next() {
                         if(peek() == '.') {
                             if(found_decimal_separator)
                                 throw Exception(fmt::format("[Tokenizer] Error: Unexpected supernumerary '.' in float constant on line {}.", _current_line),
-                                                point_error(_current_pos, _current_line, begin));
+                                                point_error(_current_column, _current_line));
                             found_decimal_separator = true;
                         }
                         advance();
@@ -124,7 +122,7 @@ Token Tokenizer::search_next() {
                         --temp_cursor;
                     if(temp_cursor == begin)
                         throw Exception(fmt::format("[Tokenizer] Error: No matching operator for '{}'.", std::string_view{_source.begin() + begin, _source.begin() + end}),
-                                        point_error(temp_cursor, _current_line, begin, end));
+                                        point_error((temp_cursor - _current_pos) + _current_column, _current_line));
                     type = operators.find(std::string_view{_source.begin() + begin, _source.begin() + temp_cursor})->second;
                     // Sync our cursor with the temp one.
                     while(_current_pos != temp_cursor)

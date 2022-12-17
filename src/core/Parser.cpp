@@ -494,9 +494,8 @@ bool Parser::parse_next_expression(const std::span<Token>& tokens, std::span<Tok
         return false;
     }
 
-    if(exprNode->children.size() != 1) {
-        throw Exception("[Parser] Invalid expression.", point_error(*it));
-    }
+    if(exprNode->children.size() != 1)
+        throw Exception("[Parser] Invalid expression ended here:", point_error(*it));
 
     curr_node->pop_child();
     auto child = exprNode->pop_child();
