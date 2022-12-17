@@ -6,7 +6,7 @@
 
 std::string_view get_nth_line(const std::string& source, size_t n) {
     size_t start = 0;
-    while (start < source.size() && n > 0) {
+    while(start < source.size() && n > 0) {
         if(source[start] == '\n')
             --n;
         ++start;
@@ -59,7 +59,7 @@ std::string point_error(const std::string_view& source, size_t at, size_t line, 
             point[i] = '~';
         point[at - line_start + 1] = '^';
         // Handle tabulations in input line by copying them.
-        //for(auto i = padding.size(); i < point.size() && i - padding.size() < source.size(); ++i)
+        // for(auto i = padding.size(); i < point.size() && i - padding.size() < source.size(); ++i)
         //  if(source[i - padding.size()] == '\t' && point[i] == ' ')
         //      point[i] = '\t';
         return_value += padding + point + '\n';

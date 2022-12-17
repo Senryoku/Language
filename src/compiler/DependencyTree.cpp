@@ -21,7 +21,7 @@ void DependencyTree::construct(const std::filesystem::path& path, const File* fr
         error("[DependencyTree::construct] Couldn't open file '{}' (Running from {}).\n", path.string(), std::filesystem::current_path().string());
         return;
     }
-    std::string        source{(std::istreambuf_iterator<char>(input_file)), std::istreambuf_iterator<char>()};
+    std::string source{(std::istreambuf_iterator<char>(input_file)), std::istreambuf_iterator<char>()};
 
     std::vector<Token> tokens;
     Tokenizer          tokenizer(source);
@@ -29,7 +29,7 @@ void DependencyTree::construct(const std::filesystem::path& path, const File* fr
         tokens.push_back(tokenizer.consume());
     Parser parser;
     parser.set_source(source);
-    auto   dependencies = parser.parse_dependencies(tokens);
+    auto dependencies = parser.parse_dependencies(tokens);
 
     for(const auto& dep : dependencies) {
         auto resolved_path = resolve_dependency(current_file.path.parent_path(), dep);
@@ -51,7 +51,7 @@ ErrorOr<std::vector<std::vector<std::filesystem::path>>> DependencyTree::generat
                 ready.push_back(file.first);
         }
 
-        if (ready.empty())
+        if(ready.empty())
             return Error("Cyclic dependency detected.");
 
         for(const auto& path : ready) {

@@ -43,11 +43,11 @@ static std::unordered_map<Token::Type, std::unordered_map<PrimitiveType, std::fu
       OP(Float, return ir_builder.CreateFCmp(llvm::CmpInst::Predicate::FCMP_ONE, lhs, rhs, "FCMP_ONE");)}},
     {Token::Type::Lesser,
      {OP(Integer, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_SLT, lhs, rhs, "ICMP_SLT");),
-      OP(U8,  return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_ULT, lhs, rhs, "ICMP_ULT");),
+      OP(U8, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_ULT, lhs, rhs, "ICMP_ULT");),
       OP(U16, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_ULT, lhs, rhs, "ICMP_ULT");),
       OP(U32, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_ULT, lhs, rhs, "ICMP_ULT");),
       OP(U64, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_ULT, lhs, rhs, "ICMP_ULT");),
-      OP(I8,  return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_SLT, lhs, rhs, "ICMP_SLT");),
+      OP(I8, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_SLT, lhs, rhs, "ICMP_SLT");),
       OP(I16, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_SLT, lhs, rhs, "ICMP_SLT");),
       OP(I32, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_SLT, lhs, rhs, "ICMP_SLT");),
       OP(I64, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_SLT, lhs, rhs, "ICMP_SLT");),
@@ -57,11 +57,11 @@ static std::unordered_map<Token::Type, std::unordered_map<PrimitiveType, std::fu
       OP(Float, return ir_builder.CreateFCmp(llvm::CmpInst::Predicate::FCMP_OLE, lhs, rhs, "FCMP_OLE");)}},
     {Token::Type::Greater,
      {OP(Integer, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_SGT, lhs, rhs, "ICMP_SGT");),
-      OP(U8,  return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_UGT, lhs, rhs, "ICMP_UGT");),
+      OP(U8, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_UGT, lhs, rhs, "ICMP_UGT");),
       OP(U16, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_UGT, lhs, rhs, "ICMP_UGT");),
       OP(U32, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_UGT, lhs, rhs, "ICMP_UGT");),
       OP(U64, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_UGT, lhs, rhs, "ICMP_UGT");),
-      OP(I8,  return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_SGT, lhs, rhs, "ICMP_SGT");),
+      OP(I8, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_SGT, lhs, rhs, "ICMP_SGT");),
       OP(I16, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_SGT, lhs, rhs, "ICMP_SGT");),
       OP(I32, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_SGT, lhs, rhs, "ICMP_SGT");),
       OP(I64, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_SGT, lhs, rhs, "ICMP_SGT");),
@@ -72,12 +72,11 @@ static std::unordered_map<Token::Type, std::unordered_map<PrimitiveType, std::fu
 };
 #undef OP
 
-
 llvm::Constant* Module::codegen_constant(const AST::Node* val) {
     auto type = GlobalTypeRegistry::instance().get_type(val->type_id);
     assert(type);
     if(type->is_array()) {
-        const auto* type_arr = static_cast<const ArrayType*>(type);
+        const auto*                  type_arr = static_cast<const ArrayType*>(type);
         auto                         element_type = get_llvm_type(type_arr->element_type);
         std::vector<llvm::Constant*> values(type_arr->capacity);
         for(unsigned int i = 0; i < type_arr->capacity; i++)
@@ -138,7 +137,7 @@ llvm::Constant* Module::codegen_constant(const AST::Node* val) {
 void Module::insert_defer_block(const AST::Node* node) {
     // Search for closest scope node
     auto parent_node = node->parent;
-    while(parent_node && parent_node->type != AST::Node::Type::Scope) 
+    while(parent_node && parent_node->type != AST::Node::Type::Scope)
         parent_node = parent_node->parent;
 
     assert(parent_node != nullptr);
@@ -199,7 +198,7 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                     [[fallthrough]];
                 }
                 case PrimitiveType::I8: [[fallthrough]];
-                case PrimitiveType::I16: [[fallthrough]]; 
+                case PrimitiveType::I16: [[fallthrough]];
                 case PrimitiveType::I32: [[fallthrough]];
                 case PrimitiveType::I64: {
                     return _llvm_ir_builder.CreateCast(llvm::Instruction::SExt, child, get_llvm_type(node->type_id), "castSignExt");
@@ -268,7 +267,7 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                     _llvm_ir_builder.CreateStore(&arg, alloca);
                     ++arg_idx;
                 }
-                
+
                 _generated_return = false;
                 auto function_body = codegen(function_declaration_node->body()); // Generate function body
                 if(!_generated_return) {
@@ -286,7 +285,8 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                 }
                 return function;
             } else {
-                assert(((flags & AST::FunctionDeclaration::Flag::Extern) || (flags & AST::FunctionDeclaration::Flag::Imported)) && "Functions without a body should be marked as 'extern' or imported.");
+                assert(((flags & AST::FunctionDeclaration::Flag::Extern) || (flags & AST::FunctionDeclaration::Flag::Imported)) &&
+                       "Functions without a body should be marked as 'extern' or imported.");
                 _llvm_module->getOrInsertFunction(function_name, function_types);
                 return nullptr;
             }
@@ -435,14 +435,12 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                 case Token::Type::LesserOrEqual: [[fallthrough]];
                 case Token::Type::Greater: [[fallthrough]];
                 case Token::Type::GreaterOrEqual: {
-                    //assert(node->children[0]->type_id == node->children[1]->type_id);
+                    // assert(node->children[0]->type_id == node->children[1]->type_id);
                     assert(is_primitive(node->children[0]->type_id));
                     auto primitive_type = static_cast<PrimitiveType>(node->children[0]->type_id);
                     if(binary_ops[node->token.type].find(primitive_type) == binary_ops[node->token.type].end()) {
-                        error("[LLVMCodegen] Unsupported types {} and {} for binary operator {}.\n",
-                              type_id_to_string(node->children[0]->type_id),
-                              type_id_to_string(node->children[1]->type_id),
-                              node->token.type);
+                        error("[LLVMCodegen] Unsupported types {} and {} for binary operator {}.\n", type_id_to_string(node->children[0]->type_id),
+                              type_id_to_string(node->children[1]->type_id), node->token.type);
                         return nullptr;
                     }
                     return binary_ops[node->token.type][primitive_type](_llvm_ir_builder, lhs, rhs);
@@ -452,13 +450,13 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                 }
                 case Token::Type::OpenSubscript: {
                     // FIXME: Remove these checks
-                    //assert(node->children[0]->type == AST::Node::Type::Variable);
+                    // assert(node->children[0]->type == AST::Node::Type::Variable);
                     auto type_record = GlobalTypeRegistry::instance().get_type(node->children[0]->type_id);
                     assert(type_record->is_array() || node->children[0]->type_id == PrimitiveType::CString);
                     if(type_record->is_array()) {
                         auto type = get_llvm_type(node->children[0]->type_id);
                         return _llvm_ir_builder.CreateGEP(type, lhs, {llvm::ConstantInt::get(*_llvm_context, llvm::APInt(32, 0)), rhs}, "ArrayGEP");
-                    } else if(node->children[0]->type_id == PrimitiveType::CString) { // FIXME: Remove this String special case? 
+                    } else if(node->children[0]->type_id == PrimitiveType::CString) { // FIXME: Remove this String special case?
                         auto charType = get_llvm_type(PrimitiveType::Char);
                         // FIXME: This is extremely hackish... I guess we should just make sure to insert a LValueToRValue node when necessary.
                         if(node->children[0]->type == AST::Node::Type::LValueToRValue) {
@@ -516,8 +514,8 @@ llvm::Value* Module::codegen(const AST::Node* node) {
             return llvm::Constant::getNullValue(llvm::Type::getInt32Ty(*_llvm_context));
         }
         case AST::Node::Type::IfStatement: {
-            auto current_function = _llvm_ir_builder.GetInsertBlock()->getParent();
-            auto if_then_block = llvm::BasicBlock::Create(*_llvm_context, "if_then", current_function);
+            auto              current_function = _llvm_ir_builder.GetInsertBlock()->getParent();
+            auto              if_then_block = llvm::BasicBlock::Create(*_llvm_context, "if_then", current_function);
             llvm::BasicBlock* if_else_block = nullptr;
             auto              if_end_block = llvm::BasicBlock::Create(*_llvm_context, "if_end", current_function);
 
@@ -594,7 +592,7 @@ llvm::Type* Module::get_llvm_type(TypeID type_id) const {
         switch(type_id) {
             case Void: return llvm::Type::getVoidTy(*_llvm_context);
             case Char: return llvm::Type::getInt8Ty(*_llvm_context);
-            case Boolean: return llvm::Type::getInt1Ty(*_llvm_context); 
+            case Boolean: return llvm::Type::getInt1Ty(*_llvm_context);
             case U8: return llvm::Type::getInt8Ty(*_llvm_context);
             case U16: return llvm::Type::getInt16Ty(*_llvm_context);
             case U32: return llvm::Type::getInt32Ty(*_llvm_context);
@@ -607,7 +605,7 @@ llvm::Type* Module::get_llvm_type(TypeID type_id) const {
             case Pointer: return llvm::Type::getInt64Ty(*_llvm_context); // FIXME ?
             case Float: return llvm::Type::getFloatTy(*_llvm_context);
             case Double: return llvm::Type::getDoubleTy(*_llvm_context);
-            case CString: return llvm::Type::getInt8PtrTy(*_llvm_context); 
+            case CString: return llvm::Type::getInt8PtrTy(*_llvm_context);
             default: throw(fmt::format("[Module] get_llvm_type: Unhandled primitive type '{}'.", type_id));
         }
     }

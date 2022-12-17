@@ -17,7 +17,7 @@ std::tuple<bool, std::span<AST::TypeDeclaration*>, std::span<AST::FunctionDeclar
             break;
         dependencies.push_back(line);
     }
-    
+
     auto type_begin = type_imports.size();
     {
         AST    type_ast;
@@ -83,13 +83,13 @@ bool ModuleInterface::save(const std::filesystem::path& path) const {
         return false;
     }
     // FIXME: Ultra TEMP, I didn't specify a file format for the module interface.
-    
+
     // Dependencies
     for(const auto& dep : dependencies) {
         interface_file << dep << std::endl;
     }
     interface_file << std::endl;
-    
+
     // Types
     for(const auto& n : type_exports) {
         interface_file << "type " << n->token.value << " { ";
@@ -99,7 +99,7 @@ bool ModuleInterface::save(const std::filesystem::path& path) const {
         interface_file << "}" << std::endl;
     }
     interface_file << std::endl;
-    
+
     // Functions
     for(const auto& n : exports) {
         interface_file << n->token.value << " " << GlobalTypeRegistry::instance().get_type(n->type_id)->designation;

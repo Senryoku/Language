@@ -35,12 +35,12 @@ AST::Node* Parser::parse(const std::span<Token>& tokens, AST& ast) {
 
 std::vector<std::string> Parser::parse_dependencies(const std::span<Token>& tokens) {
     std::vector<std::string> dependencies;
-    
+
     auto it = tokens.begin();
     while(it != tokens.end()) {
         if(it->type == Token::Type::Import) {
             ++it;
-            if (it->type != Token::Type::StringLiteral)
+            if(it->type != Token::Type::StringLiteral)
                 throw Exception(fmt::format("[Parser] Error listing dependencies: Expected a StringLiteral after import statement, got {}.", *it), point_error(*it));
             dependencies.push_back(std::string(it->value));
         }
@@ -339,12 +339,12 @@ bool Parser::parse_next_scope(const std::span<Token>& tokens, std::span<Token>::
     scope->defer = new AST::Defer(*it);
     // Append calls to destructors in the defer node
     auto ordered_variable_declarations = get_scope().get_ordered_variable_declarations();
-    while (!ordered_variable_declarations.empty()) {
+    while(!ordered_variable_declarations.empty()) {
         auto dec = ordered_variable_declarations.top();
         ordered_variable_declarations.pop();
         std::vector<AST::Node*> span;
         span.push_back(dec);
-        auto                  destructor = get_function("destructor", span);
+        auto destructor = get_function("destructor", span);
         if(destructor) {
             Token destructor_token = end != tokens.end() ? *end : Token();
             destructor_token.type = Token::Type::Identifier;
@@ -367,11 +367,11 @@ bool Parser::parse_next_scope(const std::span<Token>& tokens, std::span<Token>::
         }
     }
     // Defer node is empty, no need to keep it around.
-    if (scope->defer->children.size() == 0) {
+    if(scope->defer->children.size() == 0) {
         delete scope->defer;
         scope->defer = nullptr;
     }
-    
+
     pop_scope();
     it = end + 1;
     return r;
@@ -953,7 +953,7 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
         auto resolved_function = get_function(function_name, call_node->arguments());
         if(!resolved_function) {
             auto candidates = get_functions(function_name);
-            if(candidates.size() == 0) 
+            if(candidates.size() == 0)
                 throw Exception(fmt::format("[Parser] Call to undefined function '{}'.\n", function_name), point_error(call_node->token));
             else {
                 std::string used_types = "Called with: " + std::string(function_name) + "(";
@@ -961,11 +961,11 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
                     used_types += (i > 0 ? ", " : "") + type_id_to_string(call_node->arguments()[i]->type_id);
                 used_types += ")\n";
                 std::string candidates_display = "Candidates are:\n";
-                for (const auto& func : candidates) {
+                for(const auto& func : candidates) {
                     candidates_display += "\t" + std::string(func->name()) + "("; // TODO: We can probably do better.
                     for(auto i = 0; i < func->arguments().size(); ++i)
-                        candidates_display += (i > 0 ? ", " : "") + (func->arguments()[i]->token.value.size() > 0 ? std::string(func->arguments()[i]->token.value)
-                                                                                                                 : ("#" + std::to_string(i))) + " : " +
+                        candidates_display += (i > 0 ? ", " : "") +
+                                              (func->arguments()[i]->token.value.size() > 0 ? std::string(func->arguments()[i]->token.value) : ("#" + std::to_string(i))) + " : " +
                                               type_id_to_string(func->arguments()[i]->type_id);
                     candidates_display += ") : " + type_id_to_string(func->type_id) + "\n";
                 }
@@ -976,7 +976,7 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
 
         // Automatically cast any pointer to 'opaque' pointer type for interfacing with C++
         // Automatically cast to larger types (always safe)
-        for(auto i = 0; i < std::min(resolved_function->arguments().size(),  call_node->arguments().size()); ++i) {
+        for(auto i = 0; i < std::min(resolved_function->arguments().size(), call_node->arguments().size()); ++i) {
             if(resolved_function->arguments()[i]->type_id == PrimitiveType::Pointer && GlobalTypeRegistry::instance().get_type(call_node->arguments()[i]->type_id)->is_pointer()) {
                 auto cast_node = new AST::Node(AST::Node::Type::Cast);
                 cast_node->type_id = PrimitiveType::Pointer;
@@ -1059,13 +1059,13 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
         // Only allow a single identifier, use subscript for more complex expressions?
         if(!(it->type == Token::Type::Identifier))
             throw Exception("[Parser] Syntax error: Expected identifier on the right side of '.' operator.\n", point_error(*it));
-        const auto  identifier_name = it->value;
-        auto        type_id = prev_expr->type_id;
-        auto        type = GlobalTypeRegistry::instance().get_type(type_id);
+        const auto identifier_name = it->value;
+        auto       type_id = prev_expr->type_id;
+        auto       type = GlobalTypeRegistry::instance().get_type(type_id);
         // Automatic cast to pointee type (Could be a separate Node)
-        auto             base_type = GlobalTypeRegistry::instance().get_type(type->is_pointer() ? dynamic_cast<const PointerType*>(type)->pointee_type : type_id);
+        auto base_type = GlobalTypeRegistry::instance().get_type(type->is_pointer() ? dynamic_cast<const PointerType*>(type)->pointee_type : type_id);
         assert(base_type->is_struct());
-        auto             as_struct_type = dynamic_cast<const StructType*>(base_type);
+        auto as_struct_type = dynamic_cast<const StructType*>(base_type);
         auto member_it = as_struct_type->members.find(std::string(identifier_name));
         if(member_it != as_struct_type->members.end()) {
             auto member_identifier_node = new AST::MemberIdentifier(*it);
@@ -1101,7 +1101,8 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
 
             // Search for a corresponding method
             const auto method = get_function(identifier_name, call_node->arguments());
-            if(method && method->arguments().size() > 0 && !is_primitive(method->arguments()[0]->type_id) && GlobalTypeRegistry::instance().get_pointer_to(base_type->type_id) == method->arguments()[0]->type_id) {
+            if(method && method->arguments().size() > 0 && !is_primitive(method->arguments()[0]->type_id) &&
+               GlobalTypeRegistry::instance().get_pointer_to(base_type->type_id) == method->arguments()[0]->type_id) {
                 call_node->type_id = method->type_id;
                 call_node->flags = method->flags;
 
@@ -1260,12 +1261,12 @@ TypeID Parser::parse_type(const std::span<Token>& tokens, std::span<Token>::iter
     auto token = expect(tokens, it, Token::Type::Identifier);
 
     // FIXME: Should I get rid of this?
-    auto scoped_type = get_type(token.value);
-    auto type_id = InvalidTypeID;
+    auto        scoped_type = get_type(token.value);
+    auto        type_id = InvalidTypeID;
     const Type* type = nullptr;
 
     // Primitive Types won't show up in the scope.
-    if (scoped_type == nullptr) {
+    if(scoped_type == nullptr) {
         type = GlobalTypeRegistry::instance().get_type(std::string(token.value));
         type_id = type->type_id;
     } else {
@@ -1284,10 +1285,10 @@ TypeID Parser::parse_type(const std::span<Token>& tokens, std::span<Token>::iter
         // FIXME: Parse full expression?
         // parse_next_expression(tokens, it, varDecNode);
         uint32_t capacity;
-        auto digits = expect(tokens, it, Token::Type::Digits);
+        auto     digits = expect(tokens, it, Token::Type::Digits);
         std::from_chars(&*(digits.value.begin()), &*(digits.value.begin()) + digits.value.length(), capacity);
         expect(tokens, it, Token::Type::CloseSubscript);
-        
+
         const auto arr_type_id = GlobalTypeRegistry::instance().get_array_of(type_id, capacity);
         type = GlobalTypeRegistry::instance().get_type(arr_type_id);
     }

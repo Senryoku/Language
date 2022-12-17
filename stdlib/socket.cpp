@@ -3,16 +3,19 @@
 #include <string>
 
 #ifdef __linux__
-    #include <sys/socket.h>
-    #include <netinet/in.h>
-    #include <arpa/inet.h>
-    #include <unistd.h>
-    #include <errno.h>
+#include <arpa/inet.h>
+#include <errno.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
+#include <unistd.h>
 #elif _WIN32
-    #pragma comment(lib, "Ws2_32.lib")
-    #include <winsock2.h>
-    #include <ws2tcpip.h> // inet_pton
-    #include <windows.h> // FormatMessageA
+#pragma comment(lib, "Ws2_32.lib")
+
+#include <winsock2.h>
+
+#include <ws2tcpip.h> // inet_pton
+
+#include <windows.h> // FormatMessageA
 #endif
 
 #include <string.h>

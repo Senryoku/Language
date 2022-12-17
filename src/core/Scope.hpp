@@ -1,13 +1,13 @@
 #pragma once
 
 #include <memory>
-#include <vector>
 #include <stack>
+#include <vector>
 
 #include <het_unordered_map.hpp>
 
-#include <FlyString.hpp>
 #include <AST.hpp>
+#include <FlyString.hpp>
 #include <GlobalTypeRegistry.hpp>
 
 class Scope {
@@ -31,9 +31,9 @@ class Scope {
         return true;
     }
 
-    bool is_valid(const het_unordered_map<std::vector<AST::FunctionDeclaration*>>::iterator & it) const { return it != _functions.end(); }
-    bool is_valid(const het_unordered_map<std::vector<AST::FunctionDeclaration*>>::const_iterator & it) const { return it != _functions.cend(); }
-    [[nodiscard]] const AST::FunctionDeclaration* resolve_function(const std::string_view& name, const std::span<AST::Node*>& arguments) const;
+    bool is_valid(const het_unordered_map<std::vector<AST::FunctionDeclaration*>>::iterator& it) const { return it != _functions.end(); }
+    bool is_valid(const het_unordered_map<std::vector<AST::FunctionDeclaration*>>::const_iterator& it) const { return it != _functions.cend(); }
+    [[nodiscard]] const AST::FunctionDeclaration*                      resolve_function(const std::string_view& name, const std::span<AST::Node*>& arguments) const;
     inline [[nodiscard]] const std::vector<AST::FunctionDeclaration*>& get_functions(const std::string_view& name) const { return _functions.find(name)->second; };
     inline [[nodiscard]] bool                                          has_functions(const std::string_view& name) const { return is_valid(_functions.find(name)); };
 
@@ -115,8 +115,8 @@ class Scoped {
             get_scope().declare_function(*s_builtins[name]);
             return s_builtins[name].get();
         };
-        
-        register_builtin("put", PrimitiveType::Integer, {"character"}, {PrimitiveType::Char});        
+
+        register_builtin("put", PrimitiveType::Integer, {"character"}, {PrimitiveType::Char});
         register_builtin("printf", PrimitiveType::Integer, {}, {}, AST::FunctionDeclaration::Flag::Variadic);
     }
 
@@ -157,10 +157,9 @@ class Scoped {
     const AST::TypeDeclaration* get_type(const std::string_view& name) const;
     bool                        is_type(const std::string_view& name) const;
 
-    AST::VariableDeclaration* get(const std::string_view& name);
+    AST::VariableDeclaration*       get(const std::string_view& name);
     const AST::VariableDeclaration* get(const std::string_view& name) const;
-    bool is_declared(const std::string_view& name) const { return get(name) != nullptr; }
-
+    bool                            is_declared(const std::string_view& name) const { return get(name) != nullptr; }
 
   private:
     std::vector<Scope> _scopes;

@@ -74,7 +74,7 @@ class Module {
             codegen(n);
         }
     }
-        
+
     void codegen_imports(const std::vector<AST::TypeDeclaration*>& nodes) {
         for(const auto n : nodes) {
             assert(n->type == AST::Node::Type::TypeDeclaration);
@@ -116,5 +116,5 @@ class Module {
     llvm::Value*    codegen(const AST::Node* node);
 
     llvm::Type* get_llvm_type(TypeID type_id) const;
-    void insert_defer_block(const AST::Node* node);
+    void        insert_defer_block(const AST::Node* node);
 };

@@ -32,12 +32,12 @@ int main(int argc, char* argv[]) {
 
     Indenter log;
 
-    std::vector<std::string>      lines;
-    std::vector<Token> tokens;
-    AST                           ast;
-    Parser                        parser;
-    //Interpreter                   interpreter;
-    std::string                   input;
+    std::vector<std::string> lines;
+    std::vector<Token>       tokens;
+    AST                      ast;
+    Parser                   parser;
+    // Interpreter                   interpreter;
+    std::string input;
 
     Prompt prompt;
 
@@ -64,9 +64,9 @@ int main(int argc, char* argv[]) {
             log.print("Executing ({}) using Interpreter...\n", newNode->type);
             auto clock = std::chrono::steady_clock();
             auto start = clock.now();
-            //interpreter.execute(*newNode);
+            // interpreter.execute(*newNode);
             auto end = clock.now();
-            //log.print("Done in {}ms, returned: '{}'.\n", std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count(), interpreter.get_return_value());
+            // log.print("Done in {}ms, returned: '{}'.\n", std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count(), interpreter.get_return_value());
             log.end();
         }
         log.end();
@@ -100,15 +100,15 @@ int main(int argc, char* argv[]) {
             tokens.clear();
             ast = {};
             parser = {};
-            //interpreter = {};
+            // interpreter = {};
         } else if(input == "rerun") {
             log.print("Reseting interpreter and re-running AST...\n");
-            //interpreter = {};
+            // interpreter = {};
             auto clock = std::chrono::steady_clock();
             auto start = clock.now();
-            //interpreter.execute(ast.get_root());
+            // interpreter.execute(ast.get_root());
             auto end = clock.now();
-            //log.print("Done in {}ms, returned: '{}'.\n", std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count(), interpreter.get_return_value());
+            // log.print("Done in {}ms, returned: '{}'.\n", std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count(), interpreter.get_return_value());
         } else if(input == "debug") {
             debug = !debug;
         } else {
@@ -132,9 +132,9 @@ int main(int argc, char* argv[]) {
                     log.print("Executing ({}) using Interpreter...\n", newNode->type);
                     auto clock = std::chrono::steady_clock();
                     auto start = clock.now();
-                    //interpreter.execute(*newNode);
+                    // interpreter.execute(*newNode);
                     auto end = clock.now();
-                    //log.print("Done in {}ms, returned: '{}'.\n", std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count(), interpreter.get_return_value());
+                    // log.print("Done in {}ms, returned: '{}'.\n", std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count(), interpreter.get_return_value());
                     log.end();
                 }
             } catch(const Exception& e) { e.display(); }

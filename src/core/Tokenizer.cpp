@@ -71,8 +71,7 @@ Token Tokenizer::search_next() {
             }
             case '"': {
                 // For strings, the escape sequences will be handled by the Parser
-                while(!eof() && peek() != '"')
-                {
+                while(!eof() && peek() != '"') {
                     if(peek() == '\\') {
                         advance();
                         if(eof())

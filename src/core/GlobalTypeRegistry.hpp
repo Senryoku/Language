@@ -32,8 +32,8 @@ class GlobalTypeRegistry {
   private:
     std::vector<std::unique_ptr<Type>> _types;
     // Cache Lookup
-    std::unordered_map<std::string, TypeID> _types_by_designation;
-    std::unordered_map<TypeID, TypeID>      _pointers_to;
+    std::unordered_map<std::string, TypeID>           _types_by_designation;
+    std::unordered_map<TypeID, TypeID>                _pointers_to;
     std::unordered_map<const key_t, TypeID, key_hash> _arrays_of;
 
     void update_caches(Type* t) {
@@ -57,26 +57,26 @@ class GlobalTypeRegistry {
     }
 
     TypeID next_id() const { return _types.size(); }
-        
+
     GlobalTypeRegistry() {
         _types.reserve(2 * PrimitiveType::Count);
 
         add_type(new ScalarType("void", PrimitiveType::Void));
         add_type(new ScalarType("char", PrimitiveType::Char));
         add_type(new ScalarType("bool", PrimitiveType::Boolean));
-        add_type(new ScalarType("u8",   PrimitiveType::U8));
-        add_type(new ScalarType("u16",  PrimitiveType::U16));
-        add_type(new ScalarType("u32",  PrimitiveType::U32));
-        add_type(new ScalarType("u64",  PrimitiveType::U64));
-        add_type(new ScalarType("i8",   PrimitiveType::I8));
-        add_type(new ScalarType("i16",  PrimitiveType::I16));
-        add_type(new ScalarType("i32",  PrimitiveType::I32));
-        add_type(new ScalarType("i64",  PrimitiveType::I64));
-        add_type(new ScalarType("int",  PrimitiveType::Integer));
+        add_type(new ScalarType("u8", PrimitiveType::U8));
+        add_type(new ScalarType("u16", PrimitiveType::U16));
+        add_type(new ScalarType("u32", PrimitiveType::U32));
+        add_type(new ScalarType("u64", PrimitiveType::U64));
+        add_type(new ScalarType("i8", PrimitiveType::I8));
+        add_type(new ScalarType("i16", PrimitiveType::I16));
+        add_type(new ScalarType("i32", PrimitiveType::I32));
+        add_type(new ScalarType("i64", PrimitiveType::I64));
+        add_type(new ScalarType("int", PrimitiveType::Integer));
         add_type(new ScalarType("pointer", PrimitiveType::Pointer));
-        add_type(new ScalarType("float",   PrimitiveType::Float));
-        add_type(new ScalarType("double",  PrimitiveType::Double));
-        add_type(new PointerType("cstr",  PrimitiveType::CString, PrimitiveType::Char));
+        add_type(new ScalarType("float", PrimitiveType::Float));
+        add_type(new ScalarType("double", PrimitiveType::Double));
+        add_type(new PointerType("cstr", PrimitiveType::CString, PrimitiveType::Char));
     }
 };
 

@@ -14,7 +14,7 @@ const AST::TypeDeclaration* Scope::get_type(const std::string_view& name) const 
         return nullptr;
 
     for(const auto function : candidate_functions->second) {
-        // TODO: Correctly handle vargs functions 
+        // TODO: Correctly handle vargs functions
         if(!(function->flags & AST::FunctionDeclaration::Flag::Variadic)) {
             // TODO: Handle default values
             if(arguments.size() != function->arguments().size())
@@ -36,7 +36,7 @@ const AST::TypeDeclaration* Scope::get_type(const std::string_view& name) const 
 }
 
 const AST::FunctionDeclaration* Scoped::get_function(const std::string_view& name, const std::span<AST::Node*>& arguments) const {
-    auto                      it = _scopes.rbegin();
+    auto it = _scopes.rbegin();
     while(it != _scopes.rend()) {
         auto ret = it->resolve_function(name, arguments);
         if(ret)
@@ -45,7 +45,6 @@ const AST::FunctionDeclaration* Scoped::get_function(const std::string_view& nam
     }
     return nullptr;
 }
-
 
 std::vector<const AST::FunctionDeclaration*> Scoped::get_functions(const std::string_view& name) const {
     auto                                         it = _scopes.rbegin();

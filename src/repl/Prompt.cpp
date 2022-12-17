@@ -226,7 +226,7 @@ std::string Prompt::get_line() {
 // FIXME: Doesn't handle tokenizing errors very well :)
 std::string Prompt::syntax_highlight(const std::string& str) {
     try {
-        Tokenizer                     tokenizer(str);
+        Tokenizer          tokenizer(str);
         std::vector<Token> tokens;
         while(tokenizer.has_more())
             tokens.push_back(tokenizer.consume());

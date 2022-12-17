@@ -2,20 +2,20 @@
 
 #include <cassert>
 
-#include <PrimitiveType.hpp>
 #include <AST.hpp>
+#include <PrimitiveType.hpp>
 
 class Type {
   public:
     Type(std::string _designation, TypeID _type_id) : designation(_designation), type_id(_type_id) {}
-    virtual ~Type() =default;
+    virtual ~Type() = default;
 
     std::string designation;
     TypeID      type_id = InvalidTypeID;
 
-    virtual bool        is_array() const { return false; }
-    virtual bool        is_pointer() const { return false; }
-    virtual bool        is_struct() const { return false; }
+    virtual bool is_array() const { return false; }
+    virtual bool is_pointer() const { return false; }
+    virtual bool is_struct() const { return false; }
 };
 
 class ScalarType : public Type {
@@ -27,7 +27,7 @@ class ScalarType : public Type {
 class StructType : public Type {
   public:
     StructType(std::string _designation, TypeID _type_id) : Type(_designation, _type_id) {}
-    virtual ~StructType() =default;
+    virtual ~StructType() = default;
 
     struct Member {
         std::string name;
@@ -44,7 +44,7 @@ class PointerType : public Type {
   public:
     PointerType(std::string _designation, TypeID _type_id, TypeID _pointee_type) : Type(_designation, _type_id), pointee_type(_pointee_type) {}
     virtual ~PointerType() = default;
-    
+
     TypeID pointee_type = InvalidTypeID;
 
     bool is_pointer() const override { return true; }

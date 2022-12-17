@@ -1,14 +1,15 @@
 #pragma once
 
+#include <cassert>
 #include <string_view>
 #include <variant>
-#include <cassert>
 
 class Error {
   public:
     Error(const std::string_view& sv) : _str(sv) {}
 
     std::string_view string() const { return _str; }
+
   private:
     std::string_view _str;
 };
@@ -34,4 +35,3 @@ class ErrorOr {
   private:
     std::variant<Error, T> _value;
 };
-

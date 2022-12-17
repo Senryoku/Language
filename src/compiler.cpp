@@ -38,8 +38,8 @@
 CLIArg args;
 
 const std::filesystem::path     cache_folder("./lang_cache/");
-std::set<std::filesystem::path> input_files;                   // Original files passed to the CLI.
-std::set<std::filesystem::path> object_files;                  // List of all generated object files for linking.
+std::set<std::filesystem::path> input_files;  // Original files passed to the CLI.
+std::set<std::filesystem::path> object_files; // List of all generated object files for linking.
 
 std::set<std::filesystem::path> processed_files; // Cleared at the start of a run, makes sure we don't end up in a loop. FIXME: Shouldn't be useful anymore.
 
@@ -47,7 +47,7 @@ std::set<std::filesystem::path> processed_files; // Cleared at the start of a ru
 bool handle_file(const std::filesystem::path& path) {
     if(processed_files.contains(path))
         return false;
-    if (!std::filesystem::exists(path)) {
+    if(!std::filesystem::exists(path)) {
         error("Requested file {} does not exist.", path);
         return false;
     }
@@ -82,7 +82,7 @@ bool handle_file(const std::filesystem::path& path) {
         }
     }
     print("Processing {}... \n", path.string());
-    const auto     total_start = std::chrono::high_resolution_clock::now();
+    const auto total_start = std::chrono::high_resolution_clock::now();
 
     std ::ifstream input_file(path);
     if(!input_file) {

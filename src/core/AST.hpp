@@ -7,8 +7,8 @@
 #include <stack>
 #include <vector>
 
-#include <Tokenizer.hpp>
 #include <PrimitiveType.hpp>
+#include <Tokenizer.hpp>
 
 class AST {
   public:
@@ -93,11 +93,11 @@ class AST {
         FunctionDeclaration(Token t) : Node(Node::Type::FunctionDeclaration, t) {}
 
         enum Flag : uint8_t {
-            None     = 0,
+            None = 0,
             Exported = 1 << 0,
             Variadic = 1 << 1,
-            Extern   = 1 << 2, // Implemented in another module (no body) and disable name mangling.
-            BuiltIn  = 1 << 3,
+            Extern = 1 << 2, // Implemented in another module (no body) and disable name mangling.
+            BuiltIn = 1 << 3,
             Imported = 1 << 4, // Like Extern, but with name mangling
         };
 
@@ -148,7 +148,8 @@ class AST {
             if(children[idx + 1])
                 children[idx + 1]->parent = nullptr;
             children[idx + 1] = n;
-            if(n) n->parent = this;
+            if(n)
+                n->parent = this;
         }
 
         AST::Node* insert_before_argument(size_t idx, AST::Node* node) {

@@ -6,12 +6,12 @@
 #include <Logger.hpp>
 #include <Tokenizer.hpp>
 
-#define TOKENIZE(code)                               \
-    std::string                   source{code};      \
-    std::vector<Token> tokens;            \
-    Tokenizer                     tokenizer(source); \
-    while(tokenizer.has_more())                      \
-        tokens.push_back(tokenizer.consume());       \
+#define TOKENIZE(code)                         \
+    std::string        source{code};           \
+    std::vector<Token> tokens;                 \
+    Tokenizer          tokenizer(source);      \
+    while(tokenizer.has_more())                \
+        tokens.push_back(tokenizer.consume()); \
     EXPECT_GT(tokens.size(), 0);
 
 TEST(Tokenizer, Add) {

@@ -2,14 +2,13 @@
 
 #include <fmt/core.h>
 
-#include <Exception.hpp>
 #include <AST.hpp>
+#include <Exception.hpp>
 
 const Type* GlobalTypeRegistry::get_type(TypeID id) const {
     assert(id != InvalidTypeID);
     return _types[id].get();
 }
-
 
 const Type* GlobalTypeRegistry::get_type(const std::string& name) const {
     return get_type(_types_by_designation.at(name));
@@ -19,7 +18,7 @@ const Type* GlobalTypeRegistry::get_or_register_type(const std::string& name) {
     if(_types_by_designation.contains(name))
         return get_type(name);
     // Try to register unknown pointer to existing type.
-    if (name.ends_with("*")) {
+    if(name.ends_with("*")) {
         const auto& base_type = get_or_register_type(name.substr(0, name.size() - 1));
         return get_type(get_pointer_to(base_type->type_id));
     }
@@ -53,11 +52,13 @@ TypeID GlobalTypeRegistry::register_type(AST::TypeDeclaration& type_node) {
     //        will result in registering the type twice: Once when compiling the dependency and once
     //        when parsing the type from the dependency's interface, resulting in two different type_id
     //        for the same type.
-    //        For now, will skip the registration if the name matches an already registered type, 
+    //        For now, will skip the registration if the name matches an already registered type,
     //        but this slow and error-prone, if not completly wrong.
     for(const auto& record : _types) {
         if(type_node.token.value == record->designation) {
-            warn("[GlobalTypeRegistry] Note: A type with the name '{}' is already registered. FIXME: This should be an error, but is currently necessary because of our poor type import implementation.\n", type_node.token.value);
+            warn("[GlobalTypeRegistry] Note: A type with the name '{}' is already registered. FIXME: This should be an error, but is currently necessary because of our poor type "
+                 "import implementation.\n",
+                 type_node.token.value);
             type_node.type_id = record->type_id;
             return record->type_id;
         }
@@ -66,7 +67,7 @@ TypeID GlobalTypeRegistry::register_type(AST::TypeDeclaration& type_node) {
     std::string type_designation(type_node.token.value);
     StructType* tr = dynamic_cast<StructType*>(_types.emplace_back(new StructType{type_designation, next_id()}).get());
     uint32_t    index = 0;
-    for (const auto child : type_node.children) {
+    for(const auto child : type_node.children) {
         StructType::Member member = {.name = std::string(child->token.value), .index = index, .type_id = child->type_id};
         tr->members[std::string(child->token.value)] = member;
         ++index;
