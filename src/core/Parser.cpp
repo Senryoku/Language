@@ -384,7 +384,7 @@ bool Parser::parse_next_expression(const std::span<Token>& tokens, std::span<Tok
         return false;
     }
 
-    // Temporary expression node. Will be replace by its child when we're done parsing it.
+    // Temporary expression node. Will be replaced by its child when we're done parsing it.
     auto exprNode = curr_node->add_child(new AST::Node(AST::Node::Type::Expression));
 
     if(it->type == Token::Type::OpenParenthesis) {
@@ -494,7 +494,9 @@ bool Parser::parse_next_expression(const std::span<Token>& tokens, std::span<Tok
         return false;
     }
 
-    assert(exprNode->children.size() == 1);
+    if(exprNode->children.size() != 1) {
+        throw Exception("[Parser] Invalid expression.", point_error(*it));
+    }
 
     curr_node->pop_child();
     auto child = exprNode->pop_child();

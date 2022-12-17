@@ -4,5 +4,5 @@ function main() : int {
 	let str : String;
 	str.from_c_string("Test String");
 	printf("%s", str.ptr); // FIXME: Obviously, this shouldn't be used this way. It doesn't even have a null terminator.
-	return -;
+	return 0;
 }
