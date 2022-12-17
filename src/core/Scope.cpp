@@ -21,7 +21,10 @@ const AST::TypeDeclaration* Scope::get_type(const std::string_view& name) const 
                 continue;
             bool args_types_match = true;
             for(auto idx = 0; idx < arguments.size(); ++idx) {
-                if(arguments[idx]->type_id != function->arguments()[idx]->type_id) {
+
+                if(arguments[idx]->type_id != function->arguments()[idx]->type_id &&
+                   // Allow casting to the generic 'pointer' type
+                   (function->arguments()[idx]->type_id != PrimitiveType::Pointer || !GlobalTypeRegistry::instance().get_type(arguments[idx]->type_id)->is_pointer())) {
                     args_types_match = false;
                     break;
                 }
