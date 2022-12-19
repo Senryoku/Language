@@ -533,6 +533,38 @@ llvm::Value* Module::codegen(const AST::Node* node) {
             _llvm_ir_builder.SetInsertPoint(after_block);
             return llvm::Constant::getNullValue(llvm::Type::getInt32Ty(*_llvm_context));
         }
+        case AST::Node::Type::ForStatement: {
+            // For Init
+            if(!codegen(node->children[0]))
+                return nullptr;
+
+            llvm::Function* current_function = _llvm_ir_builder.GetInsertBlock()->getParent();
+
+            llvm::BasicBlock* condition_block = llvm::BasicBlock::Create(*_llvm_context, "for_condition", current_function);
+            llvm::BasicBlock* loop_block = llvm::BasicBlock::Create(*_llvm_context, "for_loop", current_function);
+            llvm::BasicBlock* after_block = llvm::BasicBlock::Create(*_llvm_context, "for_end", current_function);
+
+            _llvm_ir_builder.CreateBr(condition_block);
+
+            _llvm_ir_builder.SetInsertPoint(condition_block);
+            auto condition_label = _llvm_ir_builder.GetInsertBlock();
+            auto condition = codegen(node->children[1]);
+            if(!condition)
+                return nullptr;
+            _llvm_ir_builder.CreateCondBr(condition, loop_block, after_block);
+
+            _llvm_ir_builder.SetInsertPoint(loop_block);
+            // Loop block
+            if(!codegen(node->children[3]))
+                return nullptr;
+            // Iterator advance
+            if(!codegen(node->children[2]))
+                return nullptr;
+            _llvm_ir_builder.CreateBr(condition_label);
+
+            _llvm_ir_builder.SetInsertPoint(after_block);
+            return llvm::Constant::getNullValue(llvm::Type::getInt32Ty(*_llvm_context));
+        }
         case AST::Node::Type::IfStatement: {
             auto              current_function = _llvm_ir_builder.GetInsertBlock()->getParent();
             auto              if_then_block = llvm::BasicBlock::Create(*_llvm_context, "if_then", current_function);

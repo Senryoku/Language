@@ -1259,18 +1259,20 @@ bool Parser::parse_import(const std::span<Token>& tokens, std::span<Token>::iter
 
     for(const auto& e : new_type_imports) {
         if(!get_root_scope().declare_type(*e)) {
-            return false;
+            warn("[Parser::parse_import] Warning: declare_type on {} returned false, imported twice?\n", e->token.value);
         }
     }
 
     for(const auto& e : new_function_imports) {
         if(!get_root_scope().declare_function(*e)) {
-            return false;
+            warn("[Parser::parse_import] Warning: declare_function on {} returned false, imported twice?\n", e->token.value);
         }
     }
 
     // FIXME: We'll want to add a way to also directly export the imported symbols.
     //        I don't think this should be the default behavior, but opt-in by using another keyword, or an additional marker.
+    // FIXME: For now, we'll forward all the type definitions unconditionally.
+    _module_interface.type_exports.insert(_module_interface.type_exports.end(), new_type_imports.begin(), new_type_imports.end());
 
     ++it;
 
