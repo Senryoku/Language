@@ -148,8 +148,12 @@ bool Parser::parse(const std::span<Token>& tokens, AST::Node* curr_node) {
                 break;
             case Token::Type::Return: {
                 auto returnNode = curr_node->add_child(new AST::Node(AST::Node::Type::ReturnStatement, *it));
-                auto to_rvalue = returnNode->add_child(new AST::Node(AST::Node::Type::LValueToRValue));
                 ++it;
+                if(it->type == Token::Type::EndStatement) {
+                    returnNode->type_id = PrimitiveType::Void;
+                    break;
+                }
+                auto to_rvalue = returnNode->add_child(new AST::Node(AST::Node::Type::LValueToRValue));
                 if(!parse_next_expression(tokens, it, to_rvalue)) {
                     delete curr_node->pop_child();
                     return false;

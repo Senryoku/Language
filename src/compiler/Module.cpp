@@ -586,11 +586,15 @@ llvm::Value* Module::codegen(const AST::Node* node) {
             return llvm::Constant::getNullValue(llvm::Type::getInt32Ty(*_llvm_context));
         }
         case AST::Node::Type::ReturnStatement: {
-            auto val = codegen(node->children[0]);
+            auto val = node->children.empty() ? nullptr : codegen(node->children[0]);
             _generated_return = true;
 
             insert_defer_block(node);
-            return _llvm_ir_builder.CreateRet(val);
+            if(node->children.empty()) {
+                assert(node->type_id == PrimitiveType::Void);
+                return _llvm_ir_builder.CreateRetVoid();
+            } else
+                return _llvm_ir_builder.CreateRet(val);
         }
         default: warn("LLVM Codegen: Unsupported node type '{}'.\n", node->type);
     }
