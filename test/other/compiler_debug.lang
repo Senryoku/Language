@@ -2,10 +2,10 @@ import "std/String"
 import "std/File"
 
 function main() {
-	const sx : int = 2 * 1920;
-	const sy : int = 2 * 1024;
-	const max_pixel_value : int = 255;
-	const max_iterations : int = 128;
+	const sx = 2 * 1920;
+	const sy = 2 * 1024;
+	const max_pixel_value = 255;
+	const max_iterations = 128;
 	
 	let str_builder : StringBuilder;
 	// FIXME: Default values are not respected yet.
