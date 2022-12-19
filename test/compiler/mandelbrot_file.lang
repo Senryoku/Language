@@ -1,0 +1,64 @@
+import "std/File"
+import "std/String"
+
+function main() {
+	const sx : int = 1920;
+	const sy : int = 1024;
+	const max_pixel_value : int = 255;
+	const max_iterations : int = 128;
+	
+	let str_builder : StringBuilder;
+	// FIXME: Default values are not respected yet.
+	str_builder.length = 0;
+	str_builder.capacity = 0;
+	let capacity : u64 = 20 + (sx + 1) * sy * (3 + 1);
+	str_builder.reserve(capacity);
+	
+	str_builder.append("P2\n");
+	str_builder.append(to_string(sx));
+	str_builder.append('\n');
+	str_builder.append(to_string(sy));
+	str_builder.append('\n');
+	str_builder.append(to_string(max_iterations + 1));
+	str_builder.append('\n');
+	
+	let py : int = 0;
+	while(py < sy) {
+		let px : int = 0;
+		const yz : float = -1.0 + (2.0 / sy) * py;
+		while(px < sx) {
+			const xz : float = -2.5 + (3.5 / sx) * px;
+			let iterations : int = 0;
+			// Bulb test
+			const q : float= (xz - 1.0 / 4.0) * (xz - 1.0 / 4.0) + yz * yz;
+			if(q * (q + (xz - 1.0 / 4.0)) <= 1.0 / 4.0 * yz * yz) {
+				iterations = max_iterations;
+			} else {
+				let x : float = 0;
+				let y : float = 0;
+				while(x * x + y * y <= 2 * 2  && iterations < max_iterations) {
+					const xtemp : float = x * x - y * y + xz;
+					y = 2 * x * y + yz;
+					x = xtemp;
+					++iterations;
+				}
+			}
+			const to_int : int = max_pixel_value * ((1.0 * iterations) / max_iterations);
+			
+			str_builder.append(to_string(to_int));
+			str_builder.append(' ');
+			
+			++px;
+		}
+		str_builder.append('\n');
+		++py;
+	}
+	
+	str_builder.append('\0');
+	
+	let file : File;
+	file.open("./mandelbrot.ppm", "w");
+	file.write(str_builder.ptr, str_builder.length);
+
+	return 0;
+}

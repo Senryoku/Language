@@ -1269,6 +1269,9 @@ bool Parser::parse_import(const std::span<Token>& tokens, std::span<Token>::iter
         }
     }
 
+    // FIXME: We'll want to add a way to also directly export the imported symbols.
+    //        I don't think this should be the default behavior, but opt-in by using another keyword, or an additional marker.
+
     ++it;
 
     return true;
@@ -1327,7 +1330,7 @@ void Parser::resolve_operator_type(AST::UnaryOperator* op_node) {
     if(op_node->type_id == InvalidTypeID) {
         error("[Parser] Couldn't resolve operator return type (Missing impl.) on line {}. Node:\n", op_node->token.line);
         fmt::print("{}\n", *static_cast<AST::Node*>(op_node));
-        throw Exception(fmt::format("[Parser] Couldn't resolve operator return type (Missing impl.) on line {}.", op_node->token.line));
+        throw Exception(fmt::format("[Parser] Couldn't resolve operator return type (Missing impl.) on line {}.\n", op_node->token.line));
     }
 }
 
@@ -1356,6 +1359,6 @@ void Parser::resolve_operator_type(AST::BinaryOperator* op_node) {
     if(op_node->type_id == InvalidTypeID) {
         error("[Parser] Couldn't resolve operator return type (Missing impl.) on line {}. Node:\n", op_node->token.line);
         fmt::print("{}\n", *static_cast<AST::Node*>(op_node));
-        throw Exception(fmt::format("[Parser] Couldn't resolve operator return type (Missing impl.) on line {}.", op_node->token.line));
+        throw Exception(fmt::format("[Parser] Couldn't resolve operator return type (Missing impl.) on line {}.\n", op_node->token.line));
     }
 }

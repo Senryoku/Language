@@ -6,9 +6,15 @@
 #include <fcntl.h>
 #include <io.h>
 
+#include <sys\stat.h> // _S_IREAD | _S_IWRITE
+
 extern "C" {
+	
 int __open_file(const char* path, const char* mode) {
-    auto fd = _open(path, _O_RDONLY);
+	auto m = _O_RDONLY;
+	if(strcmp(mode, "r") == 0) m = _O_RDONLY;
+	if(strcmp(mode, "w") == 0) m = _O_CREAT | _O_TRUNC | _O_WRONLY;
+    auto fd = _open(path, m, _S_IREAD | _S_IWRITE);
     if(fd < 0) {
         char errmsg[2048];
         strerror_s(errmsg, sizeof(errmsg), errno);
@@ -20,4 +26,9 @@ int __open_file(const char* path, const char* mode) {
 void __close_file(int fd) {
     _close(fd);
 }
+
+void __write_file(int fd, char* buff, size_t count) {
+    _write(fd, buff, count);
+}
+
 }

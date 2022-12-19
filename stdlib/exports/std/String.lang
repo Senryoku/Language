@@ -1,12 +1,7 @@
-import "std/memory"
+extern function __itoa(value: int) : cstr;
 
-export function strlen(value: cstr) : u64 {
-	let idx : u64 = 0;
-	while(value[idx] != '\0') {
-		++idx;
-	}
-	return idx;
-}
+import "std/memory"
+import "std/cstr"
 
 export type String {
 	let length: u64 = 0;
@@ -44,4 +39,86 @@ export function from_c_string(this: String*, value: cstr) : void {
 
 export function destructor(this: String*) : void {
 	.clear();
+}
+
+// String Builder
+
+export type StringBuilder {
+	let length: u64 = 0;
+	let capacity: u64 = 0;
+	let ptr: char*;
+}
+
+export function reserve(this: StringBuilder*, size : u64) : void {
+	if(size <= .capacity) return;
+		
+	let new_ptr : char* = malloc(size);
+	if(.capacity > 0) {
+		let idx : u64 = 0;
+		while(idx < .length) {
+			new_ptr[idx] = .ptr[idx];
+			++idx;
+		}
+		free(.ptr);
+		.ptr = new_ptr;
+	}
+	.ptr = new_ptr;
+	.capacity = size;
+}
+
+export function append(this: StringBuilder*, c: char) : void {
+	if(.capacity <= .length + 1)
+		.reserve((.capacity + 1) * 2);
+	
+	.ptr[.length] = c;
+	.length = .length + 1;
+}
+
+export function append(this: StringBuilder*, str: cstr) : void {
+	const cstr_len : u64 = strlen(str);
+	
+	if(.capacity <= .length + cstr_len) {
+		.reserve((.capacity + cstr_len) * 2);
+	}
+	
+	let idx : u64 = 0;
+	while(idx < cstr_len) {
+		.ptr[.length + idx] = str[idx];
+		++idx;
+	}
+	.length = .length + cstr_len;
+}
+
+export function append(this: StringBuilder*, str: String) : void {
+	if(.capacity <= .length + str.length) {
+		.reserve((.capacity + str.length) * 2);
+	}
+	
+	let idx : u64 = 0;
+	while(idx < str.length) {
+		.ptr[.length + idx] = str.ptr[idx];
+		++idx;
+	}
+	.length = .length + str.length;
+}
+
+export function clear(this: StringBuilder*) : void {
+	if(.capacity > 0) {
+		.length = 0;
+		.capacity = 0;
+		free(.ptr);
+		.ptr = null_pointer();
+	}
+}
+
+export function destructor(this: StringBuilder*) : void {
+	.clear();
+}
+
+// Misc. functions
+
+export function to_string(value: int) : String {
+	let str : String;
+	str.adopt_c_string(__itoa(value));
+	return str;
 }

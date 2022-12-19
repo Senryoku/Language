@@ -1,5 +1,9 @@
 extern function __open_file(path: char*, mode: char*) : int;
 extern function __close_file(fd: int);
+extern function __write_file(fd: int, data: cstr, count: u64);
+
+import "std/cstr"
+import "std/String"
 
 export type File {
 	let fd : int = 0;
@@ -12,6 +16,18 @@ export function open(this: File*, path: cstr, mode: cstr) {
 
 export function close(this: File*) {
 	if(.fd != 0) __close_file(.fd);
+}
+
+export function write(this: File*, data: String) {
+	__write_file(.fd, data.ptr, data.length);
+}
+
+export function write(this: File*, data: cstr) {
+	__write_file(.fd, data, strlen(data));
+}
+
+export function write(this: File*, data: cstr, size: u64) {
+	__write_file(.fd, data, size);
 }
 
 export function destructor(this: File*) {

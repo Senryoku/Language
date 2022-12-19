@@ -1,0 +1,7 @@
+export function strlen(value: cstr) : u64 {
+	let idx : u64 = 0;
+	while(value[idx] != '\0') {
+		++idx;
+	}
+	return idx;
+}

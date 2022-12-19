@@ -1,8 +1,11 @@
-import "std/String"
+import "std/File"
 
 function main() : int {
-	let str : String;
-	str.from_c_string("Test String");
-	printf("%s", str.ptr); // FIXME: Obviously, this shouldn't be used this way. It doesn't even have a null terminator.
+	printf("Trying to open a file...\n");
+	let file : File;
+	printf("File Descriptor: %d.\n", file.fd);
+	file.open("H:/Source/Lang/.gitignore", "r");
+	printf("File Descriptor: %d.\n", file.fd);
+	file.close();
 	return 0;
 }
