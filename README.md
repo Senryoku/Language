@@ -2,7 +2,8 @@
 
 Toy Language.
 
-Nothing, including the syntax, is specified. I only have some vague goals in mind (Statically typed, object oriented, close to C++ in spirit).
+Nothing, including the syntax, is specified. I only have some vague goals in mind (Statically typed, object oriented, close to C++ in spirit). Current syntax looks a lot like typescript, mainly because it's easy to parse :)
+
 Working on a compiler using LLVM IR and clang to generate native executables.
 
 ## Features
@@ -88,6 +89,17 @@ export function function_name() : cstr {
 
 ## Future Features (Far, far away)
  - Template Strings
+   ```c
+   // Not sure of the format. I kinda like python's format strings.
+   const str = f"Key: {key}, Value: {value}\n";
+   ```
+ - Language support for array / dictionnary
+   ```c
+   const array = [0, 1, 2, 3]; // Defaults to some kind of StaticArray<int>
+   let dyn_array : Array<String> = ["A String", "Another One"];
+   const dict = {key0: value0, key1: value1}; // Defaults to some kind of Dict<KeyType, ValueType>
+   // Both keys and values of any type (hashable for the key), but of a single on for each.
+   ```
  - Templates / Concepts?
  - Reflection/Built in Serialisation
 
