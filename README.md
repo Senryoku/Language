@@ -2,24 +2,28 @@
 
 Toy Language.
 
-Nothing, including the syntax, is specified. I only have some vague goals in mind.
+Nothing, including the syntax, is specified. I only have some vague goals in mind (Statically typed, object oriented, close to C++ in spirit).
 Working on a compiler using LLVM IR and clang to generate native executables.
 
 ## Features
 
 ### Syntax
+  Examples in [test/compiler/](test/compiler/)
+
   - Primitive types
-    - Integer `int`
-    - Float `float`
-    - Array (fixed size) of other Primitive Types `int[32]`
+    - Integer `int` (`u8`...`u64`, `i8`...`i64`)
+    - Float `float`, `double`
+    - Array (fixed size) of other Primitive Types `int[32]`. Will be reworked.
+    - C-String `cstr`, null-terminated to interface with C/C++
   - Variable Declaration
-```
+```c
 let variable_name : type = optional_initial_value;
 let a : int = 0;
-let b : float = 0.0;
+const b : float = 0.0;
+const c = 0.0; // Type derived from the initial value
 ```
   - Branch
-```
+```c
 if(condition)
 	single_statement;
 else {
@@ -27,35 +31,64 @@ else {
 }
 ```
   - While Loop
-```
+```c
 while(condition_expression) {
 	[...while_body]
 }
 ```
   - Function Declaration
-```
+```c
 function name(param_0 : int, param_1 : float) : int {
 	[...function body]
 }
 ```
-  - Modules
-```
-import module
+  - Type Declaration
+```c
+type Complex {
+	let i : float = 0;
+	let j : float = 0;
+}
 
-export function function_name() {
+// Uniform Function Call Syntax (UFCS)
+function magnitude(this: Complex*) {
+	return sqrt(.i * .i + .j * .j); // Actually, there's no sqrt() yet
+}
+
+function main() : int {
+	let z : Complex;
+	z.i = 2;
+	z.j = 3;
+	let ret_val : int = z.magnitude();
+	return ret_val;
+}
+```
+  - Modules
+```c
+import "std/String"
+import "module"
+
+export function function_name() : cstr {
 	...
 }
 ```
 
 ## Todo
  - Everything
- - [] and () should be proper binary operators, not weird special cases.
-   - Rewrite builtin Arrays with this in mind.
- - String interning for keyword and symbols
+ - Design
+   - Handle const-ness: Default to const for struct passed to functions, add a way to opt-in for mutability (espacially for 'member functions').
+   - Should we have constructors (other than the default one that is currently not implemented :)) )? And copy/move constructors? Can we get away with some sort of 'always move', and providing standardized clone/copy functions?
+   - Heap allocation?
+ - Implementation
+   - Generate default constructors (and call them) for types with default values.
+   - Re-think destructors calls (They're called as soon as the declared variable is out of scope, even if it's returned from a function, for example.)
+   - Handle returning structs from a function in general.
+   - [] and () should be proper binary operators, not weird special cases.
+     - Rewrite builtin Arrays with this in mind.
+   - String interning for keyword and symbols
 
-## Future Features (Hopefully)
- - String templating
- - Templates (by 'auto'?); Concepts?
+## Future Features (Far, far away)
+ - Template Strings
+ - Templates / Concepts?
  - Reflection/Built in Serialisation
 
 ## Build
@@ -66,11 +99,11 @@ Only tested using MSVC. Make sure the build type matches the build type of your 
 
 ## Tests
 
-`cd build && ctest`
+`cd build && ctest -C Debug`
 
 ## Dependencies
  - C++20
- - fmt 9.1.0 (sources in ext/)
+ - [fmt 9.1.0](https://fmt.dev/9.1.0/) (sources in ext/)
  - [Filewatch](https://github.com/ThomasMonkman/filewatch) (included in ext/)
  - LLVM 14.0.6 (for the compiler only)
    - On Windows we'll have to compile from source or CMake won't find it.
