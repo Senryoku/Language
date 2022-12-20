@@ -1,11 +1,11 @@
 // RET : 666
-// FAIL: 444
+// FAIL: 68435184
 
 function main() {
-	const i : int = 54741;
+	const i : int = 547;
 	if(i < 1248)
 		return 666;
 	else
-		return 444;
+		return 68435184;
 	return 0;
 }
