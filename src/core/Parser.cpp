@@ -342,6 +342,9 @@ bool Parser::parse_next_scope(const std::span<Token>& tokens, std::span<Token>::
 
     scope->defer = new AST::Defer(*it);
     // Append calls to destructors in the defer node
+    // FIXME: The destructor should not be called if the local variable is returned from the function!
+    //        This is tricky, the defer node is currently only used in the codegen pass, we don't generate
+    //        unique nodes for each possible return points.
     auto ordered_variable_declarations = get_scope().get_ordered_variable_declarations();
     while(!ordered_variable_declarations.empty()) {
         auto dec = ordered_variable_declarations.top();

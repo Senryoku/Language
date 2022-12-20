@@ -9,7 +9,8 @@
 #include <sys\stat.h> // _S_IREAD | _S_IWRITE
 
 extern "C" {
-	
+
+// FIXME: Change mode to an enum.
 int __open_file(const char* path, const char* mode) {
 	auto m = _O_RDONLY;
 	if(strcmp(mode, "r") == 0) m = _O_RDONLY;

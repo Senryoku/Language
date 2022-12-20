@@ -9,7 +9,8 @@ export type File {
 	let fd : int = 0;
 }
 
-// FIXME: Change these to string
+// FIXME: Change path to a String (or provide an overload?)
+//        Change mode to an enum
 export function open(this: File*, path: cstr, mode: cstr) {
 	.fd = __open_file(path, mode);
 }

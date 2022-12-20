@@ -2,8 +2,8 @@ import "std/String"
 import "std/File"
 
 function main() {
-	const sx = 2 * 1920;
-	const sy = 2 * 1024;
+	const sx = 4 * 1920;
+	const sy = 4 * 1024;
 	const max_pixel_value = 255;
 	const max_iterations = 128;
 	
@@ -22,13 +22,13 @@ function main() {
 	str_builder.append(to_string(max_iterations + 1));
 	str_builder.append('\n');
 	
-	for(let py : int = 0; py < sy; ++py) {
-		const yz : float = -1.0 + (2.0 / sy) * py;
-		for(let px : int = 0; px < sx; ++px) {
-			const xz : float = -2.5 + (3.5 / sx) * px;
+	for(let py = 0; py < sy; ++py) {
+		const yz = -1.0 + (2.0 / sy) * py;
+		for(let px = 0; px < sx; ++px) {
+			const xz = -2.5 + (3.5 / sx) * px;
 			let iterations : int = 0;
 			// Bulb test
-			const q : float= (xz - 1.0 / 4.0) * (xz - 1.0 / 4.0) + yz * yz;
+			const q = (xz - 1.0 / 4.0) * (xz - 1.0 / 4.0) + yz * yz;
 			if(q * (q + (xz - 1.0 / 4.0)) <= 1.0 / 4.0 * yz * yz) {
 				iterations = max_iterations;
 			} else {

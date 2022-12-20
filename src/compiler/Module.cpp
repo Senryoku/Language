@@ -165,6 +165,7 @@ void Module::insert_defer_block(const AST::Node* node) {
     if(scope_node->defer) {
         // TODO: Should this be a single block, instead of duplicating code?
         //       How could we implement this? With a conditional return somehow?
+        // FIXME: We should not call the destructor of returned local variables (Also see comment in Parser defer node generation)
         for(auto c : scope_node->defer->children)
             codegen(c);
     }
