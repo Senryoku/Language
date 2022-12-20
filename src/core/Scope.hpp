@@ -33,6 +33,7 @@ class Scope {
 
     bool is_valid(const het_unordered_map<std::vector<AST::FunctionDeclaration*>>::iterator& it) const { return it != _functions.end(); }
     bool is_valid(const het_unordered_map<std::vector<AST::FunctionDeclaration*>>::const_iterator& it) const { return it != _functions.cend(); }
+    [[nodiscard]] const AST::FunctionDeclaration*                      resolve_function(const std::string_view& name, const std::span<TypeID>& arguments) const;
     [[nodiscard]] const AST::FunctionDeclaration*                      resolve_function(const std::string_view& name, const std::span<AST::Node*>& arguments) const;
     inline [[nodiscard]] const std::vector<AST::FunctionDeclaration*>& get_functions(const std::string_view& name) const { return _functions.find(name)->second; };
     inline [[nodiscard]] bool                                          has_functions(const std::string_view& name) const { return is_valid(_functions.find(name)); };
@@ -150,7 +151,8 @@ class Scoped {
 
     void pop_scope() { _scopes.pop_back(); }
 
-    const AST::FunctionDeclaration* get_function(const std::string_view& name, const std::span<AST::Node*>& arguments) const;
+    [[nodiscard]] const AST::FunctionDeclaration* get_function(const std::string_view& name, const std::span<AST::Node*>& arguments) const;
+    [[nodiscard]] const AST::FunctionDeclaration* get_function(const std::string_view& name, const std::span<TypeID>& arguments) const;
     // Debug helper, gets all functions with the given name.
     std::vector<const AST::FunctionDeclaration*> get_functions(const std::string_view& name) const;
 

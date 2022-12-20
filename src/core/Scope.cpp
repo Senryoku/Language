@@ -8,7 +8,7 @@ const AST::TypeDeclaration* Scope::get_type(const std::string_view& name) const 
         return nullptr;
 }
 
-[[nodiscard]] const AST::FunctionDeclaration* Scope::resolve_function(const std::string_view& name, const std::span<AST::Node*>& arguments) const {
+[[nodiscard]] const AST::FunctionDeclaration* Scope::resolve_function(const std::string_view& name, const std::span<TypeID>& arguments) const {
     auto candidate_functions = _functions.find(name);
     if(candidate_functions == _functions.end())
         return nullptr;
@@ -22,9 +22,9 @@ const AST::TypeDeclaration* Scope::get_type(const std::string_view& name) const 
             bool args_types_match = true;
             for(auto idx = 0; idx < arguments.size(); ++idx) {
 
-                if(arguments[idx]->type_id != function->arguments()[idx]->type_id &&
+                if(arguments[idx] != function->arguments()[idx]->type_id &&
                    // Allow casting to the generic 'pointer' type
-                   (function->arguments()[idx]->type_id != PrimitiveType::Pointer || !GlobalTypeRegistry::instance().get_type(arguments[idx]->type_id)->is_pointer())) {
+                   (function->arguments()[idx]->type_id != PrimitiveType::Pointer || !GlobalTypeRegistry::instance().get_type(arguments[idx])->is_pointer())) {
                     args_types_match = false;
                     break;
                 }
@@ -38,7 +38,14 @@ const AST::TypeDeclaration* Scope::get_type(const std::string_view& name) const 
     return nullptr;
 }
 
-const AST::FunctionDeclaration* Scoped::get_function(const std::string_view& name, const std::span<AST::Node*>& arguments) const {
+[[nodiscard]] const AST::FunctionDeclaration* Scope::resolve_function(const std::string_view& name, const std::span<AST::Node*>& arguments) const {
+    std::vector<TypeID> argument_types;
+    for(auto c : arguments)
+        argument_types.push_back(c->type_id);
+    return resolve_function(name, argument_types);
+}
+
+[[nodiscard]] const AST::FunctionDeclaration* Scoped::get_function(const std::string_view& name, const std::span<TypeID>& arguments) const {
     auto it = _scopes.rbegin();
     while(it != _scopes.rend()) {
         auto ret = it->resolve_function(name, arguments);
@@ -47,6 +54,13 @@ const AST::FunctionDeclaration* Scoped::get_function(const std::string_view& nam
         it++;
     }
     return nullptr;
+}
+
+[[nodiscard]] const AST::FunctionDeclaration* Scoped::get_function(const std::string_view& name, const std::span<AST::Node*>& arguments) const {
+    std::vector<TypeID> argument_types;
+    for(auto c : arguments)
+        argument_types.push_back(c->type_id);
+    return get_function(name, argument_types);
 }
 
 std::vector<const AST::FunctionDeclaration*> Scoped::get_functions(const std::string_view& name) const {

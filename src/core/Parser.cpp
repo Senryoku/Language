@@ -349,8 +349,8 @@ bool Parser::parse_next_scope(const std::span<Token>& tokens, std::span<Token>::
     while(!ordered_variable_declarations.empty()) {
         auto dec = ordered_variable_declarations.top();
         ordered_variable_declarations.pop();
-        std::vector<AST::Node*> span;
-        span.push_back(dec);
+        std::vector<TypeID> span;
+        span.push_back(GlobalTypeRegistry::instance().get_pointer_to(dec->type_id));
         auto destructor = get_function("destructor", span);
         if(destructor) {
             Token destructor_token = end != tokens.end() ? *end : Token();
