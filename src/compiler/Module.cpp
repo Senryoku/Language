@@ -413,10 +413,7 @@ llvm::Value* Module::codegen(const AST::Node* node) {
             auto val = codegen(node->children[0]);
             switch(node->token.type) {
                 case Token::Type::Increment: {
-                    assert(node->children[0]->type == AST::Node::Type::Variable);
-                    // FIXME: Doesn't work
-                    auto allocaInst = static_cast<llvm::AllocaInst*>(val);
-                    auto value = _llvm_ir_builder.CreateLoad(allocaInst->getAllocatedType(), allocaInst, "l-to-rvalue");
+                    auto value = _llvm_ir_builder.CreateLoad(get_llvm_type(node->children[0]->type_id), val, "l-to-rvalue");
                     // FIXME: Correctly support all types.
                     auto one = node->children[0]->type_id == PrimitiveType::U64 ? _llvm_ir_builder.getInt64(1) : _llvm_ir_builder.getInt32(1);
                     auto res = _llvm_ir_builder.CreateAdd(value, one, "inc");
