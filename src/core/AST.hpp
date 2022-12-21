@@ -64,6 +64,13 @@ class AST {
             return *this;
         }
 
+        // Note: This was not actually tested, and isn't used anywhere!
+        [[nodiscard]] virtual Node* clone() const { 
+            Node* n = new Node();
+            clone_impl(n);
+            return n;
+        }
+
         virtual ~Node() {
             for(auto pNode : children)
                 delete pNode;
@@ -80,6 +87,18 @@ class AST {
         Node* pop_child();
         // Insert a node between this and its nth child
         Node* insert_between(size_t n, Node* node);
+
+    protected:
+        void clone_impl(Node* n) const {
+            n->type = type;
+            n->subtype = subtype;
+            n->parent = nullptr;
+            n->type_id = type_id;
+            n->token = token;
+
+            for(const auto c : children)
+                n->add_child(c->clone());
+        }
     };
 
     struct TypeDeclaration : public Node {
@@ -90,6 +109,7 @@ class AST {
     };
 
     struct FunctionDeclaration : public Node {
+        FunctionDeclaration() : Node(Node::Type::FunctionDeclaration) {};
         FunctionDeclaration(Token t) : Node(Node::Type::FunctionDeclaration, t) {}
 
         enum Flag : uint8_t {
@@ -102,6 +122,13 @@ class AST {
         };
 
         Flag flags = Flag::None;
+
+        [[nodiscard]] virtual FunctionDeclaration* clone() const override { 
+            auto n = new FunctionDeclaration();
+            clone_impl(n);
+            n->flags = flags;
+            return n;
+        }
 
         auto       name() const { return token.value; }
         AST::Node* body() {
@@ -164,13 +191,28 @@ class AST {
     };
 
     struct Defer : public Node {
+        Defer() : Node(Node::Type::Defer) {}
         Defer(Token t) : Node(Node::Type::Defer, t) {}
+
+        [[nodiscard]] virtual Defer* clone() const override {
+            auto n = new Defer();
+            clone_impl(n);
+            return n;
+        }
     };
 
     struct Scope : public Node {
+        Scope() : Node(Node::Type::Scope) {}
         Scope(Token t) : Node(Node::Type::Scope, t) {}
 
         AST::Defer* defer = nullptr;
+
+        [[nodiscard]] virtual Scope* clone() const override {
+            auto n = new Scope();
+            clone_impl(n);
+            n->defer = defer->clone();
+            return n;
+        }
 
         ~Scope() override {
             if(defer)
@@ -179,18 +221,35 @@ class AST {
     };
 
     struct VariableDeclaration : public Node {
+        VariableDeclaration() : Node(Node::Type::VariableDeclaration) {}
         VariableDeclaration(Token t) : Node(Node::Type::VariableDeclaration, t) {}
 
         std::string_view name;
+
+        [[nodiscard]] virtual VariableDeclaration* clone() const override {
+            auto n = new VariableDeclaration();
+            clone_impl(n);
+            n->name = name;
+            return n;
+        }
     };
 
     struct Variable : public Node {
+        Variable() : Node(Node::Type::Variable) {}
         Variable(Token t) : Node(Node::Type::Variable, t) {}
 
         std::string_view name;
+
+        [[nodiscard]] virtual Variable* clone() const override {
+            auto n = new Variable();
+            clone_impl(n);
+            n->name = name;
+            return n;
+        }
     };
 
     struct BinaryOperator : public Node {
+        BinaryOperator() : Node(Node::Type::BinaryOperator) {}
         BinaryOperator(Token t) : Node(Node::Type::BinaryOperator, t) {}
 
         Token::Type operation() const { return token.type; }
@@ -199,6 +258,7 @@ class AST {
     };
 
     struct UnaryOperator : public Node {
+        UnaryOperator() : Node(Node::Type::UnaryOperator) {}
         UnaryOperator(Token t) : Node(Node::Type::UnaryOperator, t) {}
 
         enum class Flag {
@@ -210,20 +270,43 @@ class AST {
         Flag flags = Flag::None;
 
         Node* argument() const { return children[0]; }
+
+        [[nodiscard]] virtual UnaryOperator* clone() const override {
+            auto n = new UnaryOperator();
+            clone_impl(n);
+            n->flags = flags;
+            return n;
+        }
     };
 
     struct MemberIdentifier : public Node {
+        MemberIdentifier() : Node(Node::Type::MemberIdentifier) {}
         MemberIdentifier(Token t) : Node(Node::Type::MemberIdentifier, t) {}
 
         uint32_t index = 0;
 
         std::string_view get_name() const { return token.value; }
+
+        [[nodiscard]] virtual MemberIdentifier* clone() const override {
+            auto n = new MemberIdentifier();
+            clone_impl(n);
+            n->index = index;
+            return n;
+        }
     };
 
     template<typename T>
     struct Literal : public Node {
+        Literal() : Node(Type::ConstantValue) {}
         Literal(Token t) : Node(Type::ConstantValue, t) {}
         T value = T{};
+
+        [[nodiscard]] virtual Literal<typename T>* clone() const override {
+            auto n = new Literal<T>();
+            clone_impl(n);
+            n->value = value;
+            return n;
+        }
     };
 
     struct BoolLiteral : public Literal<bool> {
