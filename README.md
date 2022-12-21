@@ -101,7 +101,7 @@ export function function_name() : MyType {
 	...
 }
 
-// Exporting variable/value is not supported yet.
+// Exporting variables/values is not supported yet.
 ```
 
 ## Todo
