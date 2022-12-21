@@ -1,5 +1,5 @@
 // RET : 666
-// FAIL: 68435184
+// FAIL: returned 68435184
 
 function main() {
 	const i : int = 547;

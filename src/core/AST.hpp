@@ -16,7 +16,7 @@ class AST {
         enum class Type {
             Root,
             Statement,
-            Defer,
+            Defer, // This is not used anymore. It used to hold calls to destructors, but they are now 'inlined' in the AST, allowing for more control. I keeping it around for now as it could be used for an actual defer feature.
             Scope,
             Expression,
             IfStatement,
@@ -224,12 +224,19 @@ class AST {
         VariableDeclaration() : Node(Node::Type::VariableDeclaration) {}
         VariableDeclaration(Token t) : Node(Node::Type::VariableDeclaration, t) {}
 
+        enum Flag : uint8_t {
+            None  = 0,
+            Moved = 1 << 0,
+        };
+
         std::string_view name;
+        Flag             flags = Flag::None;
 
         [[nodiscard]] virtual VariableDeclaration* clone() const override {
             auto n = new VariableDeclaration();
             clone_impl(n);
             n->name = name;
+            n->flags = flags;
             return n;
         }
     };
@@ -364,6 +371,22 @@ inline AST::FunctionDeclaration::Flag operator|=(AST::FunctionDeclaration::Flag&
 inline AST::FunctionDeclaration::Flag operator&(AST::FunctionDeclaration::Flag lhs, AST::FunctionDeclaration::Flag rhs) {
     return static_cast<AST::FunctionDeclaration::Flag>(static_cast<std::underlying_type_t<AST::FunctionDeclaration::Flag>>(lhs) &
                                                        static_cast<std::underlying_type_t<AST::FunctionDeclaration::Flag>>(rhs));
+}
+
+
+inline AST::VariableDeclaration::Flag operator|(AST::VariableDeclaration::Flag lhs, AST::VariableDeclaration::Flag rhs) {
+    return static_cast<AST::VariableDeclaration::Flag>(static_cast<std::underlying_type_t<AST::VariableDeclaration::Flag>>(lhs) |
+                                                       static_cast<std::underlying_type_t<AST::VariableDeclaration::Flag>>(rhs));
+}
+
+inline AST::VariableDeclaration::Flag operator|=(AST::VariableDeclaration::Flag& lhs, AST::VariableDeclaration::Flag rhs) {
+    lhs = lhs | rhs;
+    return lhs;
+}
+
+inline AST::VariableDeclaration::Flag operator&(AST::VariableDeclaration::Flag lhs, AST::VariableDeclaration::Flag rhs) {
+    return static_cast<AST::VariableDeclaration::Flag>(static_cast<std::underlying_type_t<AST::VariableDeclaration::Flag>>(lhs) &
+                                                       static_cast<std::underlying_type_t<AST::VariableDeclaration::Flag>>(rhs));
 }
 
 #include <formatters/ASTFormat.hpp>

@@ -154,23 +154,6 @@ llvm::Constant* Module::codegen_constant(const AST::Node* val) {
     return nullptr;
 }
 
-void Module::insert_defer_block(const AST::Node* node) {
-    // Search for closest scope node
-    auto parent_node = node->parent;
-    while(parent_node && parent_node->type != AST::Node::Type::Scope)
-        parent_node = parent_node->parent;
-
-    assert(parent_node != nullptr);
-    auto scope_node = static_cast<const AST::Scope*>(parent_node);
-    if(scope_node->defer) {
-        // TODO: Should this be a single block, instead of duplicating code?
-        //       How could we implement this? With a conditional return somehow?
-        // FIXME: We should not call the destructor of returned local variables (Also see comment in Parser defer node generation)
-        for(auto c : scope_node->defer->children)
-            codegen(c);
-    }
-}
-
 llvm::Value* Module::codegen(const AST::Node* node) {
     switch(node->type) {
         case AST::Node::Type::Root: [[fallthrough]];
@@ -616,15 +599,13 @@ llvm::Value* Module::codegen(const AST::Node* node) {
             return llvm::Constant::getNullValue(llvm::Type::getInt32Ty(*_llvm_context));
         }
         case AST::Node::Type::ReturnStatement: {
-            auto val = node->children.empty() ? nullptr : codegen(node->children[0]);
             _generated_return = true;
-
-            insert_defer_block(node);
             if(node->children.empty()) {
                 assert(node->type_id == PrimitiveType::Void);
                 return _llvm_ir_builder.CreateRetVoid();
-            } else
-                return _llvm_ir_builder.CreateRet(val);
+            } else {
+                return _llvm_ir_builder.CreateRet(codegen(node->children[0]));
+            }
         }
         default: warn("LLVM Codegen: Unsupported node type '{}'.\n", node->type);
     }

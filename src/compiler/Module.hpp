@@ -116,5 +116,4 @@ class Module {
     llvm::Value*    codegen(const AST::Node* node);
 
     llvm::Type* get_llvm_type(TypeID type_id) const;
-    void        insert_defer_block(const AST::Node* node);
 };

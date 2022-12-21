@@ -147,27 +147,55 @@ bool Parser::parse(const std::span<Token>& tokens, AST::Node* curr_node) {
                 parse_variable_declaration(tokens, it, curr_node, true);
                 break;
             case Token::Type::Return: {
-                auto returnNode = curr_node->add_child(new AST::Node(AST::Node::Type::ReturnStatement, *it));
+                std::unique_ptr<AST::Node> return_node(new AST::Node(AST::Node::Type::ReturnStatement, *it));
                 ++it;
                 if(it->type == Token::Type::EndStatement) {
-                    returnNode->type_id = PrimitiveType::Void;
+                    return_node->type_id = PrimitiveType::Void;
+                    curr_node->add_child(return_node.release());
                     break;
                 }
-                auto to_rvalue = returnNode->add_child(new AST::Node(AST::Node::Type::LValueToRValue));
-                if(!parse_next_expression(tokens, it, to_rvalue)) {
-                    delete curr_node->pop_child();
+                auto to_rvalue = return_node->add_child(new AST::Node(AST::Node::Type::LValueToRValue));
+                if(!parse_next_expression(tokens, it, to_rvalue))
                     return false;
+
+                // FIXME: Detect return of structs to mark them as 'moved' and avoid calling their destructor.
+                //        There's probably a more elegant way to do this... And it will probably not be the only way to move a local value.
+                AST::VariableDeclaration* return_variable = nullptr;
+                if (to_rvalue->children[0]->type == AST::Node::Type::Variable) {
+                    auto ret_type = GlobalTypeRegistry::instance().get_type(to_rvalue->children[0]->type_id);
+                    if(ret_type->is_struct()) {
+                        return_variable = get(to_rvalue->children[0]->token.value);
+                        if(!return_variable) {
+                            warn("[Parser] Uh?! Returning a non-existant variable '{}' ?\n", to_rvalue->children[0]->token.value);
+                        } else {
+                            // FIXME: This could be completely fine for type without destructors (or with another set of compile time constraints? Traits?)
+                            if(return_variable->flags & AST::VariableDeclaration::Flag::Moved)
+                                throw Exception(fmt::format("[Parser] Returning variable '{}' which was already moved!\n", return_variable->token.value),
+                                                point_error(return_node->token));
+                                
+                            return_variable->flags |= AST::VariableDeclaration::Flag::Moved;
+                        }
+                    }
                 }
+
+                insert_defer_node(curr_node);
+
+                // The return value is moved only if this return is actually taken, restore the original value for the rest of this scope.
+                if(return_variable)
+                    return_variable->flags |= AST::VariableDeclaration::Flag::Moved;
+
                 to_rvalue->type_id = to_rvalue->children[0]->type_id;
-                returnNode->type_id = returnNode->children[0]->type_id;
+                return_node->type_id = return_node->children[0]->type_id;
                 auto scope_return_type = get_scope().get_return_type();
                 if(scope_return_type == InvalidTypeID) {
-                    get_scope().set_return_type(returnNode->type_id);
-                } else if(scope_return_type != returnNode->type_id) {
+                    get_scope().set_return_type(return_node->type_id);
+                } else if(scope_return_type != return_node->type_id) {
                     throw Exception(fmt::format("[Parser] Syntax error: Incoherent return types, got {}, expected {}.\n",
-                                                GlobalTypeRegistry::instance().get_type(returnNode->type_id)->designation, scope_return_type),
-                                    point_error(returnNode->token));
+                                                GlobalTypeRegistry::instance().get_type(return_node->type_id)->designation, scope_return_type),
+                                    point_error(return_node->token));
                 }
+
+                curr_node->add_child(return_node.release());
                 break;
             }
 
@@ -339,45 +367,6 @@ bool Parser::parse_next_scope(const std::span<Token>& tokens, std::span<Token>::
     push_scope();
     bool r = parse({begin, end}, scope);
     scope->type_id = get_scope().get_return_type();
-
-    scope->defer = new AST::Defer(*it);
-    // Append calls to destructors in the defer node
-    // FIXME: The destructor should not be called if the local variable is returned from the function!
-    //        This is tricky, the defer node is currently only used in the codegen pass, we don't generate
-    //        unique nodes for each possible return points.
-    auto ordered_variable_declarations = get_scope().get_ordered_variable_declarations();
-    while(!ordered_variable_declarations.empty()) {
-        auto dec = ordered_variable_declarations.top();
-        ordered_variable_declarations.pop();
-        std::vector<TypeID> span;
-        span.push_back(GlobalTypeRegistry::instance().get_pointer_to(dec->type_id));
-        auto destructor = get_function("destructor", span);
-        if(destructor) {
-            Token destructor_token = end != tokens.end() ? *end : Token();
-            destructor_token.type = Token::Type::Identifier;
-            destructor_token.value = *internalize_string("destructor");
-            auto call_node = new AST::FunctionCall(destructor_token);
-            call_node->type_id = destructor->type_id;
-            call_node->flags = destructor->flags;
-
-            scope->defer->add_child(call_node);
-            // Destructor method designation
-            auto destructor_node = new AST::Variable(destructor_token); // FIXME: Still using the token to get the function...
-            call_node->add_child(destructor_node);
-            // Destructor argument (pointer to the object)
-            auto get_pointer_node = call_node->add_child(new AST::Node(AST::Node::Type::GetPointer, dec->token));
-            get_pointer_node->type_id = GlobalTypeRegistry::instance().get_pointer_to(dec->type_id);
-            auto var_node = get_pointer_node->add_child(new AST::Variable(dec->token));
-            var_node->type_id = dec->type_id;
-
-            check_function_call(call_node, destructor);
-        }
-    }
-    // Defer node is empty, no need to keep it around.
-    if(scope->defer->children.size() == 0) {
-        delete scope->defer;
-        scope->defer = nullptr;
-    }
 
     pop_scope();
     it = end + 1;
@@ -1373,6 +1362,41 @@ void Parser::resolve_operator_type(AST::BinaryOperator* op_node) {
             error("[Parser] Couldn't resolve operator return type (Missing impl.) on line {}. Node:\n", op_node->token.line);
             fmt::print("{}\n", *static_cast<AST::Node*>(op_node));
             throw Exception(fmt::format("[Parser] Couldn't resolve operator return type (Missing impl.) on line {}.\n", op_node->token.line));
+        }
+    }
+}
+
+void Parser::insert_defer_node(AST::Node* curr_node) {
+    auto ordered_variable_declarations = get_scope().get_ordered_variable_declarations();
+    while(!ordered_variable_declarations.empty()) {
+        auto dec = ordered_variable_declarations.top();
+        ordered_variable_declarations.pop();
+
+        if(dec->flags & AST::VariableDeclaration::Flag::Moved)
+            continue;
+
+        std::vector<TypeID> span;
+        span.push_back(GlobalTypeRegistry::instance().get_pointer_to(dec->type_id));
+        auto destructor = get_function("destructor", span);
+        if(destructor) {
+            Token destructor_token;
+            destructor_token.type = Token::Type::Identifier;
+            destructor_token.value = *internalize_string("destructor");
+            auto call_node = new AST::FunctionCall(destructor_token);
+            call_node->type_id = destructor->type_id;
+            call_node->flags = destructor->flags;
+
+            curr_node->add_child(call_node);
+            // Destructor method designation
+            auto destructor_node = new AST::Variable(destructor_token); // FIXME: Still using the token to get the function...
+            call_node->add_child(destructor_node);
+            // Destructor argument (pointer to the object)
+            auto get_pointer_node = call_node->add_child(new AST::Node(AST::Node::Type::GetPointer, dec->token));
+            get_pointer_node->type_id = GlobalTypeRegistry::instance().get_pointer_to(dec->type_id);
+            auto var_node = get_pointer_node->add_child(new AST::Variable(dec->token));
+            var_node->type_id = dec->type_id;
+
+            check_function_call(call_node, destructor);
         }
     }
 }
