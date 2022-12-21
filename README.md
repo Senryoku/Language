@@ -78,11 +78,12 @@ export function function_name() : cstr {
  - Design
    - Handle const-ness: Default to const for struct passed to functions, add a way to opt-in for mutability (espacially for 'member functions').
    - Should we have constructors (other than the default one that is currently not implemented :)) )? And copy/move constructors? Can we get away with some sort of 'always move', and providing standardized clone/copy functions?
+     - Currently variables are marked as 'moved' when returned from a function to avoid calling their destructors. This is obviously not enough, we'll need a more general mechanism to handle marking object as moved. There is also a problem with actually retrieving value returned by functions: Nothing prevents the called to ignore the return value and currently I'm pretty sure the destructor will never be called in this case. We need a better model for this, but I think I'm not the right track (It looks like the idea of 'always move unless explicitly cloning' is pretty much what Rust does, but I need to read more about that.)
+     - In summary: I have to come up with a good ownership/lifetime model.
    - Heap allocation?
+   - Think about UTF-8. Both in the language itself (the String class should probably be utf-8 by default), and the compiler implementation (inputs). 
  - Implementation
    - Generate default constructors (and call them) for types with default values.
-   - Re-think destructors calls (They're called as soon as the declared variable is out of scope, even if it's returned from a function, for example.)
-   - Handle returning structs from a function in general.
    - [] and () should be proper binary operators, not weird special cases.
      - Rewrite builtin Arrays with this in mind.
    - String interning for keyword and symbols
