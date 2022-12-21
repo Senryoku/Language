@@ -172,6 +172,13 @@ bool handle_file(const std::filesystem::path& path) {
                 if(args['i'].set)
                     return true;
             }
+            if(args['l'].set) {
+            #ifndef NDEBUG
+                new_module.get_llvm_module().dump();
+            #else
+                warn("[compiler] LLVM Module dump is only available in debug builds.");
+            #endif
+            }
 
             const auto write_ir_end = std::chrono::high_resolution_clock::now();
 
@@ -328,6 +335,7 @@ int main(int argc, char* argv[]) {
     args.add('o', "out", 1, 1, "Specify the output file.");
     args.add('t', "tokens", 0, 0, "Dump the state after the tokenizing stage.");
     args.add('a', "ast", 0, 0, "Dump the parsed AST to the command line.");
+    args.add('l', "llvm-ir", 0, 0, "Dump the LLVM IR to the command line.");
     args.add('i', "ir", 0, 0, "Output LLVM Intermediate Representation.");
     args.add('r', "run", 0, 256, "Run the resulting executable.");
     args.add('b', "object", 0, 0, "Output an object file.");
