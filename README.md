@@ -16,14 +16,14 @@ Working on a compiler using LLVM IR and clang to generate native executables.
     - Float `float`, `double`
     - Array (fixed size) of other Primitive Types `int[32]`. Will be reworked.
     - C-String `cstr`, null-terminated to interface with C/C++
-  - Variable Declaration
-```c
-let variable_name : type = optional_initial_value;
-let a : int = 0;
-const b : float = 0.0;
-const c = 0.0; // Type derived from the initial value
-```
-  - Branch
+  - Basic Control Flow
+<table>
+<tr>
+<td> Condition </td> <td> While Loop </td><td> For Loop </td>
+</tr>
+<tr>
+<td>
+	
 ```c
 if(condition)
 	single_statement;
@@ -31,12 +31,37 @@ else {
 	...block
 }
 ```
-  - While Loop
+	
+</td>
+<td>
+	
 ```c
 while(condition_expression) {
 	[...while_body]
 }
 ```
+	
+</td>
+<td>
+	
+```c
+for(let i : int = 0; i < length; ++i) {
+	[...for_body]
+}
+```
+	
+</td>
+</tr>
+</table>
+
+  - Variable Declaration
+```c
+let variable_name : type = optional_initial_value;
+let a : int = 0;
+const b : float = 0.0;
+const c = 0.0; // Type derived from the initial value
+```
+
   - Function Declaration
 ```c
 function name(param_0 : int, param_1 : float) : int {
@@ -66,11 +91,17 @@ function main() : int {
   - Modules
 ```c
 import "std/String"
-import "module"
+import "other_module"
 
-export function function_name() : cstr {
+export type MyType {
 	...
 }
+
+export function function_name() : MyType {
+	...
+}
+
+// Exporting variable/value is not supported yet.
 ```
 
 ## Todo
