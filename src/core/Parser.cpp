@@ -65,6 +65,8 @@ TypeID Parser::resolve_operator_type(Token::Type op, TypeID lhs, TypeID rhs) {
         auto lhs_type = GlobalTypeRegistry::instance().get_type(lhs);
         if(lhs_type->is_array())
             return dynamic_cast<const ArrayType*>(lhs_type)->element_type;
+        if(lhs != PrimitiveType::Pointer && lhs_type->is_pointer())
+            return dynamic_cast<const PointerType*>(lhs_type)->pointee_type;
     }
 
     if(lhs == rhs && is_primitive(lhs))
@@ -533,8 +535,9 @@ bool Parser::parse_identifier(const std::span<Token>& tokens, std::span<Token>::
     variable_node->type_id = variable.type_id;
 
     if(peek(tokens, it, Token::Type::OpenSubscript)) { // Array accessor
-        if(!(variable.type_id == PrimitiveType::CString) && !GlobalTypeRegistry::instance().get_type(variable.type_id)->is_array())
-            throw Exception(fmt::format("[Parser] Syntax Error: Subscript operator on variable '{}' which is neither a string nor an array.\n", it->value), point_error(*it));
+        auto type = GlobalTypeRegistry::instance().get_type(variable.type_id);
+        if(!(variable.type_id == PrimitiveType::CString) && !type->is_array() && !type->is_pointer())
+            throw Exception(fmt::format("[Parser] Syntax Error: Subscript operator on variable '{}' which is neither a string nor an array, nor a pointer.\n", it->value), point_error(*it));
         auto access_operator_node = new AST::BinaryOperator(*(it + 1));
         access_operator_node->add_child(curr_node->pop_child());
         curr_node->add_child(access_operator_node);
@@ -542,8 +545,10 @@ bool Parser::parse_identifier(const std::span<Token>& tokens, std::span<Token>::
         // FIXME: Get rid of this special case? (And the string type?)
         if(variable.type_id == PrimitiveType::CString)
             access_operator_node->type_id = PrimitiveType::Char;
+        else if(type->is_pointer()) // FIXME: Won't work for string. But we'll probably get rid of it anyway.
+            access_operator_node->type_id = dynamic_cast<const PointerType*>(type)->pointee_type;
         else // FIXME: Won't work for string. But we'll probably get rid of it anyway.
-            access_operator_node->type_id = dynamic_cast<const ArrayType*>(GlobalTypeRegistry::instance().get_type(variable.type_id))->element_type;
+            access_operator_node->type_id = dynamic_cast<const ArrayType*>(type)->element_type;
 
         auto ltor = new AST::Node(AST::Node::Type::LValueToRValue);
         access_operator_node->add_child(ltor);
@@ -1285,11 +1290,11 @@ bool Parser::parse_variable_declaration(const std::span<Token>& tokens, std::spa
             call_node->flags = constructor->flags;
 
             curr_node->add_child(call_node);
-            // Destructor method designation
+            // Constructor method designation
             auto constructor_node =
                 new AST::Variable(Token(Token::Type::Identifier, *internalize_string("constructor"), 0, 0)); // FIXME: Still using the token to get the function...
             call_node->add_child(constructor_node);
-            // Destructor argument (pointer to the object)
+            // Constructor argument (pointer to the object)
             auto get_pointer_node = call_node->add_child(new AST::Node(AST::Node::Type::GetPointer, var_declaration_node->token));
             get_pointer_node->type_id = GlobalTypeRegistry::instance().get_pointer_to(var_declaration_node->type_id);
             auto var_node = get_pointer_node->add_child(new AST::Variable(var_declaration_node->token));

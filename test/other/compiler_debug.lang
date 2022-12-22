@@ -1,25 +1,85 @@
-import "std/memory"
+import "std/File"
 
-type Test {
-	let i : int = 0;
-	let t : char* = null_pointer();
+function main() : int {
+	printf("Trying to open a file...\n");
+	let file : File;
+	printf("File Descriptor: %d.\n", file.fd);
+	file.open("H:/Source/Lang/.gitignore", "r");
+	printf("File Descriptor: %d.\n", file.fd);
+	file.close();
+	return 0;
 }
 
-function destructor(this: Test*) : void {
-	printf("Destructor called: Start at %d\n", .i);
-	.i = .i + 1;
-	printf("                   End at   %d\n", .i);
-}
-
-function test() : Test {
-	let t : Test;
-	return t;
-}
-
-function main() {
-	let t = test();
-	printf("In Main: %d\n", t.i);
-	t.i = t.i + 1;
-	printf("In Main 2: %d\n", t.i);
-	return t.i;
-}
+//import "std/memory"
+//
+//type Array {
+//	let capacity : u64 = 0;
+//	let length : u64 = 0;
+//	let data : u64* = null_pointer();
+//}
+//
+//function reserve(this: Array*, size: u64) : void {
+//	if(size <= .capacity)
+//		return;
+//	
+//	let ptr : u64* = malloc(size);
+//	
+//	if(.length > 0) {
+//		for(let idx : u64 = 0; idx < .length; ++idx) {
+//			ptr[idx] = .data[idx];
+//		}
+//		free(.data);
+//	}
+//	
+//	.capacity = size;
+//	.data = ptr;
+//}
+//
+//function push_back(this: Array*, value: u64) : u64 {
+//	if(.capacity <= .length) 
+//		.reserve((.capacity + 1) * 2);
+//	
+//	.data[.length] = value;
+//	++.length;
+//	return .length;
+//}
+//
+//function destructor(this: Array*) : void {
+//	free(.data);
+//	.length = 0;
+//	.capacity = 0;
+//}
+//
+//function dump(this: Array*) : void {
+//	printf("----------------\n");
+//	for(let idx : u64 = 0; idx < .length; ++idx) {
+//		printf("%d = %d\n", idx, .data[idx]);
+//	}
+//}
+//
+//function test() : Array {
+//	let arr : Array;
+//	
+//	const forty_two : u64 = 42; // Forced Cast, otherwise the we can't resolve the function, yet.
+//	const leet : u64 = 1337;
+//	arr.push_back(forty_two);
+//	arr.push_back(leet);
+//	arr.dump();
+//	arr.push_back(forty_two);
+//	arr.push_back(leet);
+//	arr.dump();
+//	arr.push_back(forty_two);
+//	arr.push_back(leet);
+//	arr.dump();
+//	arr.push_back(forty_two);
+//	arr.push_back(leet);
+//	arr.dump();
+//	
+//	return arr;
+//}
+//
+//function main() {
+//	let t = test();
+//	t.dump();
+//	return t.length;
+//}

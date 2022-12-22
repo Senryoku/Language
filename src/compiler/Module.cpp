@@ -183,46 +183,53 @@ llvm::Value* Module::codegen(const AST::Node* node) {
             if(!child)
                 return nullptr;
             // TODO: Handle child's type.
-            assert(is_primitive(node->type_id));
-            // Switch on destination type
-            switch(node->type_id) {
-                case PrimitiveType::Float: {
-                    assert(node->children[0]->type_id == PrimitiveType::Integer); // TEMP
-                    return _llvm_ir_builder.CreateSIToFP(child, llvm::Type::getFloatTy(*_llvm_context), "castSIToFP");
-                }
-                case PrimitiveType::U8: [[fallthrough]];
-                case PrimitiveType::U16: [[fallthrough]];
-                case PrimitiveType::U32: [[fallthrough]];
-                case PrimitiveType::U64: {
-                    return _llvm_ir_builder.CreateCast(llvm::Instruction::ZExt, child, get_llvm_type(node->type_id), "castZeroExt");
-                }
-                case PrimitiveType::Integer: {
-                    if(node->children[0]->type_id == PrimitiveType::Float || node->children[0]->type_id == PrimitiveType::Double)
-                        return _llvm_ir_builder.CreateFPToSI(child, llvm::Type::getInt32Ty(*_llvm_context), "castFPToSI");
-                    [[fallthrough]];
-                }
-                case PrimitiveType::I8: [[fallthrough]];
-                case PrimitiveType::I16: [[fallthrough]];
-                case PrimitiveType::I32: [[fallthrough]];
-                case PrimitiveType::I64: {
-                    return _llvm_ir_builder.CreateCast(llvm::Instruction::SExt, child, get_llvm_type(node->type_id), "castSignExt");
-                }
-                case PrimitiveType::Pointer: {
-                    auto type = GlobalTypeRegistry::instance().get_type(node->children[0]->type_id);
-                    assert(type->is_pointer());
-                    auto as_int = _llvm_ir_builder.CreatePtrToInt(child, llvm::Type::getInt64Ty(*_llvm_context), "castToU64");
-                    return _llvm_ir_builder.CreateIntToPtr(as_int, get_llvm_type(node->type_id), "castToVoidPtr");
-                }
-                case PrimitiveType::CString: {
-                    if(node->children[0]->type_id == PrimitiveType::Pointer) {
-                        auto as_int = _llvm_ir_builder.CreatePtrToInt(child, llvm::Type::getInt64Ty(*_llvm_context), "castToU64");
-                        return _llvm_ir_builder.CreateIntToPtr(as_int, get_llvm_type(node->type_id), "castToCStr");
+            if(is_primitive(node->type_id)) {
+                switch(node->type_id) {
+                    case PrimitiveType::Float: {
+                        assert(node->children[0]->type_id == PrimitiveType::Integer); // TEMP
+                        return _llvm_ir_builder.CreateSIToFP(child, llvm::Type::getFloatTy(*_llvm_context), "castSIToFP");
                     }
-                    [[fallthrough]];
+                    case PrimitiveType::U8: [[fallthrough]];
+                    case PrimitiveType::U16: [[fallthrough]];
+                    case PrimitiveType::U32: [[fallthrough]];
+                    case PrimitiveType::U64: {
+                        return _llvm_ir_builder.CreateCast(llvm::Instruction::ZExt, child, get_llvm_type(node->type_id), "castZeroExt");
+                    }
+                    case PrimitiveType::Integer: {
+                        if(node->children[0]->type_id == PrimitiveType::Float || node->children[0]->type_id == PrimitiveType::Double)
+                            return _llvm_ir_builder.CreateFPToSI(child, llvm::Type::getInt32Ty(*_llvm_context), "castFPToSI");
+                        [[fallthrough]];
+                    }
+                    case PrimitiveType::I8: [[fallthrough]];
+                    case PrimitiveType::I16: [[fallthrough]];
+                    case PrimitiveType::I32: [[fallthrough]];
+                    case PrimitiveType::I64: {
+                        return _llvm_ir_builder.CreateCast(llvm::Instruction::SExt, child, get_llvm_type(node->type_id), "castSignExt");
+                    }
+                    case PrimitiveType::Pointer: {
+                        auto type = GlobalTypeRegistry::instance().get_type(node->children[0]->type_id);
+                        assert(type->is_pointer());
+                        auto as_int = _llvm_ir_builder.CreatePtrToInt(child, llvm::Type::getInt64Ty(*_llvm_context), "castToU64");
+                        return _llvm_ir_builder.CreateIntToPtr(as_int, get_llvm_type(node->type_id), "castToVoidPtr");
+                    }
+                    case PrimitiveType::CString: {
+                        if(node->children[0]->type_id == PrimitiveType::Pointer) {
+                            auto as_int = _llvm_ir_builder.CreatePtrToInt(child, llvm::Type::getInt64Ty(*_llvm_context), "castToU64");
+                            return _llvm_ir_builder.CreateIntToPtr(as_int, get_llvm_type(node->type_id), "castToCStr");
+                        }
+                        [[fallthrough]];
+                    }
+                    default:
+                        error("[LLVMCodegen] LLVM::Codegen: Cast from {} to {} not supported.\n", type_id_to_string(node->children[0]->type_id), type_id_to_string(node->type_id));
+                        return nullptr;
                 }
-                default:
-                    error("[LLVMCodegen] LLVM::Codegen: Cast from {} to {} not supported.\n", type_id_to_string(node->children[0]->type_id), type_id_to_string(node->type_id));
-                    return nullptr;
+            } else {
+                // Generic Pointer type to Typed Ptr
+                auto type = GlobalTypeRegistry::instance().get_type(node->type_id);
+                if(type->is_pointer() && node->children[0]->type_id == PrimitiveType::Pointer) {
+                    auto as_int = _llvm_ir_builder.CreatePtrToInt(child, llvm::Type::getInt64Ty(*_llvm_context), "castToU64");
+                    return _llvm_ir_builder.CreateIntToPtr(as_int, get_llvm_type(node->type_id), "castToTypedPtr");
+                }
             }
         }
         case AST::Node::Type::TypeDeclaration: {
@@ -379,10 +386,10 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                     auto element_type = get_llvm_type(arr_type->element_type);
                     return _llvm_ir_builder.CreateLoad(element_type, value, "l-to-rvalue");
                 }
-                if(child->children[0]->type_id == PrimitiveType::CString) {
+                if(type->is_pointer()) {
                     assert(value->getType()->isPointerTy());
-                    auto charType = get_llvm_type(PrimitiveType::Char);
-                    return _llvm_ir_builder.CreateLoad(charType, value, "l-to-rvalue");
+                    auto pointee_type = get_llvm_type(dynamic_cast<const PointerType*>(type)->pointee_type);
+                    return _llvm_ir_builder.CreateLoad(pointee_type, value, "l-to-rvalue");
                 }
             }
             // warn("[LLVMCodegen] LValueToRValue without effect:\n{}", *node);
@@ -450,21 +457,20 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                     return _llvm_ir_builder.CreateAnd(lhs, rhs, "and");
                 }
                 case Token::Type::OpenSubscript: {
-                    // FIXME: Remove these checks
-                    // assert(node->children[0]->type == AST::Node::Type::Variable);
-                    auto type_record = GlobalTypeRegistry::instance().get_type(node->children[0]->type_id);
-                    assert(type_record->is_array() || node->children[0]->type_id == PrimitiveType::CString);
-                    if(type_record->is_array()) {
-                        auto type = get_llvm_type(node->children[0]->type_id);
-                        return _llvm_ir_builder.CreateGEP(type, lhs, {llvm::ConstantInt::get(*_llvm_context, llvm::APInt(32, 0)), rhs}, "ArrayGEP");
-                    } else if(node->children[0]->type_id == PrimitiveType::CString) { // FIXME: Remove this String special case?
-                        auto charType = get_llvm_type(PrimitiveType::Char);
+                    auto type = GlobalTypeRegistry::instance().get_type(node->children[0]->type_id);
+                    assert(type->is_array() || type->is_pointer());
+                    if(type->is_array()) {
+                        auto llvm_type = get_llvm_type(node->children[0]->type_id);
+                        return _llvm_ir_builder.CreateGEP(llvm_type, lhs, {llvm::ConstantInt::get(*_llvm_context, llvm::APInt(32, 0)), rhs}, "ArrayGEP");
+                    } else if(type->is_pointer()) {
+                        auto pointer_type = dynamic_cast<const PointerType*>(type);
+                        auto pointee_type = get_llvm_type(pointer_type->pointee_type);
                         // FIXME: This is extremely hackish... I guess we should just make sure to insert a LValueToRValue node when necessary.
                         if(node->children[0]->type == AST::Node::Type::LValueToRValue) {
-                            return _llvm_ir_builder.CreateGEP(charType, lhs, {rhs}, "CStringGEP");
+                            return _llvm_ir_builder.CreateGEP(pointee_type, lhs, {rhs}, "PointerGEP");
                         } else {
-                            auto load = _llvm_ir_builder.CreateLoad(charType->getPointerTo(), lhs);
-                            return _llvm_ir_builder.CreateGEP(charType, load, {rhs}, "CStringGEP"); // FIXME: Should not be there (Or should it?)
+                            auto load = _llvm_ir_builder.CreateLoad(pointee_type->getPointerTo(), lhs);
+                            return _llvm_ir_builder.CreateGEP(pointee_type, load, {rhs}, "PointerGEP");
                         }
                     }
                     assert(false);
