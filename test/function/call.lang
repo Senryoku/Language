@@ -1,5 +1,0 @@
-function multiply(int lhs, int rhs) {
-	return lhs * rhs;
-}
-
-return multiply(18, 48);

@@ -1,6 +1,0 @@
-int a = 6;
-function c(int f) {
-	return 8 * f;
-}
-int b = a * 2 * c(4);
-return b;

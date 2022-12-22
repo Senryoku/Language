@@ -1,5 +1,0 @@
-int a = 2; 
-int b = 5; 
-int c = a * b;
-int d = c + 8;
-int e = 2 * a * b + 4 + 4 * c + 5;
