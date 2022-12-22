@@ -25,7 +25,7 @@ export function send(this: Socket*, data: cstr) {
 	__socket_send(.fd, data);
 }
 
-// FIXME: Should return a array of bytes, of something.
+// FIXME: Should return an array of bytes, or something.
 export function recv(this: Socket*) : cstr {
 	return __socket_recv(.fd);
 }

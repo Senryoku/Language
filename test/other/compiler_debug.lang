@@ -1,5 +1,8 @@
+import "std/memory"
+
 type Test {
 	let i : int = 0;
+	let t : char* = null_pointer();
 }
 
 function destructor(this: Test*) : void {
@@ -10,7 +13,6 @@ function destructor(this: Test*) : void {
 
 function test() : Test {
 	let t : Test;
-	t.i = 0;
 	return t;
 }
 

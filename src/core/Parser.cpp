@@ -161,7 +161,7 @@ bool Parser::parse(const std::span<Token>& tokens, AST::Node* curr_node) {
                 // FIXME: Detect return of structs to mark them as 'moved' and avoid calling their destructor.
                 //        There's probably a more elegant way to do this... And it will probably not be the only way to move a local value.
                 AST::VariableDeclaration* return_variable = nullptr;
-                if (to_rvalue->children[0]->type == AST::Node::Type::Variable) {
+                if(to_rvalue->children[0]->type == AST::Node::Type::Variable) {
                     auto ret_type = GlobalTypeRegistry::instance().get_type(to_rvalue->children[0]->type_id);
                     if(ret_type->is_struct()) {
                         return_variable = get(to_rvalue->children[0]->token.value);
@@ -172,7 +172,7 @@ bool Parser::parse(const std::span<Token>& tokens, AST::Node* curr_node) {
                             if(return_variable->flags & AST::VariableDeclaration::Flag::Moved)
                                 throw Exception(fmt::format("[Parser] Returning variable '{}' which was already moved!\n", return_variable->token.value),
                                                 point_error(return_node->token));
-                                
+
                             return_variable->flags |= AST::VariableDeclaration::Flag::Moved;
                         }
                     }
@@ -304,7 +304,13 @@ bool Parser::parse(const std::span<Token>& tokens, AST::Node* curr_node) {
                     case Token::Type::Type: {
                         if(!parse_type_declaration(tokens, it, curr_node))
                             return false;
-                        _module_interface.type_exports.push_back(static_cast<AST::TypeDeclaration*>(curr_node->children.back()));
+                        _module_interface.type_exports.push_back(static_cast<AST::TypeDeclaration*>(curr_node->children[0]));
+                        // Also export the default (auto-generated) constructor
+                        if(curr_node->children.size() > 1) {
+                            auto constructor = static_cast<AST::FunctionDeclaration*>(curr_node->children[1]);
+                            constructor->flags |= AST::FunctionDeclaration::Flag::Exported;
+                            _module_interface.exports.push_back(constructor);
+                        }
                         break;
                     }
                     case Token::Type::Let:
@@ -666,27 +672,27 @@ bool Parser::parse_function_declaration(const std::span<Token>& tokens, std::spa
     expect(tokens, it, Token::Type::Function);
     if(it->type != Token::Type::Identifier)
         throw Exception(fmt::format("[Parser] Expected identifier in function declaration, got {}.\n", *it), point_error(*it));
-    auto functionNode = new AST::FunctionDeclaration(*it);
-    curr_node->add_child(functionNode);
-    functionNode->token.value = *internalize_string(std::string(it->value));
+    auto function_node = new AST::FunctionDeclaration(*it);
+    curr_node->add_child(function_node);
+    function_node->token.value = *internalize_string(std::string(it->value));
 
-    if((flags & AST::FunctionDeclaration::Flag::Exported) || functionNode->name() == "main")
-        functionNode->flags |= AST::FunctionDeclaration::Flag::Exported;
+    if((flags & AST::FunctionDeclaration::Flag::Exported) || function_node->name() == "main")
+        function_node->flags |= AST::FunctionDeclaration::Flag::Exported;
 
     ++it;
     if(it->type != Token::Type::OpenParenthesis)
         throw Exception(fmt::format("Expected '(' in function declaration, got {}.\n", *it), point_error(*it));
 
     // Declare the function immediatly to allow recursive calls.
-    if(!get_scope().declare_function(*functionNode))
-        throw Exception(fmt::format("[Parser] Syntax error: Function '{}' already declared in this scope.\n", functionNode->name()), point_error(functionNode->token));
+    if(!get_scope().declare_function(*function_node))
+        throw Exception(fmt::format("[Parser] Syntax error: Function '{}' already declared in this scope.\n", function_node->name()), point_error(function_node->token));
 
     push_scope(); // FIXME: Restrict function parameters to this scope, do better.
 
     ++it;
     // Parse parameters
     while(it != tokens.end() && it->type != Token::Type::CloseParenthesis) {
-        parse_variable_declaration(tokens, it, functionNode);
+        parse_variable_declaration(tokens, it, function_node);
         if(it->type == Token::Type::Comma)
             ++it;
         else if(it->type != Token::Type::CloseParenthesis)
@@ -700,32 +706,32 @@ bool Parser::parse_function_declaration(const std::span<Token>& tokens, std::spa
     if(it->type == Token::Type::Colon) {
         ++it;
         if(it->type != Token::Type::Identifier || !is_type(it->value))
-            throw Exception(fmt::format("[Parser] Expected type identifier after function '{}' declaration body, got '{}'.\n", functionNode->token.value, it->value),
+            throw Exception(fmt::format("[Parser] Expected type identifier after function '{}' declaration body, got '{}'.\n", function_node->token.value, it->value),
                             point_error(*it));
-        functionNode->type_id = parse_type(tokens, it);
+        function_node->type_id = parse_type(tokens, it);
     }
 
     // FIXME: Hackish this.
-    if(functionNode->children.size() > 0)
-        get_scope().set_this(get(functionNode->children[0]->token.value));
+    if(function_node->children.size() > 0)
+        get_scope().set_this(get(function_node->children[0]->token.value));
 
     if(flags & AST::FunctionDeclaration::Flag::Extern) {
-        functionNode->flags |= AST::FunctionDeclaration::Flag::Extern;
-        if(functionNode->type_id == InvalidTypeID)
-            functionNode->type_id = PrimitiveType::Void;
+        function_node->flags |= AST::FunctionDeclaration::Flag::Extern;
+        if(function_node->type_id == InvalidTypeID)
+            function_node->type_id = PrimitiveType::Void;
     } else {
         // Function body
-        parse_scope_or_single_statement(tokens, it, functionNode);
+        parse_scope_or_single_statement(tokens, it, function_node);
 
         // Return type deduction
-        auto return_type = functionNode->body()->type_id;
+        auto return_type = function_node->body()->type_id;
         if(return_type == InvalidTypeID)
             return_type = PrimitiveType::Void;
-        if(functionNode->type_id != InvalidTypeID && functionNode->type_id != return_type)
-            throw Exception(fmt::format("[Parser] Syntax error: Incoherent return types for function {}, got {}, expected {}.\n", functionNode->token.value, return_type,
-                                        functionNode->type_id),
-                            point_error(functionNode->body()->token));
-        functionNode->type_id = return_type;
+        if(function_node->type_id != InvalidTypeID && function_node->type_id != return_type)
+            throw Exception(fmt::format("[Parser] Syntax error: Incoherent return types for function {}, got {}, expected {}.\n", function_node->token.value, return_type,
+                                        function_node->type_id),
+                            point_error(function_node->body()->token));
+        function_node->type_id = return_type;
     }
 
     pop_scope();
@@ -747,6 +753,9 @@ bool Parser::parse_type_declaration(const std::span<Token>& tokens, std::span<To
     push_scope();
     ++it;
 
+    std::vector<AST::Node*> default_values;
+    bool                    has_at_least_one_default_value = false;
+
     while(it != tokens.end() && !(it->type == Token::Type::CloseScope)) {
         bool const_var = false;
         switch(it->type) {
@@ -761,16 +770,15 @@ bool Parser::parse_type_declaration(const std::span<Token>& tokens, std::span<To
                 parse_variable_declaration(tokens, it, type_node, const_var);
                 skip(tokens, it, Token::Type::EndStatement);
 
-                // parse_variable_declaration may add an initialisation node, we'll make this a special case and add the default value as a child.
+                // parse_variable_declaration may add an initialisation node, we'll extract the default value and use it to create a default constructor.
                 if(type_node->children.back()->type == AST::Node::Type::BinaryOperator) {
                     auto assignment_node = type_node->pop_child();
                     auto rhs = assignment_node->pop_child();
-                    type_node->children.back()->add_child(rhs);
+                    default_values.push_back(rhs);
                     delete assignment_node;
-                    // FIXME: Should we require a constexpr value here? In this case we could store it directly in the declaration node value.
-                }
-
-                // FIXME: Add a call to the constructor here? Like the default values?
+                    has_at_least_one_default_value = true;
+                } else
+                    default_values.push_back(nullptr); // Still push a null node to keep the indices in sync
                 break;
             }
             case Token::Type::Comment: ++it; break;
@@ -783,6 +791,44 @@ bool Parser::parse_type_declaration(const std::span<Token>& tokens, std::span<To
     //       types cannot reference themselves.
     if(!get_scope().declare_type(*type_node))
         throw Exception(fmt::format("[Parser] Syntax error: Type {} already declared in this scope.\n", type_node->token.value), point_error(type_node->token));
+
+    if(has_at_least_one_default_value) {
+        // Declare a default constructor.
+        // FIXME: This could probably be way more elegant, rather then contructing the AST by hand...
+        auto this_token = Token(Token::Type::Identifier, *internalize_string("this"), 0, 0);
+        auto function_node = new AST::FunctionDeclaration(Token(Token::Type::Identifier, *internalize_string("constructor"), 0, 0));
+        curr_node->add_child(function_node);
+        function_node->type_id = PrimitiveType::Void;
+        auto this_declaration_node = function_node->add_child(new AST::VariableDeclaration(this_token));
+        this_declaration_node->type_id = GlobalTypeRegistry::instance().get_pointer_to(type_node->type_id);
+        auto function_scope = function_node->add_child(new AST::Scope());
+
+        auto type = dynamic_cast<const StructType*>(GlobalTypeRegistry::instance().get_type(type_node->type_id));
+
+        for(auto idx = 0; idx < type->members.size(); ++idx) {
+            if(default_values[idx]) {
+                auto assignment = new AST::BinaryOperator(Token(Token::Type::Assignment, *internalize_string("="), 0, 0));
+                function_scope->add_child(assignment);
+                auto member_access = new AST::BinaryOperator(Token(Token::Type::MemberAccess, *internalize_string("."), 0, 0));
+                assignment->add_child(member_access);
+                auto dereference = new AST::Node(AST::Node::Type::Dereference);
+                member_access->add_child(dereference);
+                dereference->type_id = type_node->type_id;
+                auto variable = dereference->add_child(new AST::Variable(this_token));
+                variable->type_id = this_declaration_node->type_id;
+                auto member_identifier = new AST::MemberIdentifier(Token(Token::Type::Identifier, *internalize_string(std::string(type_node->members()[idx]->token.value)), 0, 0));
+                member_access->add_child(member_identifier);
+                member_identifier->index = idx;
+                member_identifier->type_id = type_node->members()[idx]->type_id;
+                assignment->add_child(default_values[idx]);
+                resolve_operator_type(member_access);
+                resolve_operator_type(assignment);
+            }
+        }
+
+        if(!get_scope().declare_function(*function_node))
+            throw Exception(fmt::format("[Parser] Syntax error: Function '{}' already declared in this scope.\n", function_node->name()));
+    }
 
     expect(tokens, it, Token::Type::CloseScope);
     return true;
@@ -1228,6 +1274,29 @@ bool Parser::parse_variable_declaration(const std::span<Token>& tokens, std::spa
         // Deduce variable type from initial value
         if(var_declaration_node->type_id == InvalidTypeID)
             var_declaration_node->type_id = variable_node->type_id;
+    } else if(!is_primitive(var_declaration_node->type_id)) {
+        // Search for a default constructor and add a call to it if it exists
+        std::vector<TypeID> span;
+        span.push_back(GlobalTypeRegistry::instance().get_pointer_to(var_declaration_node->type_id));
+        auto constructor = get_function("constructor", span);
+        if(constructor) {
+            auto call_node = new AST::FunctionCall(Token(Token::Type::Identifier, *internalize_string("constructor"), 0, 0));
+            call_node->type_id = constructor->type_id;
+            call_node->flags = constructor->flags;
+
+            curr_node->add_child(call_node);
+            // Destructor method designation
+            auto constructor_node =
+                new AST::Variable(Token(Token::Type::Identifier, *internalize_string("constructor"), 0, 0)); // FIXME: Still using the token to get the function...
+            call_node->add_child(constructor_node);
+            // Destructor argument (pointer to the object)
+            auto get_pointer_node = call_node->add_child(new AST::Node(AST::Node::Type::GetPointer, var_declaration_node->token));
+            get_pointer_node->type_id = GlobalTypeRegistry::instance().get_pointer_to(var_declaration_node->type_id);
+            auto var_node = get_pointer_node->add_child(new AST::Variable(var_declaration_node->token));
+            var_node->type_id = var_declaration_node->type_id;
+
+            check_function_call(call_node, constructor);
+        }
     }
 
     return true;

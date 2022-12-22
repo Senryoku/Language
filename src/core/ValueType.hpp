@@ -38,6 +38,13 @@ class StructType : public Type {
     std::unordered_map<std::string, Member> members;
 
     bool is_struct() const override { return true; }
+
+    const Member& get_member(size_t idx) {
+        assert(idx < members.size());
+        for(const auto& [name, member] : members)
+            if(member.index == idx)
+                return member;
+    }
 };
 
 class PointerType : public Type {
