@@ -306,13 +306,15 @@ bool Parser::parse(const std::span<Token>& tokens, AST::Node* curr_node) {
                     case Token::Type::Type: {
                         if(!parse_type_declaration(tokens, it, curr_node))
                             return false;
-                        _module_interface.type_exports.push_back(static_cast<AST::TypeDeclaration*>(curr_node->children[0]));
-                        // Also export the default (auto-generated) constructor
-                        if(curr_node->children.size() > 1) {
-                            auto constructor = static_cast<AST::FunctionDeclaration*>(curr_node->children[1]);
+                        // Also export the default (auto-generated) constructor, if there's one.
+                        // FIXME: Hackish, as always.
+                        if(curr_node->children.back()->type == AST::Node::Type::FunctionDeclaration) {
+                            auto constructor = static_cast<AST::FunctionDeclaration*>(curr_node->children.back());
                             constructor->flags |= AST::FunctionDeclaration::Flag::Exported;
                             _module_interface.exports.push_back(constructor);
-                        }
+                            _module_interface.type_exports.push_back(static_cast<AST::TypeDeclaration*>(curr_node->children[curr_node->children.size() - 2]));
+                        } else
+                            _module_interface.type_exports.push_back(static_cast<AST::TypeDeclaration*>(curr_node->children.back()));
                         break;
                     }
                     case Token::Type::Let:
@@ -537,7 +539,8 @@ bool Parser::parse_identifier(const std::span<Token>& tokens, std::span<Token>::
     if(peek(tokens, it, Token::Type::OpenSubscript)) { // Array accessor
         auto type = GlobalTypeRegistry::instance().get_type(variable.type_id);
         if(!(variable.type_id == PrimitiveType::CString) && !type->is_array() && !type->is_pointer())
-            throw Exception(fmt::format("[Parser] Syntax Error: Subscript operator on variable '{}' which is neither a string nor an array, nor a pointer.\n", it->value), point_error(*it));
+            throw Exception(fmt::format("[Parser] Syntax Error: Subscript operator on variable '{}' which is neither a string nor an array, nor a pointer.\n", it->value),
+                            point_error(*it));
         auto access_operator_node = new AST::BinaryOperator(*(it + 1));
         access_operator_node->add_child(curr_node->pop_child());
         curr_node->add_child(access_operator_node);
@@ -697,7 +700,7 @@ bool Parser::parse_function_declaration(const std::span<Token>& tokens, std::spa
     ++it;
     // Parse parameters
     while(it != tokens.end() && it->type != Token::Type::CloseParenthesis) {
-        parse_variable_declaration(tokens, it, function_node);
+        parse_variable_declaration(tokens, it, function_node, false, false);
         if(it->type == Token::Type::Comma)
             ++it;
         else if(it->type != Token::Type::CloseParenthesis)
@@ -759,6 +762,7 @@ bool Parser::parse_type_declaration(const std::span<Token>& tokens, std::span<To
     ++it;
 
     std::vector<AST::Node*> default_values;
+    std::vector<AST::Node*> constructors;
     bool                    has_at_least_one_default_value = false;
 
     while(it != tokens.end() && !(it->type == Token::Type::CloseScope)) {
@@ -782,8 +786,17 @@ bool Parser::parse_type_declaration(const std::span<Token>& tokens, std::span<To
                     default_values.push_back(rhs);
                     delete assignment_node;
                     has_at_least_one_default_value = true;
-                } else
+                    constructors.push_back(nullptr);
+                } else if(type_node->children.back()->type == AST::Node::Type::FunctionCall) {
+                    // parse_variable_declaration generated a constructor call
+                    auto constructor_node = type_node->pop_child();
+                    constructors.push_back(constructor_node);
+                    has_at_least_one_default_value = true;
+                    default_values.push_back(nullptr);
+                } else {
                     default_values.push_back(nullptr); // Still push a null node to keep the indices in sync
+                    constructors.push_back(nullptr);
+                }
                 break;
             }
             case Token::Type::Comment: ++it; break;
@@ -794,8 +807,10 @@ bool Parser::parse_type_declaration(const std::span<Token>& tokens, std::span<To
 
     // Note: Since we're declaring the type after parsing it (because we need the members to be established after the call to declare_type right now),
     //       types cannot reference themselves.
-    if(!get_scope().declare_type(*type_node))
-        throw Exception(fmt::format("[Parser] Syntax error: Type {} already declared in this scope.\n", type_node->token.value), point_error(type_node->token));
+    if(!get_scope().declare_type(*type_node)) {
+        warn("[Parser] Syntax error: Type {} already declared in this scope.\n", type_node->token.value);
+        fmt::print("{}", point_error(type_node->token));
+    }
 
     if(has_at_least_one_default_value) {
         // Declare a default constructor.
@@ -829,6 +844,8 @@ bool Parser::parse_type_declaration(const std::span<Token>& tokens, std::span<To
                 resolve_operator_type(member_access);
                 resolve_operator_type(assignment);
             }
+            if(constructors[idx])
+                function_scope->add_child(constructors[idx]);
         }
 
         if(!get_scope().declare_function(*function_node))
@@ -1254,7 +1271,7 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
     return true;
 }
 
-bool Parser::parse_variable_declaration(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node, bool is_const) {
+bool Parser::parse_variable_declaration(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node, bool is_const, bool allow_construtor) {
     auto identifier = expect(tokens, it, Token::Type::Identifier);
 
     auto var_declaration_node = new AST::VariableDeclaration(identifier);
@@ -1279,7 +1296,7 @@ bool Parser::parse_variable_declaration(const std::span<Token>& tokens, std::spa
         // Deduce variable type from initial value
         if(var_declaration_node->type_id == InvalidTypeID)
             var_declaration_node->type_id = variable_node->type_id;
-    } else if(!is_primitive(var_declaration_node->type_id)) {
+    } else if(!is_primitive(var_declaration_node->type_id) && allow_construtor) {
         // Search for a default constructor and add a call to it if it exists
         std::vector<TypeID> span;
         span.push_back(GlobalTypeRegistry::instance().get_pointer_to(var_declaration_node->type_id));

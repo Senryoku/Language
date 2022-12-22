@@ -245,8 +245,8 @@ llvm::Value* Module::codegen(const AST::Node* node) {
             auto function_name = function_declaration_node->mangled_name();
             auto prev_function = _llvm_module->getFunction(function_name);
             if(prev_function) { // Should be handled by the parser.
-                error("Redefinition of function '{}' (line {}).\n", function_name, function_declaration_node->token.line);
-                return nullptr;
+                warn("[Module] Redefinition of function '{}' (line {}).\n", function_name, function_declaration_node->token.line);
+                return prev_function;
             }
 
             std::vector<llvm::Type*> param_types;

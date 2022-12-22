@@ -46,7 +46,7 @@ export function destructor(this: String*) : void {
 export type StringBuilder {
 	let length: u64 = 0;
 	let capacity: u64 = 0;
-	let ptr: char*;
+	let ptr: char* = null_pointer();
 }
 
 export function reserve(this: StringBuilder*, size : u64) : void {

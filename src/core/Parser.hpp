@@ -74,7 +74,7 @@ class Parser : public Scoped {
     bool                 parse_string(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
     bool                 parse_operator(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
     bool                 parse_import(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
-    bool                 parse_variable_declaration(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node, bool is_const = false);
+    bool parse_variable_declaration(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node, bool is_const = false, bool allow_construtor = true);
 
     void skip(const std::span<Token>& tokens, std::span<Token>::iterator& it, Token::Type token_type) {
         if(it != tokens.end() && it->type == token_type)
@@ -85,7 +85,7 @@ class Parser : public Scoped {
     std::string point_error(Args&&... args) {
         if(_source)
             return ::point_error(*_source, args...);
-        return "[Parser] _source not defined, cannot display the line.";
+        return "[Parser] _source not defined, cannot display the line.\n";
     }
 
     Token expect(const std::span<Token>& tokens, std::span<Token>::iterator& it, Token::Type token_type) {
