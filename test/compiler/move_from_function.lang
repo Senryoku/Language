@@ -1,0 +1,23 @@
+// RET: 1
+// PASS: Destructor call #1.
+// FAIL: Destructor call #2.
+
+type Test {
+	let i : int = 0;
+}
+
+function destructor(this: Test*) : void {
+	.i = .i + 1;
+	printf("Destructor call #%d.\n", .i);
+}
+
+function test() : Test {
+	let t : Test;
+	t.i = 0;
+	return t;
+}
+
+function main() {
+	let t = test();
+	return t.i;
+}
