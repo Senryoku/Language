@@ -1198,7 +1198,10 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
             auto member_identifier_node = new AST::MemberIdentifier(*it);
             binary_operator_node->add_child(member_identifier_node);
             member_identifier_node->index = member_it->second.index;
-            member_identifier_node->type_id = member_it->second.type_id;
+            if(base_type->is_templated())
+                member_identifier_node->type_id = specialize(member_it->second.type_id, dynamic_cast<const TemplatedType*>(base_type)->parameters);
+            else
+                member_identifier_node->type_id = member_it->second.type_id;
             ++it;
         } else if(peek(tokens, it, Token::Type::OpenParenthesis)) {
             auto binary_node = curr_node->pop_child();
@@ -1537,22 +1540,8 @@ void Parser::resolve_operator_type(AST::UnaryOperator* op_node) {
 
 void Parser::resolve_operator_type(AST::BinaryOperator* op_node) {
     if(op_node->token.type == Token::Type::MemberAccess) {
-        auto type = GlobalTypeRegistry::instance().get_type(op_node->children[0]->type_id);
-        // Automatic dereferencing of pointers (Should this be a separate AST Node?)
-        // FIXME: May not be needed anymore
-        if(type->is_pointer())
-            type = GlobalTypeRegistry::instance().get_type(dynamic_cast<const PointerType*>(type)->pointee_type);
-        if(type->is_templated())
-            type = GlobalTypeRegistry::instance().get_type(dynamic_cast<const TemplatedType*>(type)->template_type_id);
-        assert(type->is_struct());
-
-        auto struct_type = dynamic_cast<const StructType*>(type);
-        auto member_it = struct_type->members.find(std::string(op_node->children[1]->token.value));
-        if(member_it != struct_type->members.end()) {
-            op_node->type_id = member_it->second.type_id;
-            return;
-        }
-        assert(false);
+        op_node->type_id = op_node->children[1]->type_id;
+        return;
     }
 
     auto lhs = op_node->children[0]->type_id;
@@ -1607,32 +1596,34 @@ void Parser::insert_defer_node(AST::Node* curr_node) {
     }
 }
 
+TypeID Parser::specialize(TypeID type_id, const std::vector<TypeID>& parameters) {
+    auto r = type_id;
+    auto type = GlobalTypeRegistry::instance().get_type(r);
+    if(type->is_placeholder()) {
+        // FIXME: Feels hackish, as always.
+        size_t indirection_count = 0;
+        while(type->is_pointer()) {
+            auto pointer_type = dynamic_cast<const PointerType*>(type);
+            type = GlobalTypeRegistry::instance().get_type(pointer_type->pointee_type);
+            ++indirection_count;
+        }
+
+        if(type->is_templated()) {
+            auto templated_type = dynamic_cast<const TemplatedType*>(type);
+            auto specialized_type_id = GlobalTypeRegistry::instance().get_specialized_type(templated_type->template_type_id, parameters);
+            r = specialized_type_id;
+        } else
+            r = parameters[type->type_id - PlaceholderTypeID_Min];
+
+        for(auto i = 0; i < indirection_count; ++i)
+            r = GlobalTypeRegistry::instance().get_pointer_to(r);
+    }
+    return r;
+}
+
 void Parser::specialize(AST::Node* node, const std::vector<TypeID>& parameters) {
     for(auto c : node->children)
         specialize(c, parameters);
-    if(node->type_id != InvalidTypeID) {
-        const auto original_type = GlobalTypeRegistry::instance().get_type(node->type_id); // FIXME: TEMP: For debug only
-        auto       type = GlobalTypeRegistry::instance().get_type(node->type_id);
-        if(type->is_placeholder()) {
-            // FIXME: Feels hackish, as always.
-            size_t indirection_count = 0;
-            while(type->is_pointer()) {
-                auto pointer_type = dynamic_cast<const PointerType*>(type);
-                type = GlobalTypeRegistry::instance().get_type(pointer_type->pointee_type);
-                ++indirection_count;
-            }
-
-            if(type->is_templated()) {
-                auto templated_type = dynamic_cast<const TemplatedType*>(type);
-                auto specialized_type_id = GlobalTypeRegistry::instance().get_specialized_type(templated_type->template_type_id, parameters);
-                node->type_id = specialized_type_id;
-            } else
-                node->type_id = parameters[type->type_id - PlaceholderTypeID_Min];
-
-            for(auto i = 0; i < indirection_count; ++i)
-                node->type_id = GlobalTypeRegistry::instance().get_pointer_to(node->type_id);
-
-            print(" [DEBUG] Placeholder specialization: {} -> {}\n", *original_type, type_id_to_string(node->type_id));
-        }
-    }
+    if(node->type_id != InvalidTypeID)
+        node->type_id = specialize(node->type_id, parameters);
 }

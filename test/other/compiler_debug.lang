@@ -1,5 +1,3 @@
-import "std/memory"
-
 type NewType<T> {
 	let u : u64 = 0;
 	let t : T;

@@ -125,6 +125,7 @@ class Parser : public Scoped {
 
     void check_function_call(AST::FunctionCall*, const AST::FunctionDeclaration*);
 
-    void insert_defer_node(AST::Node* curr_node);
-    void specialize(AST::Node* noden, const std::vector<TypeID>& parameters);
+    void   insert_defer_node(AST::Node* curr_node);
+    void   specialize(AST::Node* node, const std::vector<TypeID>& parameters);
+    TypeID specialize(TypeID type_id, const std::vector<TypeID>& parameters);
 };
