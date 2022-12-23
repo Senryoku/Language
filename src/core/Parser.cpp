@@ -300,7 +300,7 @@ bool Parser::parse(const std::span<Token>& tokens, AST::Node* curr_node) {
                         [[fallthrough]];
                     case Token::Type::Function: {
                         parse_function_declaration(tokens, it, curr_node, function_flags);
-                        _module_interface.exports.push_back(static_cast<AST::FunctionDeclaration*>(curr_node->children.back()));
+                        _module_interface.exports.push_back(dynamic_cast<AST::FunctionDeclaration*>(curr_node->children.back()));
                         break;
                     }
                     case Token::Type::Type: {
@@ -309,12 +309,12 @@ bool Parser::parse(const std::span<Token>& tokens, AST::Node* curr_node) {
                         // Also export the default (auto-generated) constructor, if there's one.
                         // FIXME: Hackish, as always.
                         if(curr_node->children.back()->type == AST::Node::Type::FunctionDeclaration) {
-                            auto constructor = static_cast<AST::FunctionDeclaration*>(curr_node->children.back());
+                            auto constructor = dynamic_cast<AST::FunctionDeclaration*>(curr_node->children.back());
                             constructor->flags |= AST::FunctionDeclaration::Flag::Exported;
                             _module_interface.exports.push_back(constructor);
-                            _module_interface.type_exports.push_back(static_cast<AST::TypeDeclaration*>(curr_node->children[curr_node->children.size() - 2]));
+                            _module_interface.type_exports.push_back(dynamic_cast<AST::TypeDeclaration*>(curr_node->children[curr_node->children.size() - 2]));
                         } else
-                            _module_interface.type_exports.push_back(static_cast<AST::TypeDeclaration*>(curr_node->children.back()));
+                            _module_interface.type_exports.push_back(dynamic_cast<AST::TypeDeclaration*>(curr_node->children.back()));
                         break;
                     }
                     case Token::Type::Let:

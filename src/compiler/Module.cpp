@@ -96,7 +96,7 @@ llvm::Constant* Module::codegen_constant(const AST::Node* val) {
     auto type = GlobalTypeRegistry::instance().get_type(val->type_id);
     assert(type);
     if(type->is_array()) {
-        const auto*                  type_arr = static_cast<const ArrayType*>(type);
+        const auto*                  type_arr = dynamic_cast<const ArrayType*>(type);
         auto                         element_type = get_llvm_type(type_arr->element_type);
         std::vector<llvm::Constant*> values(type_arr->capacity);
         for(unsigned int i = 0; i < type_arr->capacity; i++)
@@ -116,14 +116,14 @@ llvm::Constant* Module::codegen_constant(const AST::Node* val) {
     }
     switch(val->type_id) {
         using enum PrimitiveType;
-        case Boolean: return llvm::ConstantInt::get(*_llvm_context, llvm::APInt(1, static_cast<const AST::BoolLiteral*>(val)->value));
-        case Char: return llvm::ConstantInt::get(*_llvm_context, llvm::APInt(8, static_cast<const AST::CharLiteral*>(val)->value));
-        case Float: return llvm::ConstantFP::get(*_llvm_context, llvm::APFloat(static_cast<const AST::FloatLiteral*>(val)->value));
+        case Boolean: return llvm::ConstantInt::get(*_llvm_context, llvm::APInt(1, dynamic_cast<const AST::BoolLiteral*>(val)->value));
+        case Char: return llvm::ConstantInt::get(*_llvm_context, llvm::APInt(8, dynamic_cast<const AST::CharLiteral*>(val)->value));
+        case Float: return llvm::ConstantFP::get(*_llvm_context, llvm::APFloat(dynamic_cast<const AST::FloatLiteral*>(val)->value));
         case I32: [[fallthrough]];
-        case Integer: return llvm::ConstantInt::get(*_llvm_context, llvm::APInt(32, static_cast<const AST::IntegerLiteral*>(val)->value));
+        case Integer: return llvm::ConstantInt::get(*_llvm_context, llvm::APInt(32, dynamic_cast<const AST::IntegerLiteral*>(val)->value));
         case CString: {
             // FIXME: Take a look at llvm::StringRef and llvm::Twine
-            auto        str_node = static_cast<const AST::StringLiteral*>(val);
+            auto        str_node = dynamic_cast<const AST::StringLiteral*>(val);
             const auto& str = str_node->value;
             auto        charType = llvm::IntegerType::get(*_llvm_context, 8);
 
@@ -311,7 +311,7 @@ llvm::Value* Module::codegen(const AST::Node* node) {
             return nullptr;
         }
         case AST::Node::Type::FunctionCall: {
-            auto function_call_node = static_cast<const AST::FunctionCall*>(node);
+            auto function_call_node = dynamic_cast<const AST::FunctionCall*>(node);
             auto mangled_function_name = function_call_node->mangled_name();
             auto function = _llvm_module->getFunction(mangled_function_name);
             if(!function) {
@@ -389,7 +389,7 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                 auto type = GlobalTypeRegistry::instance().get_type(child->children[0]->type_id);
                 if(type->is_array()) {
                     assert(value->getType()->isPointerTy());
-                    auto arr_type = static_cast<const ArrayType*>(type);
+                    auto arr_type = dynamic_cast<const ArrayType*>(type);
                     auto element_type = get_llvm_type(arr_type->element_type);
                     return _llvm_ir_builder.CreateLoad(element_type, value, "l-to-rvalue");
                 }
@@ -429,7 +429,7 @@ llvm::Value* Module::codegen(const AST::Node* node) {
             }
         }
         case AST::Node::Type::MemberIdentifier: {
-            auto member_identifier = static_cast<const AST::MemberIdentifier*>(node);
+            auto member_identifier = dynamic_cast<const AST::MemberIdentifier*>(node);
             return llvm::ConstantInt::get(*_llvm_context, llvm::APInt(32, member_identifier->index)); // Returns member index
         }
         case AST::Node::Type::BinaryOperator: {
