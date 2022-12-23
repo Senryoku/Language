@@ -6,10 +6,22 @@
 #include <AST.hpp>
 #include <ValueType.hpp>
 
-typedef std::tuple<TypeID, size_t> key_t;
+// Really simple Hash for std::vector<TypeID>, to use in cache
+static TypeID hash(const std::vector<TypeID>& v) {
+    static std::array<size_t, 10> primes = {3, 5, 7, 11, 13, 17, 19, 23, 29, 31};
+    uint64_t                      hash = v[0];
+    for(size_t n = 1; n < std::min(primes.size(), v.size()); ++n)
+        hash += (primes[n] * v[n]);
+    return hash;
+}
+typedef std::tuple<TypeID, size_t>              array_cache_key_t;
+typedef std::tuple<TypeID, std::vector<TypeID>> template_cache_key_t;
 
-struct key_hash {
-    std::size_t operator()(const key_t& k) const { return std::get<0>(k) ^ std::get<1>(k); }
+struct array_key_hash {
+    std::size_t operator()(const array_cache_key_t& k) const { return std::get<0>(k) ^ std::get<1>(k); }
+};
+struct template_key_hash {
+    std::size_t operator()(const template_cache_key_t& k) const { return std::get<0>(k) ^ hash(std::get<1>(k)); }
 };
 
 class GlobalTypeRegistry {
@@ -21,6 +33,8 @@ class GlobalTypeRegistry {
 
     TypeID get_pointer_to(TypeID id);
     TypeID get_array_of(TypeID id, uint32_t capacity);
+    TypeID get_specialized_type(TypeID id, const std::vector<TypeID>& parameters);
+    bool specialized_type_exists(TypeID id, const std::vector<TypeID>& parameters) { return _specialized_types.contains({id, parameters}); }
 
     TypeID register_type(AST::TypeDeclaration& type_node);
 
@@ -32,9 +46,10 @@ class GlobalTypeRegistry {
   private:
     std::vector<std::unique_ptr<Type>> _types;
     // Cache Lookup
-    std::unordered_map<std::string, TypeID>           _types_by_designation;
-    std::unordered_map<TypeID, TypeID>                _pointers_to;
-    std::unordered_map<const key_t, TypeID, key_hash> _arrays_of;
+    std::unordered_map<std::string, TypeID>                                   _types_by_designation;
+    std::unordered_map<TypeID, TypeID>                                        _pointers_to;
+    std::unordered_map<const array_cache_key_t, TypeID, array_key_hash>       _arrays_of;
+    std::unordered_map<const template_cache_key_t, TypeID, template_key_hash> _specialized_types;
 
     void update_caches(Type* t) {
         _types_by_designation[t->designation] = t->type_id;
@@ -44,13 +59,18 @@ class GlobalTypeRegistry {
             auto array_type = dynamic_cast<ArrayType*>(t);
             _arrays_of[std::make_tuple(array_type->element_type, array_type->capacity)] = t->type_id;
         }
+        if(t->is_templated()) {
+            auto templated_type = dynamic_cast<TemplatedType*>(t);
+            _specialized_types[std::make_tuple(templated_type->template_type_id, templated_type->parameters)] = t->type_id;
+        }
     }
 
     void add_type(Type* t) {
         if(t->type_id < next_id())
             _types.emplace(_types.begin() + t->type_id, t);
         else {
-            assert(t->type_id == next_id());
+            while(t->type_id > next_id())
+                _types.emplace_back(nullptr); // Padding
             _types.emplace_back(t);
         }
         update_caches(t);
@@ -77,6 +97,9 @@ class GlobalTypeRegistry {
         add_type(new ScalarType("float", PrimitiveType::Float));
         add_type(new ScalarType("double", PrimitiveType::Double));
         add_type(new PointerType("cstr", PrimitiveType::CString, PrimitiveType::Char));
+
+        for(auto i = 0; i < MaxPlaceholderTypes; ++i)
+            add_type(new PlaceholderType(fmt::format("__placeholder_{}", i), PlaceholderTypeID_Min + i));
     }
 };
 

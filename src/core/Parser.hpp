@@ -53,27 +53,29 @@ class Parser : public Scoped {
 
     bool parse(const std::span<Token>& tokens, AST::Node* curr_node);
 
-    bool                 parse_next_scope(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
-    bool                 parse_next_expression(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node, uint32_t precedence = max_precedence,
-                                               bool search_for_matching_bracket = false);
-    bool                 parse_identifier(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
-    bool                 parse_statement(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
-    bool                 parse_scope_or_single_statement(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
-    bool                 parse_while(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
-    bool                 parse_for(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
-    bool                 parse_method_declaration(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
-    bool                 parse_function_declaration(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node,
-                                                    AST::FunctionDeclaration::Flag flags = AST::FunctionDeclaration::Flag::None);
-    bool                 parse_function_arguments(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
-    bool                 parse_type_declaration(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
-    TypeID               parse_type(const std::span<Token>& tokens, std::span<Token>::iterator& it);
-    AST::BoolLiteral*    parse_boolean(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
-    AST::IntegerLiteral* parse_digits(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
-    AST::FloatLiteral*   parse_float(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
-    AST::CharLiteral*    parse_char(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
-    bool                 parse_string(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
-    bool                 parse_operator(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
-    bool                 parse_import(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
+    bool                     parse_next_scope(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
+    bool                     parse_next_expression(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node, uint32_t precedence = max_precedence,
+                                                   bool search_for_matching_bracket = false);
+    bool                     parse_identifier(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
+    bool                     parse_statement(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
+    bool                     parse_scope_or_single_statement(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
+    bool                     parse_while(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
+    bool                     parse_for(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
+    bool                     parse_method_declaration(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
+    bool                     parse_function_declaration(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node,
+                                                        AST::FunctionDeclaration::Flag flags = AST::FunctionDeclaration::Flag::None);
+    bool                     parse_function_arguments(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
+    std::vector<TypeID>      parse_template_types(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
+    std::vector<std::string> declare_template_types(const std::span<Token>& tokens, std::span<Token>::iterator& it);
+    bool                     parse_type_declaration(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
+    TypeID                   parse_type(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
+    AST::BoolLiteral*        parse_boolean(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
+    AST::IntegerLiteral*     parse_digits(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
+    AST::FloatLiteral*       parse_float(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
+    AST::CharLiteral*        parse_char(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
+    bool                     parse_string(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
+    bool                     parse_operator(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
+    bool                     parse_import(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
     bool parse_variable_declaration(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node, bool is_const = false, bool allow_construtor = true);
 
     void skip(const std::span<Token>& tokens, std::span<Token>::iterator& it, Token::Type token_type) {
@@ -124,4 +126,5 @@ class Parser : public Scoped {
     void check_function_call(AST::FunctionCall*, const AST::FunctionDeclaration*);
 
     void insert_defer_node(AST::Node* curr_node);
+    void specialize(AST::Node* noden, const std::vector<TypeID>& parameters);
 };

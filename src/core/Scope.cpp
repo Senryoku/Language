@@ -1,13 +1,5 @@
 #include "Scope.hpp"
 
-const AST::TypeDeclaration* Scope::get_type(const std::string_view& name) const {
-    auto r = _types.find(name);
-    if(is_valid(r))
-        return r->second;
-    else
-        return nullptr;
-}
-
 [[nodiscard]] const AST::FunctionDeclaration* Scope::resolve_function(const std::string_view& name, const std::span<TypeID>& arguments) const {
     auto candidate_functions = _functions.find(name);
     if(candidate_functions == _functions.end())
@@ -76,17 +68,18 @@ std::vector<const AST::FunctionDeclaration*> Scoped::get_functions(const std::st
     return r;
 }
 
-const AST::TypeDeclaration* Scoped::get_type(const std::string_view& name) const {
+TypeID Scoped::get_type(const std::string_view& name) const {
     auto it = _scopes.rbegin();
-    auto val = it->find_type(name);
-    while(it != _scopes.rend() && !it->is_valid(val)) {
+    auto type_id = it->find_type(name);
+    while(it != _scopes.rend() && type_id == InvalidTypeID) {
         it++;
         if(it != _scopes.rend())
-            val = it->find_type(name);
+            type_id = it->find_type(name);
     }
-    if(it == _scopes.rend() || !it->is_valid(val))
-        return nullptr;
-    return val->second;
+    // Search built-ins
+    if(type_id == InvalidTypeID)
+        return GlobalTypeRegistry::instance().get_type(std::string{name})->type_id;
+    return type_id;
 }
 
 AST::VariableDeclaration* Scoped::get(const std::string_view& name) {
@@ -112,17 +105,5 @@ const AST::VariableDeclaration* Scoped::get(const std::string_view& name) const 
 }
 
 bool Scoped::is_type(const std::string_view& name) const {
-    auto builtin = GlobalTypeRegistry::instance().get_type(std::string(name))->type_id;
-    if(builtin != InvalidTypeID)
-        return true;
-    // FIXME: Should be useless right now, but we may need to reintroduce some form of scoping for types, idk.
-    // Search for a type declared with this name
-    auto it = _scopes.rbegin();
-    auto val = it->find_type(name);
-    while(it != _scopes.rend() && !it->is_valid(val)) {
-        it++;
-        if(it != _scopes.rend())
-            val = it->find_type(name);
-    }
-    return it != _scopes.rend() && it->is_valid(val);
+    return get_type(name) != InvalidTypeID;
 }

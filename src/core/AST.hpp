@@ -16,7 +16,8 @@ class AST {
         enum class Type {
             Root,
             Statement,
-            Defer, // This is not used anymore. It used to hold calls to destructors, but they are now 'inlined' in the AST, allowing for more control. I keeping it around for now as it could be used for an actual defer feature.
+            Defer, // This is not used anymore. It used to hold calls to destructors, but they are now 'inlined' in the AST, allowing for more control. I keeping it around for now
+                   // as it could be used for an actual defer feature.
             Scope,
             Expression,
             IfStatement,
@@ -65,7 +66,7 @@ class AST {
         }
 
         // Note: This was not actually tested, and isn't used anywhere!
-        [[nodiscard]] virtual Node* clone() const { 
+        [[nodiscard]] virtual Node* clone() const {
             Node* n = new Node();
             clone_impl(n);
             return n;
@@ -84,11 +85,13 @@ class AST {
         std::vector<Node*> children;
 
         Node* add_child(Node* n);
+        Node* add_child_front(Node* n);
+        Node* add_child_after(Node* n, const Node* prev);
         Node* pop_child();
         // Insert a node between this and its nth child
         Node* insert_between(size_t n, Node* node);
 
-    protected:
+      protected:
         void clone_impl(Node* n) const {
             n->type = type;
             n->subtype = subtype;
@@ -107,9 +110,13 @@ class AST {
         const auto& name() const { return token.value; }
         const auto& members() const { return children; }
     };
-
+    /*
+    struct TemplatedTypeDeclaration : public TypeDeclaration {
+        TemplatedTypeDeclaration(Token t) : TypeDeclaration(t) {}
+    };
+    */
     struct FunctionDeclaration : public Node {
-        FunctionDeclaration() : Node(Node::Type::FunctionDeclaration) {};
+        FunctionDeclaration() : Node(Node::Type::FunctionDeclaration){};
         FunctionDeclaration(Token t) : Node(Node::Type::FunctionDeclaration, t) {}
 
         enum Flag : uint8_t {
@@ -123,7 +130,7 @@ class AST {
 
         Flag flags = Flag::None;
 
-        [[nodiscard]] virtual FunctionDeclaration* clone() const override { 
+        [[nodiscard]] virtual FunctionDeclaration* clone() const override {
             auto n = new FunctionDeclaration();
             clone_impl(n);
             n->flags = flags;
@@ -158,6 +165,8 @@ class AST {
         }
 
         std::string mangled_name() const;
+
+        bool is_templated() const;
     };
 
     struct FunctionCall : public Node {
@@ -210,7 +219,10 @@ class AST {
         [[nodiscard]] virtual Scope* clone() const override {
             auto n = new Scope();
             clone_impl(n);
-            n->defer = defer->clone();
+            if(defer)
+                n->defer = defer->clone();
+            else
+                n->defer = nullptr;
             return n;
         }
 
@@ -225,7 +237,7 @@ class AST {
         VariableDeclaration(Token t) : Node(Node::Type::VariableDeclaration, t) {}
 
         enum Flag : uint8_t {
-            None  = 0,
+            None = 0,
             Moved = 1 << 0,
         };
 
@@ -372,7 +384,6 @@ inline AST::FunctionDeclaration::Flag operator&(AST::FunctionDeclaration::Flag l
     return static_cast<AST::FunctionDeclaration::Flag>(static_cast<std::underlying_type_t<AST::FunctionDeclaration::Flag>>(lhs) &
                                                        static_cast<std::underlying_type_t<AST::FunctionDeclaration::Flag>>(rhs));
 }
-
 
 inline AST::VariableDeclaration::Flag operator|(AST::VariableDeclaration::Flag lhs, AST::VariableDeclaration::Flag rhs) {
     return static_cast<AST::VariableDeclaration::Flag>(static_cast<std::underlying_type_t<AST::VariableDeclaration::Flag>>(lhs) |

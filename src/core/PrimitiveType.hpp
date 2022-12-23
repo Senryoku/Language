@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cassert>
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -28,6 +29,20 @@ enum PrimitiveType : TypeID {
     Count, // Max. TypeID for Primitive Types
 };
 
+constexpr uint64_t MaxPlaceholderTypes = 1024;
+
+constexpr TypeID PlaceholderTypeID_Min = PrimitiveType::Count + 1;
+constexpr TypeID PlaceholderTypeID_Max = PrimitiveType::Count + 1 + MaxPlaceholderTypes;
+
 inline bool is_primitive(TypeID type_id) {
     return type_id < PrimitiveType::Count;
+}
+
+inline bool is_placeholder(TypeID type_id) {
+    return type_id >= PlaceholderTypeID_Min && type_id <= PlaceholderTypeID_Max;
+}
+
+inline uint64_t get_placeholder_index(TypeID type_id) {
+    assert(is_placeholder(type_id));
+    return type_id - PlaceholderTypeID_Min;
 }

@@ -233,6 +233,10 @@ llvm::Value* Module::codegen(const AST::Node* node) {
             }
         }
         case AST::Node::Type::TypeDeclaration: {
+            auto type = GlobalTypeRegistry::instance().get_type(node->type_id);
+            // Ignore Template definitions, we only care about actual instanciations.
+            if(type->is_placeholder())
+                break;
             std::vector<llvm::Type*> members;
             for(const auto c : node->children)
                 members.push_back(get_llvm_type(c->type_id));
@@ -241,7 +245,10 @@ llvm::Value* Module::codegen(const AST::Node* node) {
             break;
         }
         case AST::Node::Type::FunctionDeclaration: {
-            auto function_declaration_node = static_cast<const AST::FunctionDeclaration*>(node);
+            auto function_declaration_node = dynamic_cast<const AST::FunctionDeclaration*>(node);
+            // Ignore Template definitions, we only care about actual instanciations.
+            if(function_declaration_node->is_templated())
+                break;
             auto function_name = function_declaration_node->mangled_name();
             auto prev_function = _llvm_module->getFunction(function_name);
             if(prev_function) { // Should be handled by the parser.

@@ -688,12 +688,19 @@ bool Parser::parse_function_declaration(const std::span<Token>& tokens, std::spa
         function_node->flags |= AST::FunctionDeclaration::Flag::Exported;
 
     ++it;
-    if(it->type != Token::Type::OpenParenthesis)
-        throw Exception(fmt::format("Expected '(' in function declaration, got {}.\n", *it), point_error(*it));
 
     // Declare the function immediatly to allow recursive calls.
     if(!get_scope().declare_function(*function_node))
         throw Exception(fmt::format("[Parser] Syntax error: Function '{}' already declared in this scope.\n", function_node->name()), point_error(function_node->token));
+
+    bool templated = false;
+    if(it->type == Token::Type::Lesser) {
+        declare_template_types(tokens, it);
+        templated = true;
+    }
+
+    if(it->type != Token::Type::OpenParenthesis)
+        throw Exception(fmt::format("Expected '(' in function declaration, got {}.\n", *it), point_error(*it));
 
     push_scope(); // FIXME: Restrict function parameters to this scope, do better.
 
@@ -716,7 +723,7 @@ bool Parser::parse_function_declaration(const std::span<Token>& tokens, std::spa
         if(it->type != Token::Type::Identifier || !is_type(it->value))
             throw Exception(fmt::format("[Parser] Expected type identifier after function '{}' declaration body, got '{}'.\n", function_node->token.value, it->value),
                             point_error(*it));
-        function_node->type_id = parse_type(tokens, it);
+        function_node->type_id = parse_type(tokens, it, curr_node);
     }
 
     // FIXME: Hackish this.
@@ -747,18 +754,60 @@ bool Parser::parse_function_declaration(const std::span<Token>& tokens, std::spa
     return true;
 }
 
+std::vector<TypeID> Parser::parse_template_types(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node) {
+    assert(it->type == Token::Type::Lesser);
+    ++it;
+    std::vector<TypeID> typenames;
+    while(it != tokens.end() && it->type != Token::Type::Greater) {
+        auto scoped_type_id = parse_type(tokens, it, curr_node);
+        typenames.push_back(scoped_type_id);
+        skip(tokens, it, Token::Type::Comma);
+    }
+    expect(tokens, it, Token::Type::Greater);
+
+    return typenames;
+}
+
+std::vector<std::string> Parser::declare_template_types(const std::span<Token>& tokens, std::span<Token>::iterator& it) {
+    assert(it->type == Token::Type::Lesser);
+    ++it;
+    std::vector<std::string> typenames;
+    while(it != tokens.end() && it->type != Token::Type::Greater) {
+        if(it->type != Token::Type::Identifier)
+            throw Exception(fmt::format("[Parser] Expected type identifier in template declaration, got '{}'.", *it), point_error(*it));
+        typenames.push_back(std::string(it->value));
+        get_scope().declare_template_placeholder_type(std::string(it->value));
+        ++it;
+        skip(tokens, it, Token::Type::Comma);
+    }
+    expect(tokens, it, Token::Type::Greater);
+
+    return typenames;
+}
+
 bool Parser::parse_type_declaration(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node) {
     expect(tokens, it, Token::Type::Type);
     if(it->type != Token::Type::Identifier)
         throw Exception(fmt::format("Expected identifier in type declaration, got {}.\n", it->value), point_error(*it));
-    auto type_node = new AST::TypeDeclaration(*it);
+
+    const auto type_token = *it;
+    ++it;
+
+    AST::TypeDeclaration*    type_node = new AST::TypeDeclaration(type_token);
+    bool                     templated_type = false;
+    std::vector<std::string> template_typenames;
+
+    if(it->type == Token::Type::Lesser) {
+        template_typenames = declare_template_types(tokens, it);
+        templated_type = true;
+    }
+
     curr_node->add_child(type_node);
 
-    ++it;
+    push_scope();
+
     if(it->type != Token::Type::OpenScope)
         throw Exception(fmt::format("Expected '{{' after type declaration, got {}.\n", it->value), point_error(*it));
-
-    push_scope();
     ++it;
 
     std::vector<AST::Node*> default_values;
@@ -769,7 +818,7 @@ bool Parser::parse_type_declaration(const std::span<Token>& tokens, std::span<To
         bool const_var = false;
         switch(it->type) {
             case Token::Type::Function: {
-                // Note: Added to curr_node, not type_not. Right now methods are not special.
+                // Note: Added to curr_node, not type_node. Right now methods are not special.
                 parse_method_declaration(tokens, it, curr_node);
                 break;
             }
@@ -805,13 +854,20 @@ bool Parser::parse_type_declaration(const std::span<Token>& tokens, std::span<To
     }
     pop_scope();
 
-    // Note: Since we're declaring the type after parsing it (because we need the members to be established after the call to declare_type right now),
+    // Note: Since we're declaring the type after parsing it (because we need the members to be established before the call to declare_type right now),
     //       types cannot reference themselves.
+    /* if(templated_type) {
+        if(!get_scope().declare_templated_type(*type_node, template_typenames)) {
+            warn("[Parser] Syntax error: Type {} already declared in this scope.\n", type_node->token.value);
+            fmt::print("{}", point_error(type_node->token));
+        }
+    } else */
     if(!get_scope().declare_type(*type_node)) {
         warn("[Parser] Syntax error: Type {} already declared in this scope.\n", type_node->token.value);
         fmt::print("{}", point_error(type_node->token));
     }
 
+    // FIXME: Generate templated constructor function for templated types.
     if(has_at_least_one_default_value) {
         // Declare a default constructor.
         // FIXME: This could probably be way more elegant, rather then contructing the AST by hand...
@@ -1134,8 +1190,9 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
         auto       type = GlobalTypeRegistry::instance().get_type(type_id);
         // Automatic cast to pointee type (Could be a separate Node)
         auto base_type = GlobalTypeRegistry::instance().get_type(type->is_pointer() ? dynamic_cast<const PointerType*>(type)->pointee_type : type_id);
-        assert(base_type->is_struct());
-        auto as_struct_type = dynamic_cast<const StructType*>(base_type);
+        assert(base_type->is_struct() || base_type->is_templated());
+        auto as_struct_type = dynamic_cast<const StructType*>(
+            base_type->is_templated() ? GlobalTypeRegistry::instance().get_type(dynamic_cast<const TemplatedType*>(base_type)->template_type_id) : base_type);
         auto member_it = as_struct_type->members.find(std::string(identifier_name));
         if(member_it != as_struct_type->members.end()) {
             auto member_identifier_node = new AST::MemberIdentifier(*it);
@@ -1181,6 +1238,37 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
                 return true;
             } else {
                 auto candidates = get_functions(identifier_name);
+
+                // TEMP DEBUG
+                print("{}", get_overloads_hint_string(call_node, candidates));
+
+                // TODO: Actually deduce types.
+                std::vector<TypeID> deduced_types = {PrimitiveType::U64};
+
+                for(const auto& candidate : candidates) {
+                    if(candidate->is_templated()) {
+                        print("Template candidate: {}\n", *static_cast<const AST::Node*>(candidate));
+                        auto specialized = candidate->clone();
+                        specialize(specialized, deduced_types);
+                        // Insert it right after the generic version.
+                        candidate->parent->add_child_after(specialized, candidate);
+                        // FIXME: It should be declared in the scope of the original function declaration.
+                        get_scope().declare_function(*specialized);
+                        print("Specialized candidate: {}\n", *static_cast<const AST::Node*>(specialized));
+                        // FIXME: Factorize this code with previous successful path.
+                        if(specialized && specialized->arguments().size() > 0 && !is_primitive(specialized->arguments()[0]->type_id) &&
+                           GlobalTypeRegistry::instance().get_pointer_to(base_type->type_id) == specialized->arguments()[0]->type_id) {
+                            call_node->type_id = specialized->type_id;
+                            call_node->flags = specialized->flags;
+
+                            check_function_call(call_node, specialized);
+
+                            return true;
+                        }
+                    } else {
+                        print("Non-Template candidate: {}\n", *static_cast<const AST::Node*>(candidate));
+                    }
+                }
                 if(candidates.size() == 0) {
                     throw Exception(fmt::format("[Parser] Syntax error: Method '{}' does not exists on type {}.\n", identifier_name, base_type->designation), point_error(*it));
                 } else {
@@ -1279,7 +1367,7 @@ bool Parser::parse_variable_declaration(const std::span<Token>& tokens, std::spa
 
     if(it->type == Token::Type::Colon) {
         ++it;
-        var_declaration_node->type_id = parse_type(tokens, it);
+        var_declaration_node->type_id = parse_type(tokens, it, curr_node);
     }
 
     if(!get_scope().declare_variable(*var_declaration_node))
@@ -1365,29 +1453,55 @@ bool Parser::parse_import(const std::span<Token>& tokens, std::span<Token>::iter
     return true;
 }
 
-TypeID Parser::parse_type(const std::span<Token>& tokens, std::span<Token>::iterator& it) {
+TypeID Parser::parse_type(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node) {
     auto token = expect(tokens, it, Token::Type::Identifier);
 
-    // FIXME: Should I get rid of this?
-    auto        scoped_type = get_type(token.value);
-    auto        type_id = InvalidTypeID;
-    const Type* type = nullptr;
+    auto scoped_type_id = get_type(std::string(token.value));
 
-    // Primitive Types won't show up in the scope.
-    if(scoped_type == nullptr) {
-        type = GlobalTypeRegistry::instance().get_type(std::string(token.value));
-        type_id = type->type_id;
-    } else {
-        type_id = scoped_type->type_id;
-        type = GlobalTypeRegistry::instance().get_type(type_id);
+    if(it->type == Token::Type::Lesser) {
+        auto type_parameters = parse_template_types(tokens, it, curr_node);
+        fmt::print("[DEBUG] Parsed: {}<", token.value);
+        for(const auto& name : type_parameters)
+            fmt::print("{},", name);
+        fmt::print(">\n");
+        // Generate this type declaration if we never encountered it before
+        if(!GlobalTypeRegistry::instance().specialized_type_exists(scoped_type_id, type_parameters)) {
+            // This will create the type on the GlobalRegistry, so we have to get the scoped_type_id after checking for its existence
+            scoped_type_id = GlobalTypeRegistry::instance().get_specialized_type(scoped_type_id, type_parameters);
+            auto type = GlobalTypeRegistry::instance().get_type(scoped_type_id);
+            assert(type->is_templated());
+            if(!type->is_placeholder()) {
+                auto templated_type = dynamic_cast<const TemplatedType*>(type);
+                auto underlying_type = GlobalTypeRegistry::instance().get_type(templated_type->template_type_id);
+                assert(underlying_type->is_struct());
+                auto struct_type = dynamic_cast<const StructType*>(underlying_type);
+                // auto parent = curr_node;
+                // while(parent->parent != nullptr)
+                //     parent = parent->parent;
+                AST::TypeDeclaration* type_declaration_node = new AST::TypeDeclaration(Token(Token::Type::Identifier, templated_type->designation, 0, 0));
+                type_declaration_node->type_id = scoped_type_id;
+                for(const auto& [name, member] : struct_type->members) {
+                    auto mem = type_declaration_node->add_child(new AST::VariableDeclaration(Token(Token::Type::Identifier, member.name, 0, 0)));
+                    mem->type_id = member.type_id;
+                }
+                specialize(type_declaration_node, type_parameters);
+                // Declare early
+                print("TEST: {}\n", *static_cast<AST::Node*>(type_declaration_node));
+                auto parent = curr_node;
+                while(parent->parent)
+                    parent = parent->parent;
+                parent->add_child_front(type_declaration_node);
+            }
+        } else
+            scoped_type_id = GlobalTypeRegistry::instance().get_specialized_type(scoped_type_id, type_parameters);
     }
 
     while(it->type == Token::Type::Multiplication) {
-        const auto pointer_type_id = GlobalTypeRegistry::instance().get_pointer_to(type_id);
-        type = GlobalTypeRegistry::instance().get_type(pointer_type_id);
+        scoped_type_id = GlobalTypeRegistry::instance().get_pointer_to(scoped_type_id);
         ++it;
     }
 
+    // TODO: Doesn't work for template types yet.
     if(it->type == Token::Type::OpenSubscript) {
         ++it;
         // FIXME: Parse full expression?
@@ -1397,11 +1511,10 @@ TypeID Parser::parse_type(const std::span<Token>& tokens, std::span<Token>::iter
         std::from_chars(&*(digits.value.begin()), &*(digits.value.begin()) + digits.value.length(), capacity);
         expect(tokens, it, Token::Type::CloseSubscript);
 
-        const auto arr_type_id = GlobalTypeRegistry::instance().get_array_of(type_id, capacity);
-        type = GlobalTypeRegistry::instance().get_type(arr_type_id);
+        scoped_type_id = GlobalTypeRegistry::instance().get_array_of(scoped_type_id, capacity);
     }
 
-    return type->type_id;
+    return scoped_type_id;
 }
 
 bool Parser::write_export_interface(const std::filesystem::path& path) const {
@@ -1429,6 +1542,8 @@ void Parser::resolve_operator_type(AST::BinaryOperator* op_node) {
         // FIXME: May not be needed anymore
         if(type->is_pointer())
             type = GlobalTypeRegistry::instance().get_type(dynamic_cast<const PointerType*>(type)->pointee_type);
+        if(type->is_templated())
+            type = GlobalTypeRegistry::instance().get_type(dynamic_cast<const TemplatedType*>(type)->template_type_id);
         assert(type->is_struct());
 
         auto struct_type = dynamic_cast<const StructType*>(type);
@@ -1488,6 +1603,36 @@ void Parser::insert_defer_node(AST::Node* curr_node) {
             var_node->type_id = dec->type_id;
 
             check_function_call(call_node, destructor);
+        }
+    }
+}
+
+void Parser::specialize(AST::Node* node, const std::vector<TypeID>& parameters) {
+    for(auto c : node->children)
+        specialize(c, parameters);
+    if(node->type_id != InvalidTypeID) {
+        const auto original_type = GlobalTypeRegistry::instance().get_type(node->type_id); // FIXME: TEMP: For debug only
+        auto       type = GlobalTypeRegistry::instance().get_type(node->type_id);
+        if(type->is_placeholder()) {
+            // FIXME: Feels hackish, as always.
+            size_t indirection_count = 0;
+            while(type->is_pointer()) {
+                auto pointer_type = dynamic_cast<const PointerType*>(type);
+                type = GlobalTypeRegistry::instance().get_type(pointer_type->pointee_type);
+                ++indirection_count;
+            }
+
+            if(type->is_templated()) {
+                auto templated_type = dynamic_cast<const TemplatedType*>(type);
+                auto specialized_type_id = GlobalTypeRegistry::instance().get_specialized_type(templated_type->template_type_id, parameters);
+                node->type_id = specialized_type_id;
+            } else
+                node->type_id = parameters[type->type_id - PlaceholderTypeID_Min];
+
+            for(auto i = 0; i < indirection_count; ++i)
+                node->type_id = GlobalTypeRegistry::instance().get_pointer_to(node->type_id);
+
+            print(" [DEBUG] Placeholder specialization: {} -> {}\n", *original_type, type_id_to_string(node->type_id));
         }
     }
 }

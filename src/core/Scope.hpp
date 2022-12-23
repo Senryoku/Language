@@ -23,11 +23,27 @@ class Scope {
 
     bool declare_type(AST::TypeDeclaration& node) {
         auto sv = node.token.value;
-        if(is_valid(find_type(sv)))
+        if(find_type(sv) != InvalidTypeID)
             return false;
         auto type_id = GlobalTypeRegistry::instance().register_type(node);
         node.type_id = type_id;
-        _types.emplace(std::string{sv}, &node);
+        _types.emplace(std::string{sv}, type_id);
+        return true;
+    }
+    /*
+    bool declare_templated_type(AST::TypeDeclaration& node, const std::vector<std::string>& typenames) {
+        auto sv = node.token.value;
+        if(find_type(sv) != InvalidTypeID)
+            return false;
+        auto type_id = GlobalTypeRegistry::instance().register_templated_type(node, typenames);
+        node.type_id = type_id;
+        _types.emplace(std::string{sv}, type_id);
+        return true;
+    }
+    */
+
+    bool declare_template_placeholder_type(const std::string& name) {
+        _template_placeholder_types.push_back(name);
         return true;
     }
 
@@ -38,11 +54,15 @@ class Scope {
     inline [[nodiscard]] const std::vector<AST::FunctionDeclaration*>& get_functions(const std::string_view& name) const { return _functions.find(name)->second; };
     inline [[nodiscard]] bool                                          has_functions(const std::string_view& name) const { return is_valid(_functions.find(name)); };
 
-    bool is_valid(const het_unordered_map<AST::TypeDeclaration*>::iterator& it) const { return it != _types.end(); }
-    bool is_valid(const het_unordered_map<AST::TypeDeclaration*>::const_iterator& it) const { return it != _types.cend(); }
-    [[nodiscard]] het_unordered_map<AST::TypeDeclaration*>::iterator       find_type(const std::string_view& name) { return _types.find(name); }
-    [[nodiscard]] het_unordered_map<AST::TypeDeclaration*>::const_iterator find_type(const std::string_view& name) const { return _types.find(name); }
-    [[nodiscard]] const AST::TypeDeclaration*                              get_type(const std::string_view& name) const;
+    [[nodiscard]] TypeID find_type(const std::string_view& name) const {
+        auto it = _types.find(name);
+        if(it != _types.end())
+            return it->second;
+        auto template_it = std::find(_template_placeholder_types.begin(), _template_placeholder_types.end(), name);
+        if(template_it != _template_placeholder_types.end())
+            return PlaceholderTypeID_Min + std::distance(_template_placeholder_types.begin(), template_it);
+        return InvalidTypeID;
+    }
 
     bool declare_variable(AST::VariableDeclaration& decNode) {
         const auto& name = decNode.token.value;
@@ -81,7 +101,8 @@ class Scope {
     // FIXME: At some point we'll have ton consolidate these string_view to their final home... Maybe the lexer should have done it already.
     het_unordered_map<AST::VariableDeclaration*>              _variables;
     het_unordered_map<std::vector<AST::FunctionDeclaration*>> _functions;
-    het_unordered_map<AST::TypeDeclaration*>                  _types;
+    het_unordered_map<TypeID>                                 _types;
+    std::vector<std::string>                                  _template_placeholder_types; // Local names for placeholder types
 
     std::stack<AST::VariableDeclaration*> _ordered_variable_declarations;
 
@@ -156,8 +177,8 @@ class Scoped {
     // Debug helper, gets all functions with the given name.
     std::vector<const AST::FunctionDeclaration*> get_functions(const std::string_view& name) const;
 
-    const AST::TypeDeclaration* get_type(const std::string_view& name) const;
-    bool                        is_type(const std::string_view& name) const;
+    TypeID get_type(const std::string_view& name) const;
+    bool   is_type(const std::string_view& name) const;
 
     AST::VariableDeclaration*       get(const std::string_view& name);
     const AST::VariableDeclaration* get(const std::string_view& name) const;
