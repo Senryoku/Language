@@ -209,6 +209,7 @@ class AST {
         [[nodiscard]] virtual FunctionCall* clone() const override {
             auto n = new FunctionCall();
             clone_impl(n);
+            n->flags = flags;
             return n;
         }
     };
