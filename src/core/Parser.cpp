@@ -1050,7 +1050,8 @@ bool Parser::deduce_placeholder_types(const Type* call_node, const Type* functio
             if(arg_templated_type->parameters.size() != param_templated_type->parameters.size())
                 return false;
             for(auto idx = 0; idx < arg_templated_type->parameters.size(); ++idx) {
-                if(!deduce_placeholder_types(GlobalTypeRegistry::instance().get_type(arg_templated_type->parameters[idx]), GlobalTypeRegistry::instance().get_type(param_templated_type->parameters[idx]),  deduced_types))
+                if(!deduce_placeholder_types(GlobalTypeRegistry::instance().get_type(arg_templated_type->parameters[idx]),
+                                             GlobalTypeRegistry::instance().get_type(param_templated_type->parameters[idx]), deduced_types))
                     return false;
             }
             return true;
@@ -1535,9 +1536,15 @@ TypeID Parser::parse_type(const std::span<Token>& tokens, std::span<Token>::iter
                 //     parent = parent->parent;
                 AST::TypeDeclaration* type_declaration_node = new AST::TypeDeclaration(Token(Token::Type::Identifier, templated_type->designation, 0, 0));
                 type_declaration_node->type_id = scoped_type_id;
+                // Insert specialized members in the same order as the original declaration
+                std::vector<const StructType::Member*> members;
+                members.resize(struct_type->members.size());
                 for(const auto& [name, member] : struct_type->members) {
-                    auto mem = type_declaration_node->add_child(new AST::VariableDeclaration(Token(Token::Type::Identifier, member.name, 0, 0)));
-                    mem->type_id = member.type_id;
+                    members[member.index] = &member;
+                }
+                for(const auto& member : members) {
+                    auto mem = type_declaration_node->add_child(new AST::VariableDeclaration(Token(Token::Type::Identifier, member->name, 0, 0)));
+                    mem->type_id = member->type_id;
                 }
                 specialize(type_declaration_node, type_parameters);
                 // Declare early

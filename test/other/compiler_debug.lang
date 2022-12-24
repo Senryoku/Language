@@ -1,16 +1,24 @@
-type NewType<T> {
-	let u : u64 = 0;
-	let t : T;
+import "std/memory"
+
+type Array<T> {
+	let capacity : u64 = 0;
+	let length : u64 = 0;
+	let data : T* = null_pointer();
 }
 
-function prt<T>(this: NewType<T>*) : void {
-	printf("%d, %d\n", .u, .t);
+function push_back<T>(this: Array<T>*, value: T) : u64 {
+	if(.capacity <= .length) 
+		printf("K");
+	
+	.data[.length] = value;
+	++.length;
+	return .length;
 }
 
 function main() {
-	let t : NewType<int>;
-	t.u = 5;
-	t.t = 55;
-	t.prt();
+	let arr : Array<u8>;
+	
+	const forty_two : u8 = 42; // Forced Cast, otherwise the we can't resolve the function, yet.
+	arr.push_back(forty_two);
 	return 0;
 }
