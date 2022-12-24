@@ -983,7 +983,7 @@ bool Parser::parse_string(const std::span<Token>&, std::span<Token>::iterator& i
     return true;
 }
 
-bool Parser::parse_function_arguments(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node) {
+bool Parser::parse_function_arguments(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::FunctionCall* curr_node) {
     assert(it->type == Token::Type::OpenParenthesis);
     it++;
     assert(curr_node->type == AST::Node::Type::FunctionCall);

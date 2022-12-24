@@ -105,10 +105,17 @@ class AST {
     };
 
     struct TypeDeclaration : public Node {
+        TypeDeclaration() : Node(Node::Type::TypeDeclaration) {}
         TypeDeclaration(Token t) : Node(Node::Type::TypeDeclaration, t) {}
 
         const auto& name() const { return token.value; }
         const auto& members() const { return children; }
+
+        [[nodiscard]] virtual TypeDeclaration* clone() const override {
+            auto n = new TypeDeclaration();
+            clone_impl(n);
+            return n;
+        }
     };
     /*
     struct TemplatedTypeDeclaration : public TypeDeclaration {
@@ -170,6 +177,7 @@ class AST {
     };
 
     struct FunctionCall : public Node {
+        FunctionCall() : Node(Node::Type::FunctionCall) {}
         FunctionCall(Token t) : Node(Node::Type::FunctionCall, t) {}
 
         FunctionDeclaration::Flag flags = FunctionDeclaration::None;
@@ -197,6 +205,12 @@ class AST {
         }
 
         std::string mangled_name() const;
+
+        [[nodiscard]] virtual FunctionCall* clone() const override {
+            auto n = new FunctionCall();
+            clone_impl(n);
+            return n;
+        }
     };
 
     struct Defer : public Node {
@@ -274,6 +288,12 @@ class AST {
         Token::Type operation() const { return token.type; }
         Node*       lhs() const { return children[0]; }
         Node*       rhs() const { return children[1]; }
+
+        [[nodiscard]] virtual BinaryOperator* clone() const override {
+            auto n = new BinaryOperator();
+            clone_impl(n);
+            return n;
+        }
     };
 
     struct UnaryOperator : public Node {
@@ -329,23 +349,63 @@ class AST {
     };
 
     struct BoolLiteral : public Literal<bool> {
+        BoolLiteral() : Literal() { type_id = PrimitiveType::Boolean; }
         BoolLiteral(Token t) : Literal(t) { type_id = PrimitiveType::Boolean; }
+
+        [[nodiscard]] virtual BoolLiteral* clone() const override {
+            auto n = new BoolLiteral();
+            clone_impl(n);
+            n->value = value;
+            return n;
+        }
     };
 
     struct CharLiteral : public Literal<char> {
+        CharLiteral() : Literal() { type_id = PrimitiveType::Char; }
         CharLiteral(Token t) : Literal(t) { type_id = PrimitiveType::Char; }
+
+        [[nodiscard]] virtual CharLiteral* clone() const override {
+            auto n = new CharLiteral();
+            clone_impl(n);
+            n->value = value;
+            return n;
+        }
     };
 
     struct IntegerLiteral : public Literal<int32_t> {
+        IntegerLiteral() : Literal() { type_id = PrimitiveType::Integer; }
         IntegerLiteral(Token t) : Literal(t) { type_id = PrimitiveType::Integer; }
+
+        [[nodiscard]] virtual IntegerLiteral* clone() const override {
+            auto n = new IntegerLiteral();
+            clone_impl(n);
+            n->value = value;
+            return n;
+        }
     };
 
     struct FloatLiteral : public Literal<float> {
+        FloatLiteral() : Literal() { type_id = PrimitiveType::Float; }
         FloatLiteral(Token t) : Literal(t) { type_id = PrimitiveType::Float; }
+
+        [[nodiscard]] virtual FloatLiteral* clone() const override {
+            auto n = new FloatLiteral();
+            clone_impl(n);
+            n->value = value;
+            return n;
+        }
     };
 
     struct StringLiteral : public Literal<std::string_view> {
+        StringLiteral() : Literal() { type_id = PrimitiveType::CString; }
         StringLiteral(Token t) : Literal(t) { type_id = PrimitiveType::CString; }
+
+        [[nodiscard]] virtual StringLiteral* clone() const override {
+            auto n = new StringLiteral();
+            clone_impl(n);
+            n->value = value;
+            return n;
+        }
     };
 
     inline Node&       get_root() { return _root; }

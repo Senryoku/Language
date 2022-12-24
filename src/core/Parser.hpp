@@ -64,7 +64,7 @@ class Parser : public Scoped {
     bool                     parse_method_declaration(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
     bool                     parse_function_declaration(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node,
                                                         AST::FunctionDeclaration::Flag flags = AST::FunctionDeclaration::Flag::None);
-    bool                     parse_function_arguments(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
+    bool                     parse_function_arguments(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::FunctionCall* curr_node);
     std::vector<TypeID>      parse_template_types(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
     std::vector<std::string> declare_template_types(const std::span<Token>& tokens, std::span<Token>::iterator& it);
     bool                     parse_type_declaration(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
