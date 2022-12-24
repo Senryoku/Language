@@ -128,4 +128,8 @@ class Parser : public Scoped {
     void   insert_defer_node(AST::Node* curr_node);
     void   specialize(AST::Node* node, const std::vector<TypeID>& parameters);
     TypeID specialize(TypeID type_id, const std::vector<TypeID>& parameters);
+
+    bool                deduce_placeholder_types(const Type* call_node, const Type* function_node, std::vector<TypeID>& deduced_types);
+    std::vector<TypeID> deduce_placeholder_types(const AST::FunctionCall* call_node, const AST::FunctionDeclaration* function_node);
 };
+

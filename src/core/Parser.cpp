@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <fstream>
 
+#include <fmt/ranges.h>
+
 #include <ModuleInterface.hpp>
 
 std::optional<AST> Parser::parse(const std::span<Token>& tokens) {
@@ -1036,6 +1038,53 @@ std::string get_overloads_hint_string(const AST::FunctionCall* call_node, const 
     return used_types + candidates_display;
 }
 
+bool Parser::deduce_placeholder_types(const Type* call_node, const Type* function_node, std::vector<TypeID>& deduced_types) {
+    if(function_node->is_placeholder()) {
+        if(function_node->is_templated()) {
+            if(!call_node->is_templated())
+                return false;
+            auto arg_templated_type = dynamic_cast<const TemplatedType*>(call_node);
+            auto param_templated_type = dynamic_cast<const TemplatedType*>(function_node);
+            if(arg_templated_type->template_type_id != param_templated_type->template_type_id)
+                return false;
+            if(arg_templated_type->parameters.size() != param_templated_type->parameters.size())
+                return false;
+            for(auto idx = 0; idx < arg_templated_type->parameters.size(); ++idx) {
+                if(!deduce_placeholder_types(GlobalTypeRegistry::instance().get_type(arg_templated_type->parameters[idx]), GlobalTypeRegistry::instance().get_type(param_templated_type->parameters[idx]),  deduced_types))
+                    return false;
+            }
+            return true;
+        }
+        if(function_node->is_pointer()) {
+            if(!call_node->is_pointer())
+                return false;
+            return deduce_placeholder_types(GlobalTypeRegistry::instance().get_type(dynamic_cast<const PointerType*>(call_node)->pointee_type),
+                                            GlobalTypeRegistry::instance().get_type(dynamic_cast<const PointerType*>(function_node)->pointee_type), deduced_types);
+        }
+        // TODO: More.
+        assert(is_placeholder(function_node->type_id));
+        auto index = get_placeholder_index(function_node->type_id);
+        if(deduced_types.size() <= index)
+            deduced_types.resize(index + 1, InvalidTypeID);
+        // Mismatch
+        if(deduced_types[index] != InvalidTypeID && deduced_types[index] != call_node->type_id)
+            return false;
+        deduced_types[index] = call_node->type_id;
+        return true;
+    }
+}
+
+std::vector<TypeID> Parser::deduce_placeholder_types(const AST::FunctionCall* call_node, const AST::FunctionDeclaration* function_node) {
+    std::vector<TypeID> deduced_types;
+    for(auto idx = 0; idx < call_node->arguments().size(); ++idx) {
+        auto arg_type = GlobalTypeRegistry::instance().get_type(call_node->arguments()[idx]->type_id);
+        auto param_type = GlobalTypeRegistry::instance().get_type(function_node->arguments()[idx]->type_id);
+        if(!deduce_placeholder_types(arg_type, param_type, deduced_types))
+            return {};
+    }
+    return deduced_types;
+}
+
 bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node) {
     auto operator_type = it->type;
     // Unary operators
@@ -1245,11 +1294,14 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
                 // TEMP DEBUG
                 print("{}", get_overloads_hint_string(call_node, candidates));
 
-                // TODO: Actually deduce types.
-                std::vector<TypeID> deduced_types = {PrimitiveType::U64};
-
                 for(const auto& candidate : candidates) {
-                    if(candidate->is_templated()) {
+                    // TODO: Handle variadics
+                    if(candidate->is_templated() && candidate->arguments().size() == call_node->arguments().size()) {
+                        std::vector<TypeID> deduced_types = deduce_placeholder_types(call_node, candidate);
+                        fmt::print("Deduces types: {}\n", fmt::join(deduced_types, ", "));
+                        if(deduced_types.empty())
+                            break;
+
                         print("Template candidate: {}\n", *static_cast<const AST::Node*>(candidate));
                         auto specialized = candidate->clone();
                         specialize(specialized, deduced_types);

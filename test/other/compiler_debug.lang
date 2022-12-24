@@ -8,7 +8,7 @@ function prt<T>(this: NewType<T>*) : void {
 }
 
 function main() {
-	let t : NewType<u64>;
+	let t : NewType<int>;
 	t.u = 5;
 	t.t = 55;
 	t.prt();
