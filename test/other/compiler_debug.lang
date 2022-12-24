@@ -2,32 +2,15 @@ type NewType<T> {
 	let u : u64 = 0;
 	let t : T;
 }
+
 function prt<T>(this: NewType<T>*) : void {
-	//printf("%d, %d\n", .u, .t);
-	printf("%d, %d\n", 0, 1);
+	printf("%d, %d\n", .u, .t);
 }
 
 function main() {
 	let t : NewType<u64>;
-	//printf("%d, %d\n", 0, 1);
+	t.u = 5;
+	t.t = 55;
 	t.prt();
 	return 0;
 }
-
-//type NewType<T> {
-//	let u : u64 = 0;
-//	let t : T;
-//}
-//
-//function prt<T>(this: NewType<T>*) : void {
-//	//printf("%d, %d\n", .u, .t);
-//	printf("%d, %d\n", 0, 1);
-//}
-//
-//function main() {
-//	let t : NewType<u64>;
-//	t.u = 5;
-//	t.t = 55;
-//	t.prt();
-//	return 0;
-//}
