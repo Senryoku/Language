@@ -119,7 +119,14 @@ llvm::Constant* Module::codegen_constant(const AST::Node* val) {
         case Boolean: return llvm::ConstantInt::get(*_llvm_context, llvm::APInt(1, dynamic_cast<const AST::BoolLiteral*>(val)->value));
         case Char: return llvm::ConstantInt::get(*_llvm_context, llvm::APInt(8, dynamic_cast<const AST::CharLiteral*>(val)->value));
         case Float: return llvm::ConstantFP::get(*_llvm_context, llvm::APFloat(dynamic_cast<const AST::FloatLiteral*>(val)->value));
-        case I32: [[fallthrough]];
+        case U8: return llvm::ConstantInt::get(*_llvm_context, llvm::APInt(8, dynamic_cast<const AST::Literal<uint8_t>*>(val)->value));
+        case U16: return llvm::ConstantInt::get(*_llvm_context, llvm::APInt(16, dynamic_cast<const AST::Literal<uint16_t>*>(val)->value));
+        case U32: return llvm::ConstantInt::get(*_llvm_context, llvm::APInt(32, dynamic_cast<const AST::Literal<uint32_t>*>(val)->value));
+        case U64: return llvm::ConstantInt::get(*_llvm_context, llvm::APInt(64, dynamic_cast<const AST::Literal<uint64_t>*>(val)->value));
+        case I8: return llvm::ConstantInt::get(*_llvm_context, llvm::APInt(8, dynamic_cast<const AST::Literal<int8_t>*>(val)->value));
+        case I16: return llvm::ConstantInt::get(*_llvm_context, llvm::APInt(16, dynamic_cast<const AST::Literal<int16_t>*>(val)->value));
+        case I32: return llvm::ConstantInt::get(*_llvm_context, llvm::APInt(32, dynamic_cast<const AST::Literal<int32_t>*>(val)->value));
+        case I64: return llvm::ConstantInt::get(*_llvm_context, llvm::APInt(64, dynamic_cast<const AST::Literal<int64_t>*>(val)->value));
         case Integer: return llvm::ConstantInt::get(*_llvm_context, llvm::APInt(32, dynamic_cast<const AST::IntegerLiteral*>(val)->value));
         case CString: {
             // FIXME: Take a look at llvm::StringRef and llvm::Twine
