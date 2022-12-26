@@ -1496,27 +1496,27 @@ bool Parser::parse_variable_declaration(const std::span<Token>& tokens, std::spa
                 assignment_node->insert_between(assignment_node->children.size() - 1, new AST::Cast(var_declaration_node->type_id));
             }
         }
-    } else if(!is_primitive(var_declaration_node->type_id) && allow_construtor) {
+    } else if(auto type = GlobalTypeRegistry::instance().get_type(var_declaration_node->type_id); allow_construtor && (type->is_struct() || type->is_templated())) {
         // Search for a default constructor and add a call to it if it exists
         std::vector<TypeID> span;
         span.push_back(GlobalTypeRegistry::instance().get_pointer_to(var_declaration_node->type_id));
         auto constructor = resolve_or_instanciate_function("constructor", span);
         auto fake_token = Token(Token::Type::Identifier, *internalize_string("constructor"), var_declaration_node->token.line, var_declaration_node->token.column);
-        if(!constructor)
-            throw_unresolved_function(fake_token, span);
-        auto call_node = new AST::FunctionCall(fake_token);
+        if(constructor) {
+            auto call_node = new AST::FunctionCall(fake_token);
 
-        curr_node->add_child(call_node);
-        // Constructor method designation
-        auto constructor_node = new AST::Variable(fake_token); // FIXME: Still using the token to get the function...
-        call_node->add_child(constructor_node);
-        // Constructor argument (pointer to the object)
-        auto get_pointer_node = call_node->add_child(new AST::Node(AST::Node::Type::GetPointer, var_declaration_node->token));
-        get_pointer_node->type_id = GlobalTypeRegistry::instance().get_pointer_to(var_declaration_node->type_id);
-        auto var_node = get_pointer_node->add_child(new AST::Variable(var_declaration_node->token));
-        var_node->type_id = var_declaration_node->type_id;
+            curr_node->add_child(call_node);
+            // Constructor method designation
+            auto constructor_node = new AST::Variable(fake_token); // FIXME: Still using the token to get the function...
+            call_node->add_child(constructor_node);
+            // Constructor argument (pointer to the object)
+            auto get_pointer_node = call_node->add_child(new AST::Node(AST::Node::Type::GetPointer, var_declaration_node->token));
+            get_pointer_node->type_id = GlobalTypeRegistry::instance().get_pointer_to(var_declaration_node->type_id);
+            auto var_node = get_pointer_node->add_child(new AST::Variable(var_declaration_node->token));
+            var_node->type_id = var_declaration_node->type_id;
 
-        check_function_call(call_node, constructor);
+            check_function_call(call_node, constructor);
+        }
     }
 
     return true;
