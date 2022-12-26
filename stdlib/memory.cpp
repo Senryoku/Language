@@ -1,22 +1,25 @@
 #include <cstdlib>
 
-// DEBUG
-#include <cstdint>
+// #define DEBUG_TRACE
+
+#ifdef DEBUG_TRACE
 #include <cstdio>
+#endif
 
 extern "C" {
 void* __malloc(size_t size) {
     auto ptr = malloc(size);
+#ifdef DEBUG_TRACE
     printf("\t<std/memory> malloc(%llu) -> 0x%016x\n", size, ptr);
+#endif
     return ptr;
 }
 
 void __free(void* ptr) {
+#ifdef DEBUG_TRACE
     printf("\t<std/memory> free(0x%016x)\n", ptr);
-    printf("\t<std/memory>   0: %llu\n", *static_cast<uint64_t*>(ptr));
-    printf("\t<std/memory>   1: %llu\n", *(static_cast<uint64_t*>(ptr) + 1));
+#endif
     free(ptr);
-    printf("\t<std/memory> -> free(0x%016x) done\n", ptr);
 }
 
 void* null_pointer() {

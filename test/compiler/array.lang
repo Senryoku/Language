@@ -46,7 +46,7 @@ function destructor<T>(this: Array<T>*) : void {
 function dump<T>(this: Array<T>*) : void {
 	printf("----------------\n");
 	for(let idx : u64 = 0; idx < .length; ++idx) {
-		printf("%d = %d\n", idx, .data[idx]);
+		printf("  a[%d] = %d\n", idx, .get(idx));
 	}
 }
 

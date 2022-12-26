@@ -10,7 +10,7 @@ function reserve<T>(this: Array<T>*, size: u64) : void {
 	if(size <= .capacity)
 		return;
 	
-	// FIXME: Yeah, we don't have "sizeof" yet.
+	// FIXME: Yeah, we don't have "sizeof" yet. Will this be part of the reflection system? 'T.byte_size()' ? :O
 	// let ptr : T* = malloc(size * sizeof(T));
 	let ptr : T* = malloc(size * 64);
 	
@@ -40,18 +40,15 @@ function get<T>(this: Array<T>*, index: u64) : T {
 function dump<T>(this: Array<T>*) : void {
 	printf("----------------\n");
 	for(let idx : u64 = 0; idx < .length; ++idx) {
-		printf("%d = %d\n", idx, .data[idx]);
+		printf("  a[%d] = %d\n", idx, .get(idx));
 	}
 }
 
 function destructor<T>(this: Array<T>*) : void {
-	printf(" !! Destructor Called\n");
 	.dump();
-	free(.data); // Crashes.
-	printf("Destructor: Data freed\n");
+	free(.data);
 	.length = 0;
 	.capacity = 0;
-	printf("Destructor end Reached\n");
 }
 
 function test() : Array<u64> {
@@ -65,15 +62,12 @@ function test() : Array<u64> {
 	arr.push_back(forty_two);
 	arr.push_back(leet);
 	arr.dump();
-	
-	printf("Right before exiting from test(): arr.capacity %llu arr.length %llu arr.data 0x%016x\n", arr.capacity, arr.length, arr.data);
+
 	return arr;
 }
 
 function main() {
 	let t = test();
-	printf("Before main dump()\n");
 	t.dump();
-	printf("Right before exiting: t.capacity %llu t.length %llu t.data 0x%016x\n", t.capacity, t.length, t.data);
 	return t.length;
 }
