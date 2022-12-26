@@ -10,14 +10,15 @@ function reserve<T>(this: Array<T>*, size: u64) : void {
 	if(size <= .capacity)
 		return;
 	
-	let ptr : T* = malloc(size);
+	// FIXME: Yeah, we don't have "sizeof" yet.
+	// let ptr : T* = malloc(size * sizeof(T));
+	let ptr : T* = malloc(size * 64);
 	
-	if(.length > 0) {
-		for(let idx : u64 = 0; idx < .length; ++idx) {
-			ptr[idx] = .data[idx];
-		}
-		free(.data);
+	for(let idx : u64 = 0; idx < .length; ++idx) {
+		ptr[idx] = .data[idx];
 	}
+	if(.capacity > 0)
+		free(.data);
 	
 	.capacity = size;
 	.data = ptr;

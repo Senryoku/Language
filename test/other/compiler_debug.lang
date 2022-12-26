@@ -10,14 +10,15 @@ function reserve<T>(this: Array<T>*, size: u64) : void {
 	if(size <= .capacity)
 		return;
 	
-	let ptr : T* = malloc(size);
+	// FIXME: Yeah, we don't have "sizeof" yet.
+	// let ptr : T* = malloc(size * sizeof(T));
+	let ptr : T* = malloc(size * 64);
 	
-	if(.length > 0) {
-		for(let idx : u64 = 0; idx < .length; ++idx) {
-			ptr[idx] = .data[idx];
-		}
-		free(.data);
+	for(let idx : u64 = 0; idx < .length; ++idx) {
+		ptr[idx] = .data[idx];
 	}
+	if(.capacity > 0)
+		free(.data);
 	
 	.capacity = size;
 	.data = ptr;
@@ -36,15 +37,6 @@ function get<T>(this: Array<T>*, index: u64) : T {
 	return .data[index];
 }
 
-function destructor<T>(this: Array<T>*) : void {
-	printf("Destructor Called\n");
-	free(.data);
-	printf("Destructor: Data freed\n");
-	.length = 0;
-	.capacity = 0;
-	printf("Destructor end Reached\n");
-}
-
 function dump<T>(this: Array<T>*) : void {
 	printf("----------------\n");
 	for(let idx : u64 = 0; idx < .length; ++idx) {
@@ -52,23 +44,54 @@ function dump<T>(this: Array<T>*) : void {
 	}
 }
 
-function test() : Array<u64> {
-	let arr : Array<u64>;
-	
-	const forty_two : u64 = 42; // Forced Cast, otherwise the we can't resolve the function, yet.
-	const leet : u64 = 1337;
-	arr.push_back(forty_two);
-	arr.push_back(leet);
-	arr.dump();
-	arr.push_back(forty_two);
-	arr.push_back(leet);
-	arr.dump();
-	
-	return arr;
+function destructor<T>(this: Array<T>*) : void {
+	printf(" !! Destructor Called\n");
+	.dump();
+	free(.data); // Crashes.
+	printf("Destructor: Data freed\n");
+	.length = 0;
+	.capacity = 0;
+	printf("Destructor end Reached\n");
 }
 
-function main() {
-	let t = test();
-	t.dump();
-	return t.length;
+function main() : int {
+	let arr : Array<u64>;
+	const forty_two : u64 = 42; // Forced Cast, otherwise we can't resolve the function, yet.
+	const leet : u64 = 1337;
+	
+	arr.push_back(forty_two);
+	arr.push_back(leet);
+	arr.dump();
+	arr.push_back(forty_two);
+	arr.push_back(leet);
+	arr.dump();
+	
+	printf("Right before exiting from main(): arr.capacity %llu arr.length %llu arr.data 0x%016x\n", arr.capacity, arr.length, arr.data);
+	return 0;
 }
+
+
+//function test() : Array<u64> {
+//	let arr : Array<u64>;
+//	
+//	const forty_two : u64 = 42; // Forced Cast, otherwise the we can't resolve the function, yet.
+//	const leet : u64 = 1337;
+//	arr.push_back(forty_two);
+//	arr.push_back(leet);
+//	arr.dump();
+//	arr.push_back(forty_two);
+//	arr.push_back(leet);
+//	arr.dump();
+//	
+//	printf("Right before exiting from test(): arr.capacity %llu arr.length %llu arr.data 0x%016x\n", arr.capacity, arr.length, arr.data);
+//  // This should not call the destructor to arr, but it looks like it does.
+//	return arr;
+//}
+//
+//function main() {
+//	let t = test();
+//	printf("Before main dump()\n");
+//	t.dump();
+//	printf("Right before exiting: t.capacity %llu t.length %llu t.data 0x%016x\n", t.capacity, t.length, t.data);
+//	return t.length;
+//}
