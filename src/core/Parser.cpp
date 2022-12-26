@@ -1107,6 +1107,7 @@ bool Parser::deduce_placeholder_types(const Type* call_node, const Type* functio
         deduced_types[index] = call_node->type_id;
         return true;
     }
+    return true;
 }
 
 std::vector<TypeID> Parser::deduce_placeholder_types(const AST::FunctionCall* call_node, const AST::FunctionDeclaration* function_node) {

@@ -80,10 +80,17 @@ class Parser : public Scoped {
 
     template<typename T>
     AST::Node* gen_integer_literal_node(const Token& token, uint64_t value, PrimitiveType type) {
-        if(static_cast<intmax_t>(value) < std::numeric_limits<T>::min() || static_cast<intmax_t>(value) > std::numeric_limits<T>::max())
-            throw Exception(fmt::format("Error parsing integer for target type {}: value '{}' out-of-bounds (range: [{}, {}]).", type_id_to_string(type), value,
-                                        std::numeric_limits<T>::min(), std::numeric_limits<T>::max()),
-                            point_error(token));
+        if constexpr(std::is_unsigned<T>()) {
+            if(static_cast<uintmax_t>(value) < std::numeric_limits<T>::min() || static_cast<uintmax_t>(value) > std::numeric_limits<T>::max())
+                throw Exception(fmt::format("Error parsing integer for target type {}: value '{}' out-of-bounds (range: [{}, {}]).", type_id_to_string(type), value,
+                                            std::numeric_limits<T>::min(), std::numeric_limits<T>::max()),
+                                point_error(token));
+        } else {
+            if(static_cast<intmax_t>(value) < std::numeric_limits<T>::min() || static_cast<intmax_t>(value) > std::numeric_limits<T>::max())
+                throw Exception(fmt::format("Error parsing integer for target type {}: value '{}' out-of-bounds (range: [{}, {}]).", type_id_to_string(type), value,
+                                            std::numeric_limits<T>::min(), std::numeric_limits<T>::max()),
+                                point_error(token));
+        }
         auto local = new AST::Literal<T>(token);
         local->type_id = type;
         local->value = static_cast<T>(value);
