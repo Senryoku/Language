@@ -409,6 +409,17 @@ class AST {
         }
     };
 
+    struct Cast : public Node {
+        Cast() = default;
+        Cast(TypeID _type_id) : Node(Type::Cast) { type_id = _type_id; }
+
+        [[nodiscard]] virtual Cast* clone() const override {
+            auto n = new Cast();
+            clone_impl(n);
+            return n;
+        }
+    };
+
     inline Node&       get_root() { return _root; }
     inline const Node& get_root() const { return _root; }
 

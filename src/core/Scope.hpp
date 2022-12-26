@@ -30,17 +30,6 @@ class Scope {
         _types.emplace(std::string{sv}, type_id);
         return true;
     }
-    /*
-    bool declare_templated_type(AST::TypeDeclaration& node, const std::vector<std::string>& typenames) {
-        auto sv = node.token.value;
-        if(find_type(sv) != InvalidTypeID)
-            return false;
-        auto type_id = GlobalTypeRegistry::instance().register_templated_type(node, typenames);
-        node.type_id = type_id;
-        _types.emplace(std::string{sv}, type_id);
-        return true;
-    }
-    */
 
     bool declare_template_placeholder_type(const std::string& name) {
         _template_placeholder_types.push_back(name);

@@ -71,12 +71,24 @@ TypeID Parser::resolve_operator_type(Token::Type op, TypeID lhs, TypeID rhs) {
             return dynamic_cast<const PointerType*>(lhs_type)->pointee_type;
     }
 
+    // Promote to int for intermediary results, unless it doesn't fit.
+    if(is_integer(lhs) && is_integer(rhs)) {
+        // Keep the signed nature of the expression
+        if(lhs == PrimitiveType::I64 || rhs == PrimitiveType::I64)
+            return PrimitiveType::I64;
+        // Whole expression is unsigned, and at least one side is 64bits
+        if((lhs == PrimitiveType::U64 && is_unsigned(rhs)) || (is_unsigned(lhs) && rhs == PrimitiveType::U64))
+            return PrimitiveType::U64;
+        if(is_unsigned(lhs) && is_unsigned(lhs))
+            return PrimitiveType::U32;
+        return PrimitiveType::Integer;
+    }
+
     if(lhs == rhs && is_primitive(lhs))
         return lhs;
 
     // Promote integer to Float
-    if(is_primitive(lhs) && is_primitive(rhs) &&
-       ((lhs == PrimitiveType::Float && rhs == PrimitiveType::Integer) || (lhs == PrimitiveType::Integer && rhs == PrimitiveType::Float))) {
+    if((is_floating_point(lhs) && is_integer(rhs)) || (is_integer(lhs) && is_floating_point(rhs))) {
         return PrimitiveType::Float;
     }
 
@@ -745,8 +757,8 @@ bool Parser::parse_function_declaration(const std::span<Token>& tokens, std::spa
         if(return_type == InvalidTypeID)
             return_type = PrimitiveType::Void;
         if(function_node->type_id != InvalidTypeID && function_node->type_id != return_type)
-            throw Exception(fmt::format("[Parser] Syntax error: Incoherent return types for function {}, got {}, expected {}.\n", function_node->token.value, return_type,
-                                        function_node->type_id),
+            throw Exception(fmt::format("[Parser] Syntax error: Incoherent return types for function {}, got {}, expected {}.\n", function_node->token.value,
+                                        type_id_to_string(return_type), type_id_to_string(function_node->type_id)),
                             point_error(function_node->body()->token));
         function_node->type_id = return_type;
     }
@@ -922,38 +934,37 @@ AST::BoolLiteral* Parser::parse_boolean(const std::span<Token>&, std::span<Token
     return boolNode;
 }
 
-AST::Node* Parser::parse_digits(const std::span<Token>&, std::span<Token>::iterator& it, AST::Node* curr_node) {
+AST::Node* Parser::parse_digits(const std::span<Token>&, std::span<Token>::iterator& it, AST::Node* curr_node, PrimitiveType type) {
     uint64_t value;
     auto [ptr, error_code] = std::from_chars(&*(it->value.begin()), &*(it->value.begin()) + it->value.length(), value);
     if(error_code == std::errc::invalid_argument)
         throw Exception("[Parser::parse_digits] std::from_chars returned invalid_argument.\n", point_error(*it));
     else if(error_code == std::errc::result_out_of_range)
         throw Exception("[Parser::parse_digits] std::from_chars returned result_out_of_range.\n", point_error(*it));
-    ++it;
-    // Use the smallest type possible to allow easy casting to larger types afterwards (avoid some explicit casting on variable initialization).
     AST::Node* integer = nullptr;
-    if(value <= std::numeric_limits<uint8_t>::max()) {
-        auto local = new AST::Literal<uint8_t>(*it);
-        local->type_id = PrimitiveType::U8;
-        local->value = static_cast<uint8_t>(value);
-        integer = local;
-    } else if(value <= std::numeric_limits<uint16_t>::max()) {
-        auto local = new AST::Literal<uint16_t>(*it);
-        local->type_id = PrimitiveType::U16;
-        local->value = static_cast<uint8_t>(value);
-        integer = local;
-    } else if(value <= std::numeric_limits<uint32_t>::max()) {
-        auto local = new AST::Literal<uint32_t>(*it);
-        local->type_id = PrimitiveType::U32;
-        local->value = static_cast<uint8_t>(value);
-        integer = local;
-    } else {
-        auto local = new AST::Literal<uint64_t>(*it);
-        local->type_id = PrimitiveType::U64;
-        local->value = static_cast<uint8_t>(value);
-        integer = local;
+    switch(type) {
+        case PrimitiveType::I8: integer = gen_integer_literal_node<int8_t>(*it, value, type); break;
+        case PrimitiveType::I16: integer = gen_integer_literal_node<int16_t>(*it, value, type); break;
+        case PrimitiveType::I32: integer = gen_integer_literal_node<int32_t>(*it, value, type); break;
+        case PrimitiveType::I64: integer = gen_integer_literal_node<int64_t>(*it, value, type); break;
+        case PrimitiveType::U8: integer = gen_integer_literal_node<uint8_t>(*it, value, type); break;
+        case PrimitiveType::U16: integer = gen_integer_literal_node<uint16_t>(*it, value, type); break;
+        case PrimitiveType::U32: integer = gen_integer_literal_node<uint32_t>(*it, value, type); break;
+        case PrimitiveType::U64: integer = gen_integer_literal_node<uint64_t>(*it, value, type); break;
+        case PrimitiveType::Integer: [[fallthrough]];
+        default: {
+            if(static_cast<int64_t>(value) < std::numeric_limits<int32_t>::min() || static_cast<int64_t>(value) > std::numeric_limits<int32_t>::max())
+                throw Exception(fmt::format("Error parsing integer for target type {}: value '{}' out-of-bounds (range: [{}, {}]).", type_id_to_string(PrimitiveType::Integer),
+                                            value, std::numeric_limits<int32_t>::min(), std::numeric_limits<int32_t>::max()),
+                                point_error(*it));
+            auto local = new AST::IntegerLiteral(*it);
+            local->value = static_cast<int32_t>(value);
+            integer = local;
+            break;
+        }
     }
     curr_node->add_child(integer);
+    ++it;
     return integer;
 }
 
@@ -1463,6 +1474,13 @@ bool Parser::parse_variable_declaration(const std::span<Token>& tokens, std::spa
         // Deduce variable type from initial value
         if(var_declaration_node->type_id == InvalidTypeID)
             var_declaration_node->type_id = variable_node->type_id;
+        else {
+            auto assignment_node = curr_node->children.back();
+            if(var_declaration_node->type_id != assignment_node->children.back()->type_id) {
+                // FIXME: Check and warn (or prevent) against unsafe implicit casts
+                assignment_node->insert_between(assignment_node->children.size() - 1, new AST::Cast(var_declaration_node->type_id));
+            }
+        }
     } else if(!is_primitive(var_declaration_node->type_id) && allow_construtor) {
         // Search for a default constructor and add a call to it if it exists
         std::vector<TypeID> span;

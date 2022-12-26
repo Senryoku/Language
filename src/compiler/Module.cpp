@@ -17,8 +17,15 @@ static void dump(auto llvm_object) {
         PrimitiveType::VALUETYPE, [](llvm::IRBuilder<>& ir_builder, llvm::Value* val) { FUNC } \
     }
 static std::unordered_map<Token::Type, std::unordered_map<PrimitiveType, std::function<llvm::Value*(llvm::IRBuilder<>&, llvm::Value*)>>> unary_ops = {
-    {Token::Type::Addition, {OP(Integer, (void)ir_builder; return val;), OP(Float, (void)ir_builder; return val;)}},
-    {Token::Type::Substraction, {OP(Integer, return ir_builder.CreateNeg(val, "neg");), OP(Float, return ir_builder.CreateFNeg(val, "fneg");)}},
+    {Token::Type::Addition,
+     {OP(Integer, (void)ir_builder; return val;), OP(I8, (void)ir_builder; return val;), OP(I16, (void)ir_builder; return val;), OP(I32, (void)ir_builder; return val;),
+      OP(I64, (void)ir_builder; return val;), OP(U8, (void)ir_builder; return val;), OP(U16, (void)ir_builder; return val;), OP(U32, (void)ir_builder; return val;),
+      OP(U64, (void)ir_builder; return val;), OP(Float, (void)ir_builder; return val;)}},
+    {Token::Type::Substraction,
+     {OP(Integer, return ir_builder.CreateNeg(val, "neg");), OP(I8, return ir_builder.CreateNeg(val, "neg");), OP(I16, return ir_builder.CreateNeg(val, "neg");),
+      OP(I32, return ir_builder.CreateNeg(val, "neg");), OP(I64, return ir_builder.CreateNeg(val, "neg");), OP(U8, return ir_builder.CreateNeg(val, "neg");),
+      OP(U16, return ir_builder.CreateNeg(val, "neg");), OP(U32, return ir_builder.CreateNeg(val, "neg");), OP(U64, return ir_builder.CreateNeg(val, "neg");),
+      OP(Float, return ir_builder.CreateFNeg(val, "fneg");)}},
 };
 #undef OP
 
@@ -43,7 +50,12 @@ static std::unordered_map<Token::Type, std::unordered_map<PrimitiveType, std::fu
       OP(U32, return ir_builder.CreateMul(lhs, rhs, "mul");), OP(U64, return ir_builder.CreateMul(lhs, rhs, "mul");), OP(I8, return ir_builder.CreateMul(lhs, rhs, "mul");),
       OP(I16, return ir_builder.CreateMul(lhs, rhs, "mul");), OP(I32, return ir_builder.CreateMul(lhs, rhs, "mul");), OP(I64, return ir_builder.CreateMul(lhs, rhs, "mul");),
       OP(Float, return ir_builder.CreateFMul(lhs, rhs, "fmul");)}},
-    {Token::Type::Division, {OP(Integer, return ir_builder.CreateSDiv(lhs, rhs, "div");), OP(Float, return ir_builder.CreateFDiv(lhs, rhs, "fdiv");)}},
+    {Token::Type::Division,
+     {OP(Integer, return ir_builder.CreateSDiv(lhs, rhs, "div");), OP(I8, return ir_builder.CreateSDiv(lhs, rhs, "div");), OP(I16, return ir_builder.CreateSDiv(lhs, rhs, "div");),
+      OP(I32, return ir_builder.CreateSDiv(lhs, rhs, "div");), OP(I64, return ir_builder.CreateSDiv(lhs, rhs, "div");), OP(U8, return ir_builder.CreateUDiv(lhs, rhs, "div");),
+      OP(U16, return ir_builder.CreateUDiv(lhs, rhs, "div");), OP(U32, return ir_builder.CreateUDiv(lhs, rhs, "div");), OP(U64, return ir_builder.CreateUDiv(lhs, rhs, "div");),
+
+      OP(Float, return ir_builder.CreateFDiv(lhs, rhs, "fdiv");)}},
     {Token::Type::Modulus, {OP(Integer, return ir_builder.CreateSRem(lhs, rhs, "srem");)}},
     // Comparisons
     {Token::Type::Equal,
@@ -200,7 +212,11 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                     case PrimitiveType::U16: [[fallthrough]];
                     case PrimitiveType::U32: [[fallthrough]];
                     case PrimitiveType::U64: {
-                        return _llvm_ir_builder.CreateCast(llvm::Instruction::ZExt, child, get_llvm_type(node->type_id), "castZeroExt");
+                        // Allow truncation between unsigned types (explicit truncation to a smaller type)
+                        if(is_unsigned(node->type_id) && is_unsigned(node->children[0]->type_id) && node->type_id < node->children[0]->type_id) {
+                            return _llvm_ir_builder.CreateCast(llvm::Instruction::Trunc, child, get_llvm_type(node->type_id), "castTrunc");
+                        } else
+                            return _llvm_ir_builder.CreateCast(llvm::Instruction::ZExt, child, get_llvm_type(node->type_id), "castZeroExt");
                     }
                     case PrimitiveType::Integer: {
                         if(node->children[0]->type_id == PrimitiveType::Float || node->children[0]->type_id == PrimitiveType::Double)

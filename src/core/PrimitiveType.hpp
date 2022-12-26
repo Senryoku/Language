@@ -46,3 +46,15 @@ inline uint64_t get_placeholder_index(TypeID type_id) {
     assert(is_placeholder(type_id));
     return type_id - PlaceholderTypeID_Min;
 }
+
+inline bool is_integer(TypeID type_id) {
+    return type_id >= U8 && type_id <= Integer;
+}
+
+inline bool is_unsigned(TypeID type_id) {
+    return type_id >= U8 && type_id <= U64;
+}
+
+inline bool is_floating_point(TypeID type_id) {
+    return type_id >= Float && type_id <= Double;
+}

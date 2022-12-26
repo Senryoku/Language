@@ -70,13 +70,25 @@ class Parser : public Scoped {
     bool                     parse_type_declaration(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
     TypeID                   parse_type(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
     AST::BoolLiteral*        parse_boolean(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
-    AST::Node*               parse_digits(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
+    AST::Node*               parse_digits(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node, PrimitiveType type = Void);
     AST::FloatLiteral*       parse_float(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
     AST::CharLiteral*        parse_char(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
     bool                     parse_string(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
     bool                     parse_operator(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
     bool                     parse_import(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
     bool parse_variable_declaration(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node, bool is_const = false, bool allow_construtor = true);
+
+    template<typename T>
+    AST::Node* gen_integer_literal_node(const Token& token, uint64_t value, PrimitiveType type) {
+        if(static_cast<intmax_t>(value) < std::numeric_limits<T>::min() || static_cast<intmax_t>(value) > std::numeric_limits<T>::max())
+            throw Exception(fmt::format("Error parsing integer for target type {}: value '{}' out-of-bounds (range: [{}, {}]).", type_id_to_string(type), value,
+                                        std::numeric_limits<T>::min(), std::numeric_limits<T>::max()),
+                            point_error(token));
+        auto local = new AST::Literal<T>(token);
+        local->type_id = type;
+        local->value = static_cast<T>(value);
+        return local;
+    }
 
     void skip(const std::span<Token>& tokens, std::span<Token>::iterator& it, Token::Type token_type) {
         if(it != tokens.end() && it->type == token_type)
