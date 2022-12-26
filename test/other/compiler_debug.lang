@@ -37,9 +37,12 @@ function get<T>(this: Array<T>*, index: u64) : T {
 }
 
 function destructor<T>(this: Array<T>*) : void {
+	printf("Destructor Called\n");
 	free(.data);
+	printf("Destructor: Data freed\n");
 	.length = 0;
 	.capacity = 0;
+	printf("Destructor end Reached\n");
 }
 
 function dump<T>(this: Array<T>*) : void {

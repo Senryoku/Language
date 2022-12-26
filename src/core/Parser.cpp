@@ -1684,14 +1684,12 @@ void Parser::insert_defer_node(AST::Node* curr_node) {
 
         std::vector<TypeID> span;
         span.push_back(GlobalTypeRegistry::instance().get_pointer_to(dec->type_id));
-        auto destructor = get_function("destructor", span);
+        auto destructor = resolve_or_instanciate_function("destructor", span);
         if(destructor) {
             Token destructor_token;
             destructor_token.type = Token::Type::Identifier;
             destructor_token.value = *internalize_string("destructor");
             auto call_node = new AST::FunctionCall(destructor_token);
-            call_node->type_id = destructor->type_id;
-            call_node->flags = destructor->flags;
 
             curr_node->add_child(call_node);
             // Destructor method designation
