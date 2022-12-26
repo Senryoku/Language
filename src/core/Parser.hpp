@@ -70,7 +70,7 @@ class Parser : public Scoped {
     bool                     parse_type_declaration(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
     TypeID                   parse_type(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
     AST::BoolLiteral*        parse_boolean(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
-    AST::IntegerLiteral*     parse_digits(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
+    AST::Node*               parse_digits(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
     AST::FloatLiteral*       parse_float(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
     AST::CharLiteral*        parse_char(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
     bool                     parse_string(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
@@ -132,4 +132,3 @@ class Parser : public Scoped {
     bool                deduce_placeholder_types(const Type* call_node, const Type* function_node, std::vector<TypeID>& deduced_types);
     std::vector<TypeID> deduce_placeholder_types(const AST::FunctionCall* call_node, const AST::FunctionDeclaration* function_node);
 };
-
