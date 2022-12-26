@@ -186,6 +186,13 @@ class AST {
         auto       arguments() { return std::span<AST::Node*>(children.data() + 1, std::max<int>(0, static_cast<int>(children.size()) - 1)); }
         const auto arguments() const { return std::span<const AST::Node* const>(children.data() + 1, std::max<int>(0, static_cast<int>(children.size()) - 1)); }
 
+        std::vector<TypeID> get_argument_types() const {
+            std::vector<TypeID> r;
+            for(const auto& c : arguments())
+                r.push_back(c->type_id);
+            return r;
+        }
+
         void set_argument(size_t idx, AST::Node* n) {
             if(n)
                 assert(n->parent == nullptr);

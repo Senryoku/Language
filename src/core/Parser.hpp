@@ -142,13 +142,16 @@ class Parser : public Scoped {
     void resolve_operator_type(AST::UnaryOperator* op_node);
     void resolve_operator_type(AST::BinaryOperator* op_node);
 
-    void check_function_call(AST::FunctionCall*);
-    void check_function_call(AST::FunctionCall*, const AST::FunctionDeclaration*);
+    const AST::FunctionDeclaration* resolve_or_instanciate_function(const AST::FunctionCall* call_node);
+    const AST::FunctionDeclaration* resolve_or_instanciate_function(const std::string_view& name, const std::span<TypeID>& arguments);
+    void                            check_function_call(AST::FunctionCall*, const AST::FunctionDeclaration*);
+    std::string get_overloads_hint_string(const std::string_view& name, const std::span<TypeID>& arguments, const std::vector<const AST::FunctionDeclaration*>& candidates);
+    void        throw_unresolved_function(const Token& name, const std::span<TypeID>& arguments);
 
     void   insert_defer_node(AST::Node* curr_node);
     void   specialize(AST::Node* node, const std::vector<TypeID>& parameters);
     TypeID specialize(TypeID type_id, const std::vector<TypeID>& parameters);
 
     bool                deduce_placeholder_types(const Type* call_node, const Type* function_node, std::vector<TypeID>& deduced_types);
-    std::vector<TypeID> deduce_placeholder_types(const AST::FunctionCall* call_node, const AST::FunctionDeclaration* function_node);
+    std::vector<TypeID> deduce_placeholder_types(const std::span<TypeID>& arguments, const AST::FunctionDeclaration* function_node);
 };

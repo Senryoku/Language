@@ -890,7 +890,15 @@ bool Parser::parse_type_declaration(const std::span<Token>& tokens, std::span<To
         curr_node->add_child(function_node);
         function_node->type_id = PrimitiveType::Void;
         auto this_declaration_node = function_node->add_child(new AST::VariableDeclaration(this_token));
-        this_declaration_node->type_id = GlobalTypeRegistry::instance().get_pointer_to(type_node->type_id);
+        // For template types, we need to create the templated type with its placeholder arguments.
+        if(templated_type) {
+            std::vector<TypeID> placeholder_types;
+            for(auto i = 0; i < template_typenames.size(); ++i)
+                placeholder_types.push_back(PlaceholderTypeID_Min + i);
+            auto templated_type = GlobalTypeRegistry::instance().get_specialized_type(type_node->type_id, placeholder_types);
+            this_declaration_node->type_id = GlobalTypeRegistry::instance().get_pointer_to(templated_type);
+        } else
+            this_declaration_node->type_id = GlobalTypeRegistry::instance().get_pointer_to(type_node->type_id);
         auto function_scope = function_node->add_child(new AST::Scope());
 
         auto type = dynamic_cast<const StructType*>(GlobalTypeRegistry::instance().get_type(type_node->type_id));
@@ -903,7 +911,7 @@ bool Parser::parse_type_declaration(const std::span<Token>& tokens, std::span<To
                 assignment->add_child(member_access);
                 auto dereference = new AST::Node(AST::Node::Type::Dereference);
                 member_access->add_child(dereference);
-                dereference->type_id = type_node->type_id;
+                dereference->type_id = this_declaration_node->type_id;
                 auto variable = dereference->add_child(new AST::Variable(this_token));
                 variable->type_id = this_declaration_node->type_id;
                 auto member_identifier = new AST::MemberIdentifier(Token(Token::Type::Identifier, *internalize_string(std::string(type_node->members()[idx]->token.value)), 0, 0));
@@ -920,6 +928,7 @@ bool Parser::parse_type_declaration(const std::span<Token>& tokens, std::span<To
 
         if(!get_scope().declare_function(*function_node))
             throw Exception(fmt::format("[Parser] Syntax error: Function '{}' already declared in this scope.\n", function_node->name()));
+        print("GENERATED CONSTRUCTOR: {}\n", *static_cast<const AST::Node*>(function_node));
     }
 
     expect(tokens, it, Token::Type::CloseScope);
@@ -1036,10 +1045,10 @@ bool Parser::parse_function_arguments(const std::span<Token>& tokens, std::span<
     return true;
 }
 
-std::string get_overloads_hint_string(const AST::FunctionCall* call_node, const std::vector<const AST::FunctionDeclaration*>& candidates) {
-    std::string used_types = "Called with: " + std::string(call_node->token.value) + "(";
-    for(auto i = 0; i < call_node->arguments().size(); ++i)
-        used_types += (i > 0 ? ", " : "") + type_id_to_string(call_node->arguments()[i]->type_id);
+std::string Parser::get_overloads_hint_string(const std::string_view& name, const std::span<TypeID>& arguments, const std::vector<const AST::FunctionDeclaration*>& candidates) {
+    std::string used_types = "Called with: " + std::string(name) + "(";
+    for(auto i = 0; i < arguments.size(); ++i)
+        used_types += (i > 0 ? ", " : "") + type_id_to_string(arguments[i]);
     used_types += ")\n";
     std::string candidates_display = "Candidates are:\n";
     for(const auto& func : candidates) {
@@ -1053,25 +1062,37 @@ std::string get_overloads_hint_string(const AST::FunctionCall* call_node, const 
     return used_types + candidates_display;
 }
 
-void Parser::check_function_call(AST::FunctionCall* call_node) {
+void Parser::throw_unresolved_function(const Token& name, const std::span<TypeID>& arguments) {
+    auto candidates = get_functions(name.value);
+    if(candidates.size() == 0)
+        throw Exception(fmt::format("[Parser] Call to undefined function '{}'.\n", name.value), point_error(name));
+    else {
+        auto hint = get_overloads_hint_string(name.value, arguments, candidates);
+        throw Exception(fmt::format("[Parser] Call to undefined function '{}', no candidate matches the arguments types.\n", name.value), point_error(name) + hint);
+    }
+}
+
+const AST::FunctionDeclaration* Parser::resolve_or_instanciate_function(const AST::FunctionCall* call_node) {
+    std::vector<TypeID> param_types;
+    for(auto c : call_node->arguments())
+        param_types.push_back(c->type_id);
+    return resolve_or_instanciate_function(call_node->token.value, param_types);
+}
+
+const AST::FunctionDeclaration* Parser::resolve_or_instanciate_function(const std::string_view& name, const std::span<TypeID>& arguments) {
     // Search for a corresponding method
-    const auto function = get_function(call_node->token.value, call_node->arguments());
+    const auto function = get_function(name, arguments);
     if(function) {
-        call_node->type_id = function->type_id;
-        call_node->flags = function->flags;
-        check_function_call(call_node, function);
-        return;
+        return function;
     } else {
-        auto candidates = get_functions(call_node->token.value);
+        auto candidates = get_functions(name);
         if(candidates.size() == 0)
-            throw Exception(fmt::format("[Parser] Syntax error: Could not find function with name '{}'.\n", call_node->token.value), point_error(call_node->token));
-        // TEMP DEBUG
-        print("{}", get_overloads_hint_string(call_node, candidates));
+            return nullptr;
 
         for(const auto& candidate : candidates) {
             // TODO: Handle variadics
-            if(candidate->is_templated() && candidate->arguments().size() == call_node->arguments().size()) {
-                std::vector<TypeID> deduced_types = deduce_placeholder_types(call_node, candidate);
+            if(candidate->is_templated() && candidate->arguments().size() == arguments.size()) {
+                std::vector<TypeID> deduced_types = deduce_placeholder_types(arguments, candidate);
                 fmt::print("Deduces types: {}\n", fmt::join(deduced_types, ", "));
                 if(deduced_types.empty())
                     break;
@@ -1087,23 +1108,18 @@ void Parser::check_function_call(AST::FunctionCall* call_node) {
                 //        We have to recursively specialize those.
                 print("Specialized candidate: {}\n", *static_cast<const AST::Node*>(specialized));
                 // FIXME: Factorize this code with previous successful path.
-                if(specialized && specialized->arguments().size() > 0) {
-                    call_node->type_id = specialized->type_id;
-                    call_node->flags = specialized->flags;
-                    check_function_call(call_node, specialized);
-                    return;
-                }
-            } else {
-                print("Non-Template candidate: {}\n", *static_cast<const AST::Node*>(candidate));
+                if(specialized && specialized->arguments().size() > 0)
+                    return specialized;
             }
         }
-        auto hint = get_overloads_hint_string(call_node, candidates);
-        throw Exception(fmt::format("[Parser] Syntax error: Could not find function with '{}' matching the supplied arguments.\n", call_node->token),
-                        point_error(call_node->token) + hint);
     }
+    return nullptr;
 }
 
 void Parser::check_function_call(AST::FunctionCall* call_node, const AST::FunctionDeclaration* function) {
+    call_node->type_id = function->type_id;
+    call_node->flags = function->flags;
+
     auto function_flags = function->flags;
     if(!(function_flags & AST::FunctionDeclaration::Flag::Variadic) && call_node->arguments().size() != function->arguments().size()) {
         throw Exception(fmt::format("[Parser] Function '{}' expects {} argument(s), got {}.\n", function->name(), function->arguments().size(), call_node->arguments().size()),
@@ -1160,10 +1176,10 @@ bool Parser::deduce_placeholder_types(const Type* call_node, const Type* functio
     return true;
 }
 
-std::vector<TypeID> Parser::deduce_placeholder_types(const AST::FunctionCall* call_node, const AST::FunctionDeclaration* function_node) {
+std::vector<TypeID> Parser::deduce_placeholder_types(const std::span<TypeID>& arguments, const AST::FunctionDeclaration* function_node) {
     std::vector<TypeID> deduced_types;
-    for(auto idx = 0; idx < call_node->arguments().size(); ++idx) {
-        auto arg_type = GlobalTypeRegistry::instance().get_type(call_node->arguments()[idx]->type_id);
+    for(auto idx = 0; idx < arguments.size(); ++idx) {
+        auto arg_type = GlobalTypeRegistry::instance().get_type(arguments[idx]);
         auto param_type = GlobalTypeRegistry::instance().get_type(function_node->arguments()[idx]->type_id);
         if(!deduce_placeholder_types(arg_type, param_type, deduced_types))
             return {};
@@ -1223,17 +1239,12 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
 
         parse_function_arguments(tokens, it, call_node);
 
-        auto resolved_function = get_function(function_name, call_node->arguments());
-        if(!resolved_function) {
-            auto candidates = get_functions(function_name);
-            if(candidates.size() == 0)
-                throw Exception(fmt::format("[Parser] Call to undefined function '{}'.\n", function_name), point_error(call_node->token));
-            else {
-                auto hint = get_overloads_hint_string(call_node, candidates);
-                throw Exception(fmt::format("[Parser] Call to undefined function '{}', no candidate matches the arguments types.\n", function_name),
-                                point_error(call_node->token) + hint);
-            }
-        }
+        std::vector<TypeID> arguments_types;
+        for(const auto& c : call_node->arguments())
+            arguments_types.push_back(c->type_id);
+        auto resolved_function = resolve_or_instanciate_function(function_name, arguments_types);
+        if(!resolved_function)
+            throw_unresolved_function(call_node->token, arguments_types);
 
         // Automatically cast any pointer to 'opaque' pointer type for interfacing with C++
         // Automatically cast to larger types (always safe)
@@ -1364,7 +1375,11 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
                 call_node->set_argument(0, get_pointer_node);
             }
 
-            check_function_call(call_node);
+            auto arg_types = call_node->get_argument_types();
+            auto method = resolve_or_instanciate_function(call_node->token.value, arg_types);
+            if(!method)
+                throw_unresolved_function(call_node->token, arg_types);
+            check_function_call(call_node, method);
             return true;
         } else {
             throw Exception(fmt::format("[Parser] Syntax error: Member '{}' does not exists on type {}.\n", identifier_name, base_type->designation), point_error(*it));
@@ -1484,25 +1499,23 @@ bool Parser::parse_variable_declaration(const std::span<Token>& tokens, std::spa
         // Search for a default constructor and add a call to it if it exists
         std::vector<TypeID> span;
         span.push_back(GlobalTypeRegistry::instance().get_pointer_to(var_declaration_node->type_id));
-        auto constructor = get_function("constructor", span);
-        if(constructor) {
-            auto call_node = new AST::FunctionCall(Token(Token::Type::Identifier, *internalize_string("constructor"), 0, 0));
-            call_node->type_id = constructor->type_id;
-            call_node->flags = constructor->flags;
+        auto constructor = resolve_or_instanciate_function("constructor", span);
+        auto fake_token = Token(Token::Type::Identifier, *internalize_string("constructor"), var_declaration_node->token.line, var_declaration_node->token.column);
+        if(!constructor)
+            throw_unresolved_function(fake_token, span);
+        auto call_node = new AST::FunctionCall(fake_token);
 
-            curr_node->add_child(call_node);
-            // Constructor method designation
-            auto constructor_node =
-                new AST::Variable(Token(Token::Type::Identifier, *internalize_string("constructor"), 0, 0)); // FIXME: Still using the token to get the function...
-            call_node->add_child(constructor_node);
-            // Constructor argument (pointer to the object)
-            auto get_pointer_node = call_node->add_child(new AST::Node(AST::Node::Type::GetPointer, var_declaration_node->token));
-            get_pointer_node->type_id = GlobalTypeRegistry::instance().get_pointer_to(var_declaration_node->type_id);
-            auto var_node = get_pointer_node->add_child(new AST::Variable(var_declaration_node->token));
-            var_node->type_id = var_declaration_node->type_id;
+        curr_node->add_child(call_node);
+        // Constructor method designation
+        auto constructor_node = new AST::Variable(fake_token); // FIXME: Still using the token to get the function...
+        call_node->add_child(constructor_node);
+        // Constructor argument (pointer to the object)
+        auto get_pointer_node = call_node->add_child(new AST::Node(AST::Node::Type::GetPointer, var_declaration_node->token));
+        get_pointer_node->type_id = GlobalTypeRegistry::instance().get_pointer_to(var_declaration_node->type_id);
+        auto var_node = get_pointer_node->add_child(new AST::Variable(var_declaration_node->token));
+        var_node->type_id = var_declaration_node->type_id;
 
-            check_function_call(call_node, constructor);
-        }
+        check_function_call(call_node, constructor);
     }
 
     return true;
@@ -1729,7 +1742,9 @@ void Parser::specialize(AST::Node* node, const std::vector<TypeID>& parameters) 
     // Verify the updated node.
     switch(node->type) {
         case AST::Node::Type::FunctionCall:
-            check_function_call(dynamic_cast<AST::FunctionCall*>(node));
+            auto function_call_node = dynamic_cast<AST::FunctionCall*>(node);
+            auto function = resolve_or_instanciate_function(function_call_node);
+            check_function_call(function_call_node, function);
             break;
             // TODO: Check Types Declarations
     }
