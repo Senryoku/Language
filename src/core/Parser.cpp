@@ -1036,6 +1036,73 @@ bool Parser::parse_function_arguments(const std::span<Token>& tokens, std::span<
     return true;
 }
 
+std::string get_overloads_hint_string(const AST::FunctionCall* call_node, const std::vector<const AST::FunctionDeclaration*>& candidates) {
+    std::string used_types = "Called with: " + std::string(call_node->token.value) + "(";
+    for(auto i = 0; i < call_node->arguments().size(); ++i)
+        used_types += (i > 0 ? ", " : "") + type_id_to_string(call_node->arguments()[i]->type_id);
+    used_types += ")\n";
+    std::string candidates_display = "Candidates are:\n";
+    for(const auto& func : candidates) {
+        candidates_display += "\t" + std::string(func->name()) + "("; // TODO: We can probably do better.
+        for(auto i = 0; i < func->arguments().size(); ++i)
+            candidates_display += (i > 0 ? ", " : "") +
+                                  (func->arguments()[i]->token.value.size() > 0 ? std::string(func->arguments()[i]->token.value) : ("#" + std::to_string(i))) + " : " +
+                                  type_id_to_string(func->arguments()[i]->type_id);
+        candidates_display += ") : " + type_id_to_string(func->type_id) + "\n";
+    }
+    return used_types + candidates_display;
+}
+
+void Parser::check_function_call(AST::FunctionCall* call_node) {
+    // Search for a corresponding method
+    const auto function = get_function(call_node->token.value, call_node->arguments());
+    if(function) {
+        call_node->type_id = function->type_id;
+        call_node->flags = function->flags;
+        check_function_call(call_node, function);
+        return;
+    } else {
+        auto candidates = get_functions(call_node->token.value);
+        if(candidates.size() == 0)
+            throw Exception(fmt::format("[Parser] Syntax error: Could not find function with name '{}'.\n", call_node->token.value), point_error(call_node->token));
+        // TEMP DEBUG
+        print("{}", get_overloads_hint_string(call_node, candidates));
+
+        for(const auto& candidate : candidates) {
+            // TODO: Handle variadics
+            if(candidate->is_templated() && candidate->arguments().size() == call_node->arguments().size()) {
+                std::vector<TypeID> deduced_types = deduce_placeholder_types(call_node, candidate);
+                fmt::print("Deduces types: {}\n", fmt::join(deduced_types, ", "));
+                if(deduced_types.empty())
+                    break;
+
+                print("Template candidate: {}\n", *static_cast<const AST::Node*>(candidate));
+                auto specialized = candidate->clone();
+                specialize(specialized, deduced_types);
+                // Insert it right after the generic version.
+                candidate->parent->add_child_after(specialized, candidate);
+                // FIXME: It should be declared in the scope of the original function declaration.
+                get_scope().declare_function(*specialized);
+                // FIXME: The newly specialized function may require some not-yet-declared specialized functions and types.
+                //        We have to recursively specialize those.
+                print("Specialized candidate: {}\n", *static_cast<const AST::Node*>(specialized));
+                // FIXME: Factorize this code with previous successful path.
+                if(specialized && specialized->arguments().size() > 0) {
+                    call_node->type_id = specialized->type_id;
+                    call_node->flags = specialized->flags;
+                    check_function_call(call_node, specialized);
+                    return;
+                }
+            } else {
+                print("Non-Template candidate: {}\n", *static_cast<const AST::Node*>(candidate));
+            }
+        }
+        auto hint = get_overloads_hint_string(call_node, candidates);
+        throw Exception(fmt::format("[Parser] Syntax error: Could not find function with '{}' matching the supplied arguments.\n", call_node->token),
+                        point_error(call_node->token) + hint);
+    }
+}
+
 void Parser::check_function_call(AST::FunctionCall* call_node, const AST::FunctionDeclaration* function) {
     auto function_flags = function->flags;
     if(!(function_flags & AST::FunctionDeclaration::Flag::Variadic) && call_node->arguments().size() != function->arguments().size()) {
@@ -1053,23 +1120,6 @@ void Parser::check_function_call(AST::FunctionCall* call_node, const AST::Functi
                                 point_error(call_node->token));
             }
         }
-}
-
-std::string get_overloads_hint_string(const AST::FunctionCall* call_node, const std::vector<const AST::FunctionDeclaration*>& candidates) {
-    std::string used_types = "Called with: " + std::string(call_node->token.value) + "(";
-    for(auto i = 0; i < call_node->arguments().size(); ++i)
-        used_types += (i > 0 ? ", " : "") + type_id_to_string(call_node->arguments()[i]->type_id);
-    used_types += ")\n";
-    std::string candidates_display = "Candidates are:\n";
-    for(const auto& func : candidates) {
-        candidates_display += "\t" + std::string(func->name()) + "("; // TODO: We can probably do better.
-        for(auto i = 0; i < func->arguments().size(); ++i)
-            candidates_display += (i > 0 ? ", " : "") +
-                                  (func->arguments()[i]->token.value.size() > 0 ? std::string(func->arguments()[i]->token.value) : ("#" + std::to_string(i))) + " : " +
-                                  type_id_to_string(func->arguments()[i]->type_id);
-        candidates_display += ") : " + type_id_to_string(func->type_id) + "\n";
-    }
-    return used_types + candidates_display;
 }
 
 bool Parser::deduce_placeholder_types(const Type* call_node, const Type* function_node, std::vector<TypeID>& deduced_types) {
@@ -1314,60 +1364,8 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
                 call_node->set_argument(0, get_pointer_node);
             }
 
-            // Search for a corresponding method
-            const auto method = get_function(identifier_name, call_node->arguments());
-            if(method && method->arguments().size() > 0 && !is_primitive(method->arguments()[0]->type_id) &&
-               GlobalTypeRegistry::instance().get_pointer_to(base_type->type_id) == method->arguments()[0]->type_id) {
-                call_node->type_id = method->type_id;
-                call_node->flags = method->flags;
-
-                check_function_call(call_node, method);
-
-                return true;
-            } else {
-                auto candidates = get_functions(identifier_name);
-
-                // TEMP DEBUG
-                print("{}", get_overloads_hint_string(call_node, candidates));
-
-                for(const auto& candidate : candidates) {
-                    // TODO: Handle variadics
-                    if(candidate->is_templated() && candidate->arguments().size() == call_node->arguments().size()) {
-                        std::vector<TypeID> deduced_types = deduce_placeholder_types(call_node, candidate);
-                        fmt::print("Deduces types: {}\n", fmt::join(deduced_types, ", "));
-                        if(deduced_types.empty())
-                            break;
-
-                        print("Template candidate: {}\n", *static_cast<const AST::Node*>(candidate));
-                        auto specialized = candidate->clone();
-                        specialize(specialized, deduced_types);
-                        // Insert it right after the generic version.
-                        candidate->parent->add_child_after(specialized, candidate);
-                        // FIXME: It should be declared in the scope of the original function declaration.
-                        get_scope().declare_function(*specialized);
-                        print("Specialized candidate: {}\n", *static_cast<const AST::Node*>(specialized));
-                        // FIXME: Factorize this code with previous successful path.
-                        if(specialized && specialized->arguments().size() > 0 && !is_primitive(specialized->arguments()[0]->type_id) &&
-                           GlobalTypeRegistry::instance().get_pointer_to(base_type->type_id) == specialized->arguments()[0]->type_id) {
-                            call_node->type_id = specialized->type_id;
-                            call_node->flags = specialized->flags;
-
-                            check_function_call(call_node, specialized);
-
-                            return true;
-                        }
-                    } else {
-                        print("Non-Template candidate: {}\n", *static_cast<const AST::Node*>(candidate));
-                    }
-                }
-                if(candidates.size() == 0) {
-                    throw Exception(fmt::format("[Parser] Syntax error: Method '{}' does not exists on type {}.\n", identifier_name, base_type->designation), point_error(*it));
-                } else {
-                    auto hint = get_overloads_hint_string(call_node, candidates);
-                    throw Exception(fmt::format("[Parser] Syntax error: Method '{}' on type {} does not match the supplied arguments.\n", identifier_name, base_type->designation),
-                                    point_error(*it) + hint);
-                }
-            }
+            check_function_call(call_node);
+            return true;
         } else {
             throw Exception(fmt::format("[Parser] Syntax error: Member '{}' does not exists on type {}.\n", identifier_name, base_type->designation), point_error(*it));
         }
@@ -1727,4 +1725,12 @@ void Parser::specialize(AST::Node* node, const std::vector<TypeID>& parameters) 
         specialize(c, parameters);
     if(node->type_id != InvalidTypeID)
         node->type_id = specialize(node->type_id, parameters);
+
+    // Verify the updated node.
+    switch(node->type) {
+        case AST::Node::Type::FunctionCall:
+            check_function_call(dynamic_cast<AST::FunctionCall*>(node));
+            break;
+            // TODO: Check Types Declarations
+    }
 }

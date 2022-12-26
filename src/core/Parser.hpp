@@ -142,6 +142,7 @@ class Parser : public Scoped {
     void resolve_operator_type(AST::UnaryOperator* op_node);
     void resolve_operator_type(AST::BinaryOperator* op_node);
 
+    void check_function_call(AST::FunctionCall*);
     void check_function_call(AST::FunctionCall*, const AST::FunctionDeclaration*);
 
     void   insert_defer_node(AST::Node* curr_node);

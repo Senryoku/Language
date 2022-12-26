@@ -337,10 +337,8 @@ llvm::Value* Module::codegen(const AST::Node* node) {
             auto function_call_node = dynamic_cast<const AST::FunctionCall*>(node);
             auto mangled_function_name = function_call_node->mangled_name();
             auto function = _llvm_module->getFunction(mangled_function_name);
-            if(!function) {
-                error("[LLVMCodegen] Call to undeclared function '{}' (line {}).\n", mangled_function_name, function_call_node->token.line);
-                return nullptr;
-            }
+            if(!function)
+                throw Exception(fmt::format("[LLVMCodegen] Call to undeclared function '{}' (line {}).\n", mangled_function_name, function_call_node->token.line));
             // TODO: Handle default values.
             // TODO: Handle vargs functions (variable number of parameters, like printf :^) )
             auto function_flags = function_call_node->flags;
@@ -358,7 +356,8 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                     print("\n");
                 }
 #endif
-                return nullptr;
+                throw Exception(fmt::format("[LLVMCodegen] Unexpected number of parameters in function call '{}' (line {}): Expected {}, got {}.\n", mangled_function_name,
+                                            node->token.line, function->arg_size(), function_call_node->arguments().size()));
             }
             std::vector<llvm::Value*> parameters;
             for(auto arg_node : function_call_node->arguments()) {
