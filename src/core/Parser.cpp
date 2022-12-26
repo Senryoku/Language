@@ -885,20 +885,20 @@ bool Parser::parse_type_declaration(const std::span<Token>& tokens, std::span<To
     if(has_at_least_one_default_value) {
         // Declare a default constructor.
         // FIXME: This could probably be way more elegant, rather then contructing the AST by hand...
-        auto this_token = Token(Token::Type::Identifier, *internalize_string("this"), 0, 0);
-        auto function_node = new AST::FunctionDeclaration(Token(Token::Type::Identifier, *internalize_string("constructor"), 0, 0));
+        auto this_token = Token(Token::Type::Identifier, *internalize_string("this"), type_node->token.line, type_node->token.column);
+        auto function_node = new AST::FunctionDeclaration(Token(Token::Type::Identifier, *internalize_string("constructor"), type_node->token.line, type_node->token.column));
         curr_node->add_child(function_node);
         function_node->type_id = PrimitiveType::Void;
         auto this_declaration_node = function_node->add_child(new AST::VariableDeclaration(this_token));
         // For template types, we need to create the templated type with its placeholder arguments.
+        auto this_base_type = type_node->type_id;
         if(templated_type) {
             std::vector<TypeID> placeholder_types;
             for(auto i = 0; i < template_typenames.size(); ++i)
                 placeholder_types.push_back(PlaceholderTypeID_Min + i);
-            auto templated_type = GlobalTypeRegistry::instance().get_specialized_type(type_node->type_id, placeholder_types);
-            this_declaration_node->type_id = GlobalTypeRegistry::instance().get_pointer_to(templated_type);
-        } else
-            this_declaration_node->type_id = GlobalTypeRegistry::instance().get_pointer_to(type_node->type_id);
+            this_base_type = GlobalTypeRegistry::instance().get_specialized_type(type_node->type_id, placeholder_types);
+        }
+        this_declaration_node->type_id = GlobalTypeRegistry::instance().get_pointer_to(this_base_type);
         auto function_scope = function_node->add_child(new AST::Scope());
 
         auto type = dynamic_cast<const StructType*>(GlobalTypeRegistry::instance().get_type(type_node->type_id));
@@ -911,7 +911,7 @@ bool Parser::parse_type_declaration(const std::span<Token>& tokens, std::span<To
                 assignment->add_child(member_access);
                 auto dereference = new AST::Node(AST::Node::Type::Dereference);
                 member_access->add_child(dereference);
-                dereference->type_id = this_declaration_node->type_id;
+                dereference->type_id = this_base_type;
                 auto variable = dereference->add_child(new AST::Variable(this_token));
                 variable->type_id = this_declaration_node->type_id;
                 auto member_identifier = new AST::MemberIdentifier(Token(Token::Type::Identifier, *internalize_string(std::string(type_node->members()[idx]->token.value)), 0, 0));
