@@ -179,7 +179,8 @@ bool Parser::parse(const std::span<Token>& tokens, AST::Node* curr_node) {
                 AST::VariableDeclaration* return_variable = nullptr;
                 if(to_rvalue->children[0]->type == AST::Node::Type::Variable) {
                     auto ret_type = GlobalTypeRegistry::instance().get_type(to_rvalue->children[0]->type_id);
-                    if(ret_type->is_struct()) {
+                    if(ret_type->is_struct() ||
+                       (ret_type->is_templated() && GlobalTypeRegistry::instance().get_type(dynamic_cast<const TemplatedType*>(ret_type)->template_type_id)->is_struct())) {
                         return_variable = get(to_rvalue->children[0]->token.value);
                         if(!return_variable) {
                             warn("[Parser] Uh?! Returning a non-existant variable '{}' ?\n", to_rvalue->children[0]->token.value);

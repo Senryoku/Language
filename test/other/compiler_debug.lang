@@ -54,11 +54,11 @@ function destructor<T>(this: Array<T>*) : void {
 	printf("Destructor end Reached\n");
 }
 
-function main() : int {
+function test() : Array<u64> {
 	let arr : Array<u64>;
-	const forty_two : u64 = 42; // Forced Cast, otherwise we can't resolve the function, yet.
+	
+	const forty_two : u64 = 42; // Forced Cast, otherwise the we can't resolve the function, yet.
 	const leet : u64 = 1337;
-	
 	arr.push_back(forty_two);
 	arr.push_back(leet);
 	arr.dump();
@@ -66,32 +66,14 @@ function main() : int {
 	arr.push_back(leet);
 	arr.dump();
 	
-	printf("Right before exiting from main(): arr.capacity %llu arr.length %llu arr.data 0x%016x\n", arr.capacity, arr.length, arr.data);
-	return 0;
+	printf("Right before exiting from test(): arr.capacity %llu arr.length %llu arr.data 0x%016x\n", arr.capacity, arr.length, arr.data);
+	return arr;
 }
 
-
-//function test() : Array<u64> {
-//	let arr : Array<u64>;
-//	
-//	const forty_two : u64 = 42; // Forced Cast, otherwise the we can't resolve the function, yet.
-//	const leet : u64 = 1337;
-//	arr.push_back(forty_two);
-//	arr.push_back(leet);
-//	arr.dump();
-//	arr.push_back(forty_two);
-//	arr.push_back(leet);
-//	arr.dump();
-//	
-//	printf("Right before exiting from test(): arr.capacity %llu arr.length %llu arr.data 0x%016x\n", arr.capacity, arr.length, arr.data);
-//  // This should not call the destructor to arr, but it looks like it does.
-//	return arr;
-//}
-//
-//function main() {
-//	let t = test();
-//	printf("Before main dump()\n");
-//	t.dump();
-//	printf("Right before exiting: t.capacity %llu t.length %llu t.data 0x%016x\n", t.capacity, t.length, t.data);
-//	return t.length;
-//}
+function main() {
+	let t = test();
+	printf("Before main dump()\n");
+	t.dump();
+	printf("Right before exiting: t.capacity %llu t.length %llu t.data 0x%016x\n", t.capacity, t.length, t.data);
+	return t.length;
+}
