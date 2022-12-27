@@ -871,12 +871,6 @@ bool Parser::parse_type_declaration(const std::span<Token>& tokens, std::span<To
 
     // Note: Since we're declaring the type after parsing it (because we need the members to be established before the call to declare_type right now),
     //       types cannot reference themselves.
-    /* if(templated_type) {
-        if(!get_scope().declare_templated_type(*type_node, template_typenames)) {
-            warn("[Parser] Syntax error: Type {} already declared in this scope.\n", type_node->token.value);
-            fmt::print("{}", point_error(type_node->token));
-        }
-    } else */
     if(!get_scope().declare_type(*type_node)) {
         warn("[Parser] Syntax error: Type {} already declared in this scope.\n", type_node->token.value);
         fmt::print("{}", point_error(type_node->token));
@@ -929,7 +923,6 @@ bool Parser::parse_type_declaration(const std::span<Token>& tokens, std::span<To
 
         if(!get_scope().declare_function(*function_node))
             throw Exception(fmt::format("[Parser] Syntax error: Function '{}' already declared in this scope.\n", function_node->name()));
-        print("GENERATED CONSTRUCTOR: {}\n", *static_cast<const AST::Node*>(function_node));
     }
 
     expect(tokens, it, Token::Type::CloseScope);
@@ -1104,21 +1097,15 @@ const AST::FunctionDeclaration* Parser::resolve_or_instanciate_function(const st
             // TODO: Handle variadics
             if(candidate->is_templated() && candidate->arguments().size() == arguments.size()) {
                 std::vector<TypeID> deduced_types = deduce_placeholder_types(arguments, candidate);
-                fmt::print("Deduces types: {}\n", fmt::join(deduced_types, ", "));
                 if(deduced_types.empty())
                     break;
 
-                print("Template candidate: {}\n", *static_cast<const AST::Node*>(candidate));
                 auto specialized = candidate->clone();
                 specialize(specialized, deduced_types);
                 // Insert it right after the generic version.
                 candidate->parent->add_child_after(specialized, candidate);
                 // FIXME: It should be declared in the scope of the original function declaration.
                 get_scope().declare_function(*specialized);
-                // FIXME: The newly specialized function may require some not-yet-declared specialized functions and types.
-                //        We have to recursively specialize those.
-                print("Specialized candidate: {}\n", *static_cast<const AST::Node*>(specialized));
-                // FIXME: Factorize this code with previous successful path.
                 if(specialized && specialized->arguments().size() > 0)
                     return specialized;
             }
@@ -1580,10 +1567,6 @@ TypeID Parser::parse_type(const std::span<Token>& tokens, std::span<Token>::iter
 
     if(it->type == Token::Type::Lesser) {
         auto type_parameters = parse_template_types(tokens, it, curr_node);
-        fmt::print("[DEBUG] Parsed: {}<", token.value);
-        for(const auto& name : type_parameters)
-            fmt::print("{},", name);
-        fmt::print(">\n");
         // Generate this type declaration if we never encountered it before
         if(!GlobalTypeRegistry::instance().specialized_type_exists(scoped_type_id, type_parameters)) {
             // This will create the type on the GlobalRegistry, so we have to get the scoped_type_id after checking for its existence
@@ -1595,24 +1578,20 @@ TypeID Parser::parse_type(const std::span<Token>& tokens, std::span<Token>::iter
                 auto underlying_type = GlobalTypeRegistry::instance().get_type(templated_type->template_type_id);
                 assert(underlying_type->is_struct());
                 auto struct_type = dynamic_cast<const StructType*>(underlying_type);
-                // auto parent = curr_node;
-                // while(parent->parent != nullptr)
-                //     parent = parent->parent;
+
                 AST::TypeDeclaration* type_declaration_node = new AST::TypeDeclaration(Token(Token::Type::Identifier, templated_type->designation, 0, 0));
                 type_declaration_node->type_id = scoped_type_id;
                 // Insert specialized members in the same order as the original declaration
                 std::vector<const StructType::Member*> members;
                 members.resize(struct_type->members.size());
-                for(const auto& [name, member] : struct_type->members) {
+                for(const auto& [name, member] : struct_type->members)
                     members[member.index] = &member;
-                }
                 for(const auto& member : members) {
                     auto mem = type_declaration_node->add_child(new AST::VariableDeclaration(Token(Token::Type::Identifier, member->name, 0, 0)));
                     mem->type_id = member->type_id;
                 }
                 specialize(type_declaration_node, type_parameters);
                 // Declare early
-                print("TEST: {}\n", *static_cast<AST::Node*>(type_declaration_node));
                 auto parent = curr_node;
                 while(parent->parent)
                     parent = parent->parent;
