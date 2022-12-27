@@ -9,6 +9,7 @@
 
 #include <PrimitiveType.hpp>
 #include <Tokenizer.hpp>
+#include <FlyString.hpp>
 
 class AST {
   public:
@@ -98,6 +99,7 @@ class AST {
             n->parent = nullptr;
             n->type_id = type_id;
             n->token = token;
+            n->token.value = *internalize_string(std::string(token.value));
 
             for(const auto c : children)
                 n->add_child(c->clone());

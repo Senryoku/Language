@@ -9,6 +9,7 @@
 #include <AST.hpp>
 #include <FlyString.hpp>
 #include <GlobalTypeRegistry.hpp>
+#include <GlobalTemplateCache.hpp>
 
 class Scope {
   public:

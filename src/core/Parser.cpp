@@ -6,6 +6,7 @@
 #include <fmt/ranges.h>
 
 #include <ModuleInterface.hpp>
+#include <GlobalTemplateCache.hpp>
 
 std::optional<AST> Parser::parse(const std::span<Token>& tokens) {
     std::optional<AST> ast(AST{});
@@ -766,6 +767,9 @@ bool Parser::parse_function_declaration(const std::span<Token>& tokens, std::spa
 
     pop_scope();
 
+    if(templated)
+        GlobalTemplateCache::instance().register_function(*function_node);
+
     return true;
 }
 
@@ -923,6 +927,8 @@ bool Parser::parse_type_declaration(const std::span<Token>& tokens, std::span<To
 
         if(!get_scope().declare_function(*function_node))
             throw Exception(fmt::format("[Parser] Syntax error: Function '{}' already declared in this scope.\n", function_node->name()));
+        if(function_node->is_templated())
+            GlobalTemplateCache::instance().register_function(*function_node);
     }
 
     expect(tokens, it, Token::Type::CloseScope);
@@ -1076,14 +1082,14 @@ void Parser::throw_unresolved_function(const Token& name, const std::span<TypeID
     }
 }
 
-const AST::FunctionDeclaration* Parser::resolve_or_instanciate_function(const AST::FunctionCall* call_node) {
+const AST::FunctionDeclaration* Parser::resolve_or_instanciate_function(AST::FunctionCall* call_node) {
     std::vector<TypeID> param_types;
     for(auto c : call_node->arguments())
         param_types.push_back(c->type_id);
-    return resolve_or_instanciate_function(call_node->token.value, param_types);
+    return resolve_or_instanciate_function(call_node->token.value, param_types, call_node);
 }
 
-const AST::FunctionDeclaration* Parser::resolve_or_instanciate_function(const std::string_view& name, const std::span<TypeID>& arguments) {
+const AST::FunctionDeclaration* Parser::resolve_or_instanciate_function(const std::string_view& name, const std::span<TypeID>& arguments, AST::Node* curr_node) {
     // Search for a corresponding method
     const auto function = get_function(name, arguments);
     if(function) {
@@ -1100,12 +1106,16 @@ const AST::FunctionDeclaration* Parser::resolve_or_instanciate_function(const st
                 if(deduced_types.empty())
                     break;
 
-                auto specialized = candidate->clone();
+                auto specialized = candidate->body() ? candidate->clone() : GlobalTemplateCache::instance().get_function(std::string(candidate->token.value))->clone();
                 specialize(specialized, deduced_types);
                 // Insert it right after the generic version.
-                candidate->parent->add_child_after(specialized, candidate);
-                // FIXME: It should be declared in the scope of the original function declaration.
-                get_scope().declare_function(*specialized);
+                if(candidate->parent)
+                    candidate->parent->add_child_after(specialized, candidate);
+                else {
+                    get_hoisted_declarations_node(curr_node)->add_child(specialized);
+                }
+                // FIXME: Idealy, it should be declared in the scope of the original function declaration.
+                get_root_scope().declare_function(*specialized);
                 if(specialized && specialized->arguments().size() > 0)
                     return specialized;
             }
@@ -1240,7 +1250,7 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
         std::vector<TypeID> arguments_types;
         for(const auto& c : call_node->arguments())
             arguments_types.push_back(c->type_id);
-        auto resolved_function = resolve_or_instanciate_function(function_name, arguments_types);
+        auto resolved_function = resolve_or_instanciate_function(function_name, arguments_types, call_node);
         if(!resolved_function)
             throw_unresolved_function(call_node->token, arguments_types);
 
@@ -1374,7 +1384,7 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
             }
 
             auto arg_types = call_node->get_argument_types();
-            auto method = resolve_or_instanciate_function(call_node->token.value, arg_types);
+            auto method = resolve_or_instanciate_function(call_node->token.value, arg_types, call_node);
             if(!method)
                 throw_unresolved_function(call_node->token, arg_types);
             check_function_call(call_node, method);
@@ -1497,7 +1507,7 @@ bool Parser::parse_variable_declaration(const std::span<Token>& tokens, std::spa
         // Search for a default constructor and add a call to it if it exists
         std::vector<TypeID> span;
         span.push_back(GlobalTypeRegistry::instance().get_pointer_to(var_declaration_node->type_id));
-        auto constructor = resolve_or_instanciate_function("constructor", span);
+        auto constructor = resolve_or_instanciate_function("constructor", span, var_declaration_node);
         auto fake_token = Token(Token::Type::Identifier, *internalize_string("constructor"), var_declaration_node->token.line, var_declaration_node->token.column);
         if(constructor) {
             auto call_node = new AST::FunctionCall(fake_token);
@@ -1592,10 +1602,7 @@ TypeID Parser::parse_type(const std::span<Token>& tokens, std::span<Token>::iter
                 }
                 specialize(type_declaration_node, type_parameters);
                 // Declare early
-                auto parent = curr_node;
-                while(parent->parent)
-                    parent = parent->parent;
-                parent->add_child_front(type_declaration_node);
+                get_hoisted_declarations_node(curr_node)->add_child(type_declaration_node);
             }
         } else
             scoped_type_id = GlobalTypeRegistry::instance().get_specialized_type(scoped_type_id, type_parameters);
@@ -1674,7 +1681,7 @@ void Parser::insert_defer_node(AST::Node* curr_node) {
 
         std::vector<TypeID> span;
         span.push_back(GlobalTypeRegistry::instance().get_pointer_to(dec->type_id));
-        auto destructor = resolve_or_instanciate_function("destructor", span);
+        auto destructor = resolve_or_instanciate_function("destructor", span, dec);
         if(destructor) {
             Token destructor_token;
             destructor_token.type = Token::Type::Identifier;

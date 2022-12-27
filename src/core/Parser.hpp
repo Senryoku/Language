@@ -51,6 +51,18 @@ class Parser : public Scoped {
 
     ModuleInterface _module_interface;
 
+    // FIXME: This is used to preserve the order of declaration of specialized templates, but, as always, this is hackish.
+    AST::Node* _hoisted_declarations = nullptr;
+    inline AST::Node* get_hoisted_declarations_node(AST::Node* curr_node) { 
+        if(!_hoisted_declarations) {
+            auto parent = curr_node;
+            while(parent->parent)
+                parent = parent->parent;
+            _hoisted_declarations = parent->add_child_front(new AST::Node(AST::Node::Type::Root));
+        }
+        return _hoisted_declarations;
+    }
+
     bool parse(const std::span<Token>& tokens, AST::Node* curr_node);
 
     bool                     parse_next_scope(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
@@ -142,8 +154,8 @@ class Parser : public Scoped {
     void resolve_operator_type(AST::UnaryOperator* op_node);
     void resolve_operator_type(AST::BinaryOperator* op_node);
 
-    const AST::FunctionDeclaration* resolve_or_instanciate_function(const AST::FunctionCall* call_node);
-    const AST::FunctionDeclaration* resolve_or_instanciate_function(const std::string_view& name, const std::span<TypeID>& arguments);
+    const AST::FunctionDeclaration* resolve_or_instanciate_function(AST::FunctionCall* call_node);
+    const AST::FunctionDeclaration* resolve_or_instanciate_function(const std::string_view& name, const std::span<TypeID>& arguments, AST::Node* curr_node);
     void                            check_function_call(AST::FunctionCall*, const AST::FunctionDeclaration*);
     std::string get_overloads_hint_string(const std::string_view& name, const std::span<TypeID>& arguments, const std::vector<const AST::FunctionDeclaration*>& candidates);
     void        throw_unresolved_function(const Token& name, const std::span<TypeID>& arguments);

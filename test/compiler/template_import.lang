@@ -1,6 +1,6 @@
 // PASS: Value: 1337. Destructor called.
 
-import "../compiler/include/TemplateTest"
+import "include/TemplateTest"
 
 function main() {
 	let val : TemplateTest<u64>;

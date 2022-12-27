@@ -4,6 +4,7 @@
 
 #include <AST.hpp>
 #include <Exception.hpp>
+#include <GlobalTemplateCache.hpp>
 
 const Type* GlobalTypeRegistry::get_type(TypeID id) const {
     assert(id != InvalidTypeID);
@@ -88,6 +89,9 @@ TypeID GlobalTypeRegistry::register_type(AST::TypeDeclaration& type_node) {
         ++index;
     }
     update_caches(tr);
+
+    if(tr->is_templated())
+        GlobalTemplateCache::instance().register_type(type_node);
 
     return tr->type_id;
 }
