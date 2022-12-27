@@ -210,16 +210,21 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                     }
                     case PrimitiveType::U8: [[fallthrough]];
                     case PrimitiveType::U16: [[fallthrough]];
-                    case PrimitiveType::U32: [[fallthrough]];
-                    case PrimitiveType::U64: {
-                        // Allow truncation between unsigned types (explicit truncation to a smaller type)
-                        if(is_unsigned(node->type_id) && is_unsigned(node->children[0]->type_id) && node->type_id < node->children[0]->type_id) {
+                    case PrimitiveType::U32:
+                        // Allow initializing variables from LiteralInteger
+                        if(node->children[0]->type_id == PrimitiveType::Integer)
                             return _llvm_ir_builder.CreateCast(llvm::Instruction::Trunc, child, get_llvm_type(node->type_id), "castTrunc");
-                        } else
-                            return _llvm_ir_builder.CreateCast(llvm::Instruction::ZExt, child, get_llvm_type(node->type_id), "castZeroExt");
+                        [[fallthrough]];
+                    case PrimitiveType::U64: {
+                        if(is_floating_point(node->children[0]->type_id))
+                            return _llvm_ir_builder.CreateCast(llvm::Instruction::UIToFP, child, get_llvm_type(node->type_id), "castUIToFP");
+                        // Allow truncation between unsigned types (explicit truncation to a smaller type)
+                        if((is_unsigned(node->type_id) && is_unsigned(node->children[0]->type_id) && node->type_id < node->children[0]->type_id))
+                            return _llvm_ir_builder.CreateCast(llvm::Instruction::Trunc, child, get_llvm_type(node->type_id), "castTrunc");
+                        return _llvm_ir_builder.CreateCast(llvm::Instruction::ZExt, child, get_llvm_type(node->type_id), "castZeroExt");
                     }
                     case PrimitiveType::Integer: {
-                        if(node->children[0]->type_id == PrimitiveType::Float || node->children[0]->type_id == PrimitiveType::Double)
+                        if(is_floating_point(node->children[0]->type_id))
                             return _llvm_ir_builder.CreateFPToSI(child, llvm::Type::getInt32Ty(*_llvm_context), "castFPToSI");
                         [[fallthrough]];
                     }

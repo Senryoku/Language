@@ -173,11 +173,11 @@ bool handle_file(const std::filesystem::path& path) {
                     return true;
             }
             if(args['l'].set) {
-            #ifndef NDEBUG
+#ifndef NDEBUG
                 new_module.get_llvm_module().dump();
-            #else
+#else
                 warn("[compiler] LLVM Module dump is only available in debug builds.");
-            #endif
+#endif
             }
 
             const auto write_ir_end = std::chrono::high_resolution_clock::now();

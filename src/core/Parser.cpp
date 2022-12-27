@@ -952,6 +952,16 @@ AST::Node* Parser::parse_digits(const std::span<Token>&, std::span<Token>::itera
     else if(error_code == std::errc::result_out_of_range)
         throw Exception("[Parser::parse_digits] std::from_chars returned result_out_of_range.\n", point_error(*it));
     AST::Node* integer = nullptr;
+    if(type == PrimitiveType::Void) {
+        if(value > std::numeric_limits<int64_t>::max())
+            type = PrimitiveType::U64;
+        else if(value > std::numeric_limits<uint32_t>::max())
+            type = PrimitiveType::I64;
+        else if(value > std::numeric_limits<int32_t>::max())
+            type = PrimitiveType::U32;
+        else
+            type = PrimitiveType::Integer;
+    }
     switch(type) {
         case PrimitiveType::I8: integer = gen_integer_literal_node<int8_t>(*it, value, type); break;
         case PrimitiveType::I16: integer = gen_integer_literal_node<int16_t>(*it, value, type); break;
@@ -961,8 +971,7 @@ AST::Node* Parser::parse_digits(const std::span<Token>&, std::span<Token>::itera
         case PrimitiveType::U16: integer = gen_integer_literal_node<uint16_t>(*it, value, type); break;
         case PrimitiveType::U32: integer = gen_integer_literal_node<uint32_t>(*it, value, type); break;
         case PrimitiveType::U64: integer = gen_integer_literal_node<uint64_t>(*it, value, type); break;
-        case PrimitiveType::Integer: [[fallthrough]];
-        default: {
+        case PrimitiveType::Integer: {
             if(static_cast<int64_t>(value) < std::numeric_limits<int32_t>::min() || static_cast<int64_t>(value) > std::numeric_limits<int32_t>::max())
                 throw Exception(fmt::format("Error parsing integer for target type {}: value '{}' out-of-bounds (range: [{}, {}]).", type_id_to_string(PrimitiveType::Integer),
                                             value, std::numeric_limits<int32_t>::min(), std::numeric_limits<int32_t>::max()),
@@ -972,6 +981,7 @@ AST::Node* Parser::parse_digits(const std::span<Token>&, std::span<Token>::itera
             integer = local;
             break;
         }
+        default: throw Exception(fmt::format("[Parser::parse_digits] Unexpected target type '{}'.\n", type));
     }
     curr_node->add_child(integer);
     ++it;
@@ -1024,7 +1034,7 @@ bool Parser::parse_string(const std::span<Token>&, std::span<Token>::iterator& i
         }
         strNode->value = *internalize_string(str);
     } else
-        strNode->value = it->value;
+        strNode->value = *internalize_string(std::string(it->value));
     ++it;
     return true;
 }
