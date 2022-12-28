@@ -17,8 +17,15 @@ static void dump(auto llvm_object) {
         PrimitiveType::VALUETYPE, [](llvm::IRBuilder<>& ir_builder, llvm::Value* val) { FUNC } \
     }
 static std::unordered_map<Token::Type, std::unordered_map<PrimitiveType, std::function<llvm::Value*(llvm::IRBuilder<>&, llvm::Value*)>>> unary_ops = {
-    {Token::Type::Addition, {OP(Integer, (void)ir_builder; return val;), OP(Float, (void)ir_builder; return val;)}},
-    {Token::Type::Substraction, {OP(Integer, return ir_builder.CreateNeg(val, "neg");), OP(Float, return ir_builder.CreateFNeg(val, "fneg");)}},
+    {Token::Type::Addition,
+     {OP(Integer, (void)ir_builder; return val;), OP(I8, (void)ir_builder; return val;), OP(I16, (void)ir_builder; return val;), OP(I32, (void)ir_builder; return val;),
+      OP(I64, (void)ir_builder; return val;), OP(U8, (void)ir_builder; return val;), OP(U16, (void)ir_builder; return val;), OP(U32, (void)ir_builder; return val;),
+      OP(U64, (void)ir_builder; return val;), OP(Float, (void)ir_builder; return val;)}},
+    {Token::Type::Substraction,
+     {OP(Integer, return ir_builder.CreateNeg(val, "neg");), OP(I8, return ir_builder.CreateNeg(val, "neg");), OP(I16, return ir_builder.CreateNeg(val, "neg");),
+      OP(I32, return ir_builder.CreateNeg(val, "neg");), OP(I64, return ir_builder.CreateNeg(val, "neg");), OP(U8, return ir_builder.CreateNeg(val, "neg");),
+      OP(U16, return ir_builder.CreateNeg(val, "neg");), OP(U32, return ir_builder.CreateNeg(val, "neg");), OP(U64, return ir_builder.CreateNeg(val, "neg");),
+      OP(Float, return ir_builder.CreateFNeg(val, "fneg");)}},
 };
 #undef OP
 
@@ -43,7 +50,12 @@ static std::unordered_map<Token::Type, std::unordered_map<PrimitiveType, std::fu
       OP(U32, return ir_builder.CreateMul(lhs, rhs, "mul");), OP(U64, return ir_builder.CreateMul(lhs, rhs, "mul");), OP(I8, return ir_builder.CreateMul(lhs, rhs, "mul");),
       OP(I16, return ir_builder.CreateMul(lhs, rhs, "mul");), OP(I32, return ir_builder.CreateMul(lhs, rhs, "mul");), OP(I64, return ir_builder.CreateMul(lhs, rhs, "mul");),
       OP(Float, return ir_builder.CreateFMul(lhs, rhs, "fmul");)}},
-    {Token::Type::Division, {OP(Integer, return ir_builder.CreateSDiv(lhs, rhs, "div");), OP(Float, return ir_builder.CreateFDiv(lhs, rhs, "fdiv");)}},
+    {Token::Type::Division,
+     {OP(Integer, return ir_builder.CreateSDiv(lhs, rhs, "div");), OP(I8, return ir_builder.CreateSDiv(lhs, rhs, "div");), OP(I16, return ir_builder.CreateSDiv(lhs, rhs, "div");),
+      OP(I32, return ir_builder.CreateSDiv(lhs, rhs, "div");), OP(I64, return ir_builder.CreateSDiv(lhs, rhs, "div");), OP(U8, return ir_builder.CreateUDiv(lhs, rhs, "div");),
+      OP(U16, return ir_builder.CreateUDiv(lhs, rhs, "div");), OP(U32, return ir_builder.CreateUDiv(lhs, rhs, "div");), OP(U64, return ir_builder.CreateUDiv(lhs, rhs, "div");),
+
+      OP(Float, return ir_builder.CreateFDiv(lhs, rhs, "fdiv");)}},
     {Token::Type::Modulus, {OP(Integer, return ir_builder.CreateSRem(lhs, rhs, "srem");)}},
     // Comparisons
     {Token::Type::Equal,
@@ -96,7 +108,7 @@ llvm::Constant* Module::codegen_constant(const AST::Node* val) {
     auto type = GlobalTypeRegistry::instance().get_type(val->type_id);
     assert(type);
     if(type->is_array()) {
-        const auto*                  type_arr = static_cast<const ArrayType*>(type);
+        const auto*                  type_arr = dynamic_cast<const ArrayType*>(type);
         auto                         element_type = get_llvm_type(type_arr->element_type);
         std::vector<llvm::Constant*> values(type_arr->capacity);
         for(unsigned int i = 0; i < type_arr->capacity; i++)
@@ -116,14 +128,21 @@ llvm::Constant* Module::codegen_constant(const AST::Node* val) {
     }
     switch(val->type_id) {
         using enum PrimitiveType;
-        case Boolean: return llvm::ConstantInt::get(*_llvm_context, llvm::APInt(1, static_cast<const AST::BoolLiteral*>(val)->value));
-        case Char: return llvm::ConstantInt::get(*_llvm_context, llvm::APInt(8, static_cast<const AST::CharLiteral*>(val)->value));
-        case Float: return llvm::ConstantFP::get(*_llvm_context, llvm::APFloat(static_cast<const AST::FloatLiteral*>(val)->value));
-        case I32: [[fallthrough]];
-        case Integer: return llvm::ConstantInt::get(*_llvm_context, llvm::APInt(32, static_cast<const AST::IntegerLiteral*>(val)->value));
+        case Boolean: return llvm::ConstantInt::get(*_llvm_context, llvm::APInt(1, dynamic_cast<const AST::BoolLiteral*>(val)->value));
+        case Char: return llvm::ConstantInt::get(*_llvm_context, llvm::APInt(8, dynamic_cast<const AST::CharLiteral*>(val)->value));
+        case Float: return llvm::ConstantFP::get(*_llvm_context, llvm::APFloat(dynamic_cast<const AST::FloatLiteral*>(val)->value));
+        case U8: return llvm::ConstantInt::get(*_llvm_context, llvm::APInt(8, dynamic_cast<const AST::Literal<uint8_t>*>(val)->value));
+        case U16: return llvm::ConstantInt::get(*_llvm_context, llvm::APInt(16, dynamic_cast<const AST::Literal<uint16_t>*>(val)->value));
+        case U32: return llvm::ConstantInt::get(*_llvm_context, llvm::APInt(32, dynamic_cast<const AST::Literal<uint32_t>*>(val)->value));
+        case U64: return llvm::ConstantInt::get(*_llvm_context, llvm::APInt(64, dynamic_cast<const AST::Literal<uint64_t>*>(val)->value));
+        case I8: return llvm::ConstantInt::get(*_llvm_context, llvm::APInt(8, dynamic_cast<const AST::Literal<int8_t>*>(val)->value));
+        case I16: return llvm::ConstantInt::get(*_llvm_context, llvm::APInt(16, dynamic_cast<const AST::Literal<int16_t>*>(val)->value));
+        case I32: return llvm::ConstantInt::get(*_llvm_context, llvm::APInt(32, dynamic_cast<const AST::Literal<int32_t>*>(val)->value));
+        case I64: return llvm::ConstantInt::get(*_llvm_context, llvm::APInt(64, dynamic_cast<const AST::Literal<int64_t>*>(val)->value));
+        case Integer: return llvm::ConstantInt::get(*_llvm_context, llvm::APInt(32, dynamic_cast<const AST::IntegerLiteral*>(val)->value));
         case CString: {
             // FIXME: Take a look at llvm::StringRef and llvm::Twine
-            auto        str_node = static_cast<const AST::StringLiteral*>(val);
+            auto        str_node = dynamic_cast<const AST::StringLiteral*>(val);
             const auto& str = str_node->value;
             auto        charType = llvm::IntegerType::get(*_llvm_context, 8);
 
@@ -191,12 +210,21 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                     }
                     case PrimitiveType::U8: [[fallthrough]];
                     case PrimitiveType::U16: [[fallthrough]];
-                    case PrimitiveType::U32: [[fallthrough]];
+                    case PrimitiveType::U32:
+                        // Allow initializing variables from LiteralInteger
+                        if(node->children[0]->type_id == PrimitiveType::Integer)
+                            return _llvm_ir_builder.CreateCast(llvm::Instruction::Trunc, child, get_llvm_type(node->type_id), "castTrunc");
+                        [[fallthrough]];
                     case PrimitiveType::U64: {
+                        if(is_floating_point(node->children[0]->type_id))
+                            return _llvm_ir_builder.CreateCast(llvm::Instruction::UIToFP, child, get_llvm_type(node->type_id), "castUIToFP");
+                        // Allow truncation between unsigned types (explicit truncation to a smaller type)
+                        if((is_unsigned(node->type_id) && is_unsigned(node->children[0]->type_id) && node->type_id < node->children[0]->type_id))
+                            return _llvm_ir_builder.CreateCast(llvm::Instruction::Trunc, child, get_llvm_type(node->type_id), "castTrunc");
                         return _llvm_ir_builder.CreateCast(llvm::Instruction::ZExt, child, get_llvm_type(node->type_id), "castZeroExt");
                     }
                     case PrimitiveType::Integer: {
-                        if(node->children[0]->type_id == PrimitiveType::Float || node->children[0]->type_id == PrimitiveType::Double)
+                        if(is_floating_point(node->children[0]->type_id))
                             return _llvm_ir_builder.CreateFPToSI(child, llvm::Type::getInt32Ty(*_llvm_context), "castFPToSI");
                         [[fallthrough]];
                     }
@@ -233,6 +261,10 @@ llvm::Value* Module::codegen(const AST::Node* node) {
             }
         }
         case AST::Node::Type::TypeDeclaration: {
+            auto type = GlobalTypeRegistry::instance().get_type(node->type_id);
+            // Ignore Template definitions, we only care about actual instanciations.
+            if(type->is_placeholder())
+                break;
             std::vector<llvm::Type*> members;
             for(const auto c : node->children)
                 members.push_back(get_llvm_type(c->type_id));
@@ -241,7 +273,10 @@ llvm::Value* Module::codegen(const AST::Node* node) {
             break;
         }
         case AST::Node::Type::FunctionDeclaration: {
-            auto function_declaration_node = static_cast<const AST::FunctionDeclaration*>(node);
+            auto function_declaration_node = dynamic_cast<const AST::FunctionDeclaration*>(node);
+            // Ignore Template definitions, we only care about actual instanciations.
+            if(function_declaration_node->is_templated())
+                break;
             auto function_name = function_declaration_node->mangled_name();
             auto prev_function = _llvm_module->getFunction(function_name);
             if(prev_function) { // Should be handled by the parser.
@@ -304,13 +339,11 @@ llvm::Value* Module::codegen(const AST::Node* node) {
             return nullptr;
         }
         case AST::Node::Type::FunctionCall: {
-            auto function_call_node = static_cast<const AST::FunctionCall*>(node);
+            auto function_call_node = dynamic_cast<const AST::FunctionCall*>(node);
             auto mangled_function_name = function_call_node->mangled_name();
             auto function = _llvm_module->getFunction(mangled_function_name);
-            if(!function) {
-                error("[LLVMCodegen] Call to undeclared function '{}' (line {}).\n", mangled_function_name, function_call_node->token.line);
-                return nullptr;
-            }
+            if(!function)
+                throw Exception(fmt::format("[LLVMCodegen] Call to undeclared function '{}' (line {}).\n", mangled_function_name, function_call_node->token.line));
             // TODO: Handle default values.
             // TODO: Handle vargs functions (variable number of parameters, like printf :^) )
             auto function_flags = function_call_node->flags;
@@ -328,7 +361,8 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                     print("\n");
                 }
 #endif
-                return nullptr;
+                throw Exception(fmt::format("[LLVMCodegen] Unexpected number of parameters in function call '{}' (line {}): Expected {}, got {}.\n", mangled_function_name,
+                                            node->token.line, function->arg_size(), function_call_node->arguments().size()));
             }
             std::vector<llvm::Value*> parameters;
             for(auto arg_node : function_call_node->arguments()) {
@@ -382,7 +416,7 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                 auto type = GlobalTypeRegistry::instance().get_type(child->children[0]->type_id);
                 if(type->is_array()) {
                     assert(value->getType()->isPointerTy());
-                    auto arr_type = static_cast<const ArrayType*>(type);
+                    auto arr_type = dynamic_cast<const ArrayType*>(type);
                     auto element_type = get_llvm_type(arr_type->element_type);
                     return _llvm_ir_builder.CreateLoad(element_type, value, "l-to-rvalue");
                 }
@@ -422,7 +456,7 @@ llvm::Value* Module::codegen(const AST::Node* node) {
             }
         }
         case AST::Node::Type::MemberIdentifier: {
-            auto member_identifier = static_cast<const AST::MemberIdentifier*>(node);
+            auto member_identifier = dynamic_cast<const AST::MemberIdentifier*>(node);
             return llvm::ConstantInt::get(*_llvm_context, llvm::APInt(32, member_identifier->index)); // Returns member index
         }
         case AST::Node::Type::BinaryOperator: {

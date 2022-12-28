@@ -9,6 +9,20 @@ AST::Node* AST::Node::add_child(Node* n) {
     return n;
 }
 
+AST::Node* AST::Node::add_child_front(Node* n) {
+    assert(n->parent == nullptr);
+    children.insert(children.begin(), n);
+    n->parent = this;
+    return n;
+}
+
+AST::Node* AST::Node::add_child_after(Node* n, const Node* prev) {
+    assert(n->parent == nullptr);
+    children.insert(++std::find(children.begin(), children.end(), prev), n);
+    n->parent = this;
+    return n;
+}
+
 AST::Node* AST::Node::pop_child() {
     AST::Node* c = children.back();
     children.pop_back();
@@ -37,6 +51,15 @@ auto mangle_name(const std::string_view& name, auto arguments, AST::FunctionDecl
 
 std::string AST::FunctionDeclaration::mangled_name() const {
     return mangle_name(token.value, arguments(), flags);
+}
+
+bool AST::FunctionDeclaration::is_templated() const {
+    if(GlobalTypeRegistry::instance().get_type(type_id)->is_placeholder())
+        return true;
+    for(const auto& arg : arguments())
+        if(GlobalTypeRegistry::instance().get_type(arg->type_id)->is_placeholder())
+            return true;
+    return false;
 }
 
 std::string AST::FunctionCall::mangled_name() const {

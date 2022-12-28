@@ -1,0 +1,15 @@
+export type TemplateTest<T> {
+	let val : T = 1337;
+}
+
+export function destructor<T>(this: TemplateTest<T>*) {
+	printf(" Destructor called.\n");
+}
+
+export function print<T>(this: TemplateTest<T>*) {
+	printf("Value: %llu.", .val);
+}
+
+// FIXME: Random function just so LLVM has something to generate.
+function random() {
+}
