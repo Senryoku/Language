@@ -12,14 +12,27 @@ extern "C" {
 
 // FIXME: Change mode to an enum.
 int __open_file(const char* path, const char* mode) {
-	auto m = _O_RDONLY;
-	if(strcmp(mode, "r") == 0) m = _O_RDONLY;
-	if(strcmp(mode, "w") == 0) m = _O_CREAT | _O_TRUNC | _O_WRONLY;
-    auto fd = _open(path, m, _S_IREAD | _S_IWRITE);
+    auto       oflag = _O_RDONLY;
+    auto       shflag = _SH_DENYRW;
+    const auto pmode = _S_IREAD | _S_IWRITE;
+    if(strcmp(mode, "r") == 0) {
+        oflag = _O_RDONLY;
+        shflag = _SH_DENYWR;
+    }
+    if(strcmp(mode, "w") == 0) {
+        oflag = _O_CREAT | _O_TRUNC | _O_WRONLY;
+        shflag = _SH_DENYRD;
+    }
+    if(strcmp(mode, "rw") == 0) {
+        oflag = _O_CREAT | _O_TRUNC | _O_RDWR;
+        shflag = _SH_DENYNO;
+    }
+    int  fd;
+    auto _errno = _sopen_s(&fd, path, oflag, shflag, pmode);
     if(fd < 0) {
         char errmsg[2048];
-        strerror_s(errmsg, sizeof(errmsg), errno);
-        printf("Error %d opening '%s': %s.\n", errno, path, errmsg);
+        strerror_s(errmsg, sizeof(errmsg), _errno);
+        printf("Error %d opening '%s': %s.\n", _errno, path, errmsg);
     }
     return fd;
 }
@@ -45,5 +58,4 @@ int __read_file(int fd, char* buff, size_t buff_size) {
 int __read_file_buffer_offset(int fd, char* buff, size_t offset_into_buffer, size_t buff_size) {
     return __read_file(fd, buff + offset_into_buffer, buff_size - offset_into_buffer);
 }
-
 }
