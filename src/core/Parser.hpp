@@ -32,6 +32,8 @@ class Parser : public Scoped {
     // Append to an existing AST and return the added children
     AST::Node* parse(const std::span<Token>& tokens, AST& ast);
 
+    AST::Node* parse_type(const std::span<Token>& tokens, AST& ast);
+
     std::vector<std::string> parse_dependencies(const std::span<Token>& tokens);
 
     // Returns true if the next token exists and matches the supplied type and value.
@@ -52,8 +54,8 @@ class Parser : public Scoped {
     ModuleInterface _module_interface;
 
     // FIXME: This is used to preserve the order of declaration of specialized templates, but, as always, this is hackish.
-    AST::Node* _hoisted_declarations = nullptr;
-    inline AST::Node* get_hoisted_declarations_node(AST::Node* curr_node) { 
+    AST::Node*        _hoisted_declarations = nullptr;
+    inline AST::Node* get_hoisted_declarations_node(AST::Node* curr_node) {
         if(!_hoisted_declarations) {
             auto parent = curr_node;
             while(parent->parent)

@@ -30,7 +30,14 @@ std::tuple<bool, std::span<AST::TypeDeclaration*>, std::span<AST::FunctionDeclar
             while(type_tokenizer.has_more()) {
                 tokens.push_back(type_tokenizer.consume());
             }
-            auto root_node = type_parser.parse(tokens, type_ast);
+            AST::Node* root_node = nullptr;
+            if(tokens[0].type == Token::Type::Type) {
+                // Type Declarations
+                root_node = type_parser.parse(tokens, type_ast);
+            } else {
+                // Template specializations
+                root_node = type_parser.parse_type(tokens, type_ast);
+            }
             // Remove superfluous nodes
             auto type_node = root_node;
             while(type_node->type != AST::Node::Type::TypeDeclaration && !type_node->children.empty())
@@ -92,11 +99,17 @@ bool ModuleInterface::save(const std::filesystem::path& path) const {
 
     // Types
     for(const auto& n : type_exports) {
-        interface_file << "type " << n->token.value << " { ";
-        for(const auto& member : n->children) {
-            interface_file << "let " << member->token.value << ": " << GlobalTypeRegistry::instance().get_type(member->type_id)->designation << "; ";
+        auto type = GlobalTypeRegistry::instance().get_type(n->type_id);
+        // Export template specialization simply by spelling them out. Importing module should have all the information needed to reconstruct them from their names.
+        if(type->is_templated() && !type->is_placeholder()) {
+            interface_file << type->designation << std::endl;
+        } else {
+            interface_file << "type " << n->token.value << " { ";
+            for(const auto& member : n->children) {
+                interface_file << "let " << member->token.value << ": " << GlobalTypeRegistry::instance().get_type(member->type_id)->designation << "; ";
+            }
+            interface_file << "}" << std::endl;
         }
-        interface_file << "}" << std::endl;
     }
     interface_file << std::endl;
 

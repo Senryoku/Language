@@ -36,6 +36,19 @@ AST::Node* Parser::parse(const std::span<Token>& tokens, AST& ast) {
     return root;
 }
 
+AST::Node* Parser::parse_type(const std::span<Token>& tokens, AST& ast) {
+    auto root = ast.get_root().add_child(new AST::Node{AST::Node::Type::Root});
+    auto it = tokens.begin();
+    auto type_id = parse_type(tokens, it, root);
+    for(const auto& child : get_hoisted_declarations_node(root)->children) {
+        if(child->type == AST::Node::Type::TypeDeclaration && child->type_id == type_id) {
+            return child;
+        }
+    }
+    assert(false);
+    return nullptr;
+}
+
 std::vector<std::string> Parser::parse_dependencies(const std::span<Token>& tokens) {
     std::vector<std::string> dependencies;
 
@@ -878,6 +891,7 @@ bool Parser::parse_type_declaration(const std::span<Token>& tokens, std::span<To
     if(!get_scope().declare_type(*type_node)) {
         warn("[Parser] Syntax error: Type {} already declared in this scope.\n", type_node->token.value);
         fmt::print("{}", point_error(type_node->token));
+        type_node->type_id = get_scope().find_type(type_node->token.value);
     }
 
     // FIXME: Generate templated constructor function for templated types.
@@ -1621,9 +1635,15 @@ TypeID Parser::parse_type(const std::span<Token>& tokens, std::span<Token>::iter
                 specialize(type_declaration_node, type_parameters);
                 // Declare early
                 get_hoisted_declarations_node(curr_node)->add_child(type_declaration_node);
+                // FIXME: Systematically exports nexly generated template specializations.
+                //        Ideally we'd want to export only the specializations that are part of some form of interface (parameters/return types of exported functions, for example)
+                _module_interface.type_exports.push_back(type_declaration_node);
             }
         }
     }
+
+    if(it == tokens.end())
+        return scoped_type_id;
 
     while(it->type == Token::Type::Multiplication) {
         scoped_type_id = GlobalTypeRegistry::instance().get_pointer_to(scoped_type_id);

@@ -1,13 +1,21 @@
-import "std/File"
-import "std/memory" // This should not be neccesary
-import "std/Array" // This should not be neccesary
+ import "include/Test"
 
 function main() {
-	let file : File;
-	file.open("C:/Users/YoaLi/Downloads/Custom.txt", "r");
-	let arr : Array<u8> = file.read_until('\n'); // We should not have to specify the type here, but our imports are still flaky.
-	for(let i : u64 = 0; i < arr.length; ++i)
-		printf("%d", arr.get(i));
-	printf("\n");
+	let t = something();
+	printf("%d\n", t.value);
 	return 0;
 }
+
+//import "std/File"
+//import "std/memory" // This should not be neccesary
+//import "std/Array" // This should not be neccesary
+//
+//function main() {
+//	let file : File;
+//	file.open("C:/Users/YoaLi/Downloads/Custom.txt", "r");
+//	let arr : Array<u8> = file.read_until('\n'); // We should not have to specify the type here, but our imports are still flaky.
+//	for(let i : u64 = 0; i < arr.length; ++i)
+//		printf("%d", arr.get(i));
+//	printf("\n");
+//	return 0;
+//}

@@ -1,0 +1,9 @@
+// PASS: 128
+
+import "include/TemplateSpecializationExport"
+
+function main() {
+	let t = something();
+	printf("%d\n", t.value);
+	return 0;
+}
