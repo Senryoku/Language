@@ -1,12 +1,39 @@
 extern function __open_file(path: char*, mode: char*) : int;
 extern function __close_file(fd: int);
 extern function __write_file(fd: int, data: cstr, count: u64);
+extern function __read_file(fd: int, data: u8*, count: u64) : int;
+extern function __read_file_buffer_offset(fd: int, data: u8*, offset: u64, count: u64) : int;
 
 import "std/cstr"
+import "std/memory"
+import "std/Array"
 import "std/String"
+
+// Globals are not supported yet
+//const FileInnerBufferCapacity : u64 = 1024;
+
+// Convolluted way to cast an int into a u64.
+function u64(val: int) : u64 {
+	const v : u64 = val;
+	return v;
+}
 
 export type File {
 	let fd : int = 0;
+	// TODO: Make these private.
+	let inner_buffer : u8* = malloc(u64(1024)); // malloc(FileInnerBufferCapacity);
+	let inner_pointer_start : u64 = 0; // These offsets could be smaller.
+	let inner_pointer_end : u64 = 0;
+}
+
+function _read_buffered(this: File*) {
+	if(.inner_pointer_start  == .inner_pointer_end) {
+		.inner_pointer_start = 0;
+		.inner_pointer_end = 0;
+	}
+	let read_bytes = __read_file_buffer_offset(.fd, .inner_buffer, .inner_pointer_end, u64(1024));
+	.inner_pointer_end = .inner_pointer_end + read_bytes;
+	return read_bytes;
 }
 
 // FIXME: Change path to a String (or provide an overload?)
@@ -31,6 +58,27 @@ export function write(this: File*, data: cstr, size: u64) {
 	__write_file(.fd, data, size);
 }
 
+export function read_until(this: File*, delimiter: char) : Array<u8> {
+	let r : Array<u8>;
+
+	while(true) {
+		while(.inner_pointer_start != .inner_pointer_end) {
+			r.push_back(.inner_buffer[.inner_pointer_start]);
+			++.inner_pointer_start;
+			if(.inner_buffer[.inner_pointer_start - 1] == delimiter)
+				return r;
+		}
+		let read = ._read_buffered();
+		if(read == 0) return r;
+	}
+	
+	return r;
+}
+
 export function destructor(this: File*) {
 	.close();
+	free(.inner_buffer);
+	.inner_buffer = null_pointer();
+	.inner_pointer_start = 0;
+	.inner_pointer_end = 0;
 }

@@ -481,4 +481,14 @@ inline AST::VariableDeclaration::Flag operator&(AST::VariableDeclaration::Flag l
                                                        static_cast<std::underlying_type_t<AST::VariableDeclaration::Flag>>(rhs));
 }
 
+inline AST::VariableDeclaration::Flag operator&=(AST::VariableDeclaration::Flag& lhs, AST::VariableDeclaration::Flag rhs) {
+    lhs = lhs & rhs;
+    return lhs;
+}
+
+inline AST::VariableDeclaration::Flag operator&=(AST::VariableDeclaration::Flag& lhs, int rhs) {
+    lhs = lhs & static_cast<AST::VariableDeclaration::Flag>(rhs);
+    return lhs;
+}
+
 #include <formatters/ASTFormat.hpp>

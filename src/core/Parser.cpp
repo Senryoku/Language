@@ -5,8 +5,8 @@
 
 #include <fmt/ranges.h>
 
-#include <ModuleInterface.hpp>
 #include <GlobalTemplateCache.hpp>
+#include <ModuleInterface.hpp>
 
 std::optional<AST> Parser::parse(const std::span<Token>& tokens) {
     std::optional<AST> ast(AST{});
@@ -200,7 +200,7 @@ bool Parser::parse(const std::span<Token>& tokens, AST::Node* curr_node) {
 
                 // The return value is moved only if this return is actually taken, restore the original value for the rest of this scope.
                 if(return_variable)
-                    return_variable->flags |= AST::VariableDeclaration::Flag::Moved;
+                    return_variable->flags &= ~AST::VariableDeclaration::Flag::Moved;
 
                 to_rvalue->type_id = to_rvalue->children[0]->type_id;
                 return_node->type_id = return_node->children[0]->type_id;
@@ -1406,6 +1406,9 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
                 if(binary_operator_node->children[1]->type_id == type_id) {
                     auto cast = binary_operator_node->insert_between(1, new AST::Node(AST::Node::Type::Cast));
                     cast->type_id = to;
+                    // Insert load if we're dealing with a variable.
+                    if(cast->children[0]->type == AST::Node::Type::Variable)
+                        cast->insert_between(0, new AST::Node(AST::Node::Type::LValueToRValue));
                     break;
                 }
             }
@@ -1441,13 +1444,13 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
     resolve_operator_type(binary_operator_node);
     // Implicit casts
     auto create_cast_node = [&](int index, TypeID type) {
-        auto castNode = new AST::Node(AST::Node::Type::Cast);
-        castNode->type_id = type;
-        castNode->parent = binary_operator_node;
+        auto cast_node = new AST::Node(AST::Node::Type::Cast);
+        cast_node->type_id = type;
+        cast_node->parent = binary_operator_node;
         auto child = binary_operator_node->children[index];
         child->parent = nullptr;
-        castNode->add_child(child);
-        binary_operator_node->children[index] = castNode;
+        cast_node->add_child(child);
+        binary_operator_node->children[index] = cast_node;
     };
     // FIXME: Cleanup, like everything else :)
     // Promotion from integer to float, either because of the binary_operator_node type, or the type of its operands.
@@ -1466,6 +1469,10 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
             create_cast_node(0, PrimitiveType::Integer);
         if(binary_operator_node->children[1]->type_id == PrimitiveType::Float)
             create_cast_node(1, PrimitiveType::Integer);
+    }
+
+    if(binary_operator_node->token.type == Token::Type::Assignment && binary_operator_node->children[1]->type_id == PrimitiveType::Void) {
+        throw Exception(fmt::format("[Parser] Cannot assign void to a variable.\n"), point_error(binary_operator_node->token));
     }
 
     return true;

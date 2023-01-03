@@ -6,7 +6,7 @@
 #include <AST.hpp>
 
 /* NOTE/FIXME: As the name suggests, this is not scoped.
- *             Nothing prevents name clashing between files, this may come to bite use later :))
+ *             Nothing prevents name clashing between files, this may come to bite us later :))
  */
 class GlobalTemplateCache {
   public:

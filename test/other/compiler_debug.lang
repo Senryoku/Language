@@ -1,9 +1,8 @@
-// PASS: Value: 1337. Destructor called.
-
-import "../compiler/include/TemplateTest"
+import "std/File"
 
 function main() {
-	let val : TemplateTest<u64>;
-	val.print();
+	let file : File;
+	file.open("C:/Users/YoaLi/Downloads/Custom.txt", "r");
+	let arr = file.read_until('\n');
 	return 0;
 }

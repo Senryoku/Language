@@ -1,0 +1,25 @@
+import "std/memory"
+
+export type owning_ptr<T> {
+	let ptr : T* = null_pointer();
+}
+
+export function release<T>(this: owning_ptr<T>*) {
+	free(.ptr);
+	.ptr = null_pointer();
+}
+
+export function destructor<T>(this: owning_ptr<T>*) {
+	.release();
+}
+
+export function set<T>(this: owning_ptr<T>*, value: T*) {
+	.release();
+	.ptr = value;
+}
+
+function main() {
+	let val : owning_ptr<u64>;
+	val.set(malloc(4));
+	return 0;
+}

@@ -59,10 +59,26 @@ static std::unordered_map<Token::Type, std::unordered_map<PrimitiveType, std::fu
     {Token::Type::Modulus, {OP(Integer, return ir_builder.CreateSRem(lhs, rhs, "srem");)}},
     // Comparisons
     {Token::Type::Equal,
-     {OP(Integer, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_EQ, lhs, rhs, "ICMP_EQ");),
+     {OP(I8, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_EQ, lhs, rhs, "ICMP_EQ");),
+      OP(I16, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_EQ, lhs, rhs, "ICMP_EQ");),
+      OP(I32, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_EQ, lhs, rhs, "ICMP_EQ");),
+      OP(I64, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_EQ, lhs, rhs, "ICMP_EQ");),
+      OP(U8, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_EQ, lhs, rhs, "ICMP_EQ");),
+      OP(U16, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_EQ, lhs, rhs, "ICMP_EQ");),
+      OP(U32, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_EQ, lhs, rhs, "ICMP_EQ");),
+      OP(U64, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_EQ, lhs, rhs, "ICMP_EQ");),
+      OP(Integer, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_EQ, lhs, rhs, "ICMP_EQ");),
       OP(Float, return ir_builder.CreateFCmp(llvm::CmpInst::Predicate::FCMP_OEQ, lhs, rhs, "FCMP_OEQ");)}},
     {Token::Type::Different,
-     {OP(Integer, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_NE, lhs, rhs, "ICMP_NE");),
+     {OP(U8, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_NE, lhs, rhs, "ICMP_NE");),
+      OP(U16, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_NE, lhs, rhs, "ICMP_NE");),
+      OP(U32, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_NE, lhs, rhs, "ICMP_NE");),
+      OP(U64, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_NE, lhs, rhs, "ICMP_NE");),
+      OP(I8, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_NE, lhs, rhs, "ICMP_NE");),
+      OP(I16, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_NE, lhs, rhs, "ICMP_NE");),
+      OP(I32, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_NE, lhs, rhs, "ICMP_NE");),
+      OP(I64, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_NE, lhs, rhs, "ICMP_NE");),
+      OP(Integer, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_NE, lhs, rhs, "ICMP_NE");),
       OP(Char, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_NE, lhs, rhs, "ICMP_NE");),
       OP(Float, return ir_builder.CreateFCmp(llvm::CmpInst::Predicate::FCMP_ONE, lhs, rhs, "FCMP_ONE");)}},
     {Token::Type::Lesser,
@@ -381,10 +397,22 @@ llvm::Value* Module::codegen(const AST::Node* node) {
         }
         case AST::Node::Type::VariableDeclaration: {
             llvm::AllocaInst* ret = nullptr;
-            auto              parent_function = _llvm_ir_builder.GetInsertBlock()->getParent();
-            if(!parent_function)
+            auto              type = get_llvm_type(node->type_id);
+            auto              insert_block = _llvm_ir_builder.GetInsertBlock();
+            llvm::Function*   parent_function = nullptr;
+            if(!insert_block) {
                 warn("TODO: Correctly handle global variables! ({}:{})\n", __FILE__, __LINE__);
-            auto type = get_llvm_type(node->type_id);
+                assert(false);
+                /*
+                std::string name{node->token.value};
+                _llvm_module->getOrInsertGlobal(name, type);
+                auto global_var = _llvm_module->getNamedGlobal(name);
+                global_var->setLinkage(llvm::GlobalValue::CommonLinkage);
+                // global_var->setAlignment(llvm::MaybeAlign());
+                return global_var;
+                */
+            } else
+                parent_function = insert_block->getParent();
             ret = create_entry_block_alloca(parent_function, type, std::string{node->token.value});
             if(!set(node->token.value, ret))
                 throw Exception(fmt::format("[LLVMCodegen] Variable '{}' already declared (line {}).\n", node->token.value, node->token.line));
@@ -393,8 +421,10 @@ llvm::Value* Module::codegen(const AST::Node* node) {
         case AST::Node::Type::Variable: {
             auto var = get(node->token.value);
             if(!var) {
-                error("[LLVMCodegen] Undeclared variable '{}'.\n", node->token.value);
-                assert(false);
+                auto global = _llvm_module->getNamedGlobal(std::string(node->token.value));
+                if(global)
+                    return global;
+                throw Exception(fmt::format("[LLVMCodegen] Undeclared variable '{}'.\n", node->token.value));
             }
             return var;
         }
