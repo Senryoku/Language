@@ -1584,10 +1584,21 @@ TypeID Parser::parse_type(const std::span<Token>& tokens, std::span<Token>::iter
 
     if(it->type == Token::Type::Lesser) {
         auto type_parameters = parse_template_types(tokens, it, curr_node);
-        // Generate this type declaration if we never encountered it before
-        if(!GlobalTypeRegistry::instance().specialized_type_exists(scoped_type_id, type_parameters)) {
-            // This will create the type on the GlobalRegistry, so we have to get the scoped_type_id after checking for its existence
-            scoped_type_id = GlobalTypeRegistry::instance().get_specialized_type(scoped_type_id, type_parameters);
+        // This will generate this type specialization if we never encountered it before (across modules)
+        scoped_type_id = GlobalTypeRegistry::instance().get_specialized_type(scoped_type_id, type_parameters);
+        // We still have to generate a local type declaration since each module need to know the layout of the type.
+        // FIXME: We could rewrite the Module to use Type objects to generate the LLVM struct, removing the need to generate and hoist these nodes (as it would be easy to generate
+        //        missing specializations on the fly), but the current shape of TemplatedStruct makes it a little awkward (we still have to
+        //        access the underlying StructType to get the member types).
+        // FIXME: Search if this type is already declared locally, this could be done much more efficiently.
+        bool already_declared = false;
+        for(const auto& child : get_hoisted_declarations_node(curr_node)->children) {
+            if(child->type == AST::Node::Type::TypeDeclaration && child->type_id == scoped_type_id) {
+                already_declared = true;
+                break;
+            }
+        }
+        if(!already_declared) {
             auto type = GlobalTypeRegistry::instance().get_type(scoped_type_id);
             assert(type->is_templated());
             if(!type->is_placeholder()) {
@@ -1611,8 +1622,7 @@ TypeID Parser::parse_type(const std::span<Token>& tokens, std::span<Token>::iter
                 // Declare early
                 get_hoisted_declarations_node(curr_node)->add_child(type_declaration_node);
             }
-        } else
-            scoped_type_id = GlobalTypeRegistry::instance().get_specialized_type(scoped_type_id, type_parameters);
+        }
     }
 
     while(it->type == Token::Type::Multiplication) {
@@ -1746,6 +1756,8 @@ void Parser::specialize(AST::Node* node, const std::vector<TypeID>& parameters) 
         case AST::Node::Type::FunctionCall:
             auto function_call_node = dynamic_cast<AST::FunctionCall*>(node);
             auto function = resolve_or_instanciate_function(function_call_node);
+            if(!function)
+                throw Exception(fmt::format("[Parser] Could not find specialized function for:\n{}\n", *node));
             check_function_call(function_call_node, function);
             break;
             // TODO: Check Types Declarations
