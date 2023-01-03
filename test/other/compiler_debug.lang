@@ -5,7 +5,7 @@ import "std/Array" // This should not be neccesary
 function main() {
 	let file : File;
 	file.open("H:/Source/Lang/README.md", "r");
-	let arr : Array<u8> = file.read_until('\n'); // We should not have to specify the type here, but our imports are still flaky.
+	let arr = file.read_until('\n');
 	for(let i : u64 = 0; i < arr.length; ++i)
 		printf("%c", arr.get(i));
 	printf("\n");
