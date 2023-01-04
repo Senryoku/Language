@@ -39,7 +39,7 @@ inline bool is_primitive(TypeID type_id) {
 }
 
 inline bool is_placeholder(TypeID type_id) {
-    return type_id >= PlaceholderTypeID_Min && type_id <= PlaceholderTypeID_Max;
+    return type_id >= PlaceholderTypeID_Min && type_id < PlaceholderTypeID_Max;
 }
 
 inline uint64_t get_placeholder_index(TypeID type_id) {
