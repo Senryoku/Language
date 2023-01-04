@@ -23,7 +23,7 @@ const Type* GlobalTypeRegistry::get_or_register_type(const std::string& name) {
         const auto& base_type = get_or_register_type(name.substr(0, name.size() - 1));
         return get_type(get_pointer_to(base_type->type_id));
     }
-    throw fmt::format("[GlobalTypeRegistry::get_or_register_type] Unknown type {}.", name);
+    throw Exception(fmt::format("[GlobalTypeRegistry::get_or_register_type] Unknown type {}.", name));
 }
 
 TypeID GlobalTypeRegistry::get_pointer_to(TypeID id) {

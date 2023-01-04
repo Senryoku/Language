@@ -47,7 +47,7 @@ void __write_file(int fd, char* buff, size_t count) {
 
 int __read_file(int fd, char* buff, size_t buff_size) {
     auto r = _read(fd, buff, buff_size);
-    if(r < 1) {
+    if(r < 0) {
         char errmsg[2048];
         strerror_s(errmsg, sizeof(errmsg), errno);
         printf("Error %d reading %d: %s.\n", errno, fd, errmsg);
@@ -58,4 +58,9 @@ int __read_file(int fd, char* buff, size_t buff_size) {
 int __read_file_buffer_offset(int fd, char* buff, size_t offset_into_buffer, size_t buff_size) {
     return __read_file(fd, buff + offset_into_buffer, buff_size - offset_into_buffer);
 }
+
+int __read_text_file_buffer_offset(int fd, char* buff, size_t offset_into_buffer, size_t buff_size) {
+    return __read_file_buffer_offset(fd, buff, offset_into_buffer, buff_size);
+}
+
 }

@@ -3,11 +3,12 @@ import "std/memory" // This should not be neccesary
 import "std/Array" // This should not be neccesary
 
 function main() {
-	let file : File;
-	file.open("H:/Source/Lang/README.md", "r");
-	let arr = file.read_until('\n');
-	for(let i : u64 = 0; i < arr.length; ++i)
-		printf("%c", arr.get(i));
-	printf("\n");
+	let file = TextFile("H:/Source/Lang/README.md", "r");
+	let str = file.read_until('\n');
+	while(str.length > 0) {
+		for(let i : u64 = 0; i < str.length; ++i)
+			printf("%c", str.ptr[i]);
+		str = file.read_until('\n');
+	}
 	return 0;
 }

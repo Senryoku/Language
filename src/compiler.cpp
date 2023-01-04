@@ -48,8 +48,7 @@ bool handle_file(const std::filesystem::path& path) {
     if(processed_files.contains(path))
         return false;
     if(!std::filesystem::exists(path)) {
-        error("Requested file {} does not exist.", path);
-        return false;
+        throw Exception(fmt::format("Requested file {} does not exist.", path));
     }
     auto filename = path.stem();
 
@@ -85,10 +84,8 @@ bool handle_file(const std::filesystem::path& path) {
     const auto total_start = std::chrono::high_resolution_clock::now();
 
     std ::ifstream input_file(path);
-    if(!input_file) {
-        error("[compiler::handle_file] Couldn't open file '{}' (Running from {}).\n", path.string(), std::filesystem::current_path().string());
-        return false;
-    }
+    if(!input_file)
+        throw Exception(fmt::format("[compiler::handle_file] Couldn't open file '{}' (Running from {}).\n", path.string(), std::filesystem::current_path().string()));
     std::string source{(std::istreambuf_iterator<char>(input_file)), std::istreambuf_iterator<char>()};
 
     const auto tokenizing_start = std::chrono::high_resolution_clock::now();
@@ -144,14 +141,10 @@ bool handle_file(const std::filesystem::path& path) {
             new_module.codegen_imports(parser.get_module_interface().type_imports);
             new_module.codegen_imports(parser.get_module_interface().imports);
             auto result = new_module.codegen(*ast);
-            if(!result) {
-                error("LLVM Codegen returned nullptr.\n");
-                return false;
-            }
-            if(llvm::verifyModule(new_module.get_llvm_module(), &llvm::errs())) {
-                error("\nErrors in LLVM Module, exiting...\n");
-                return false;
-            }
+            if(!result)
+                throw Exception("LLVM Codegen returned nullptr.\n");
+            if(llvm::verifyModule(new_module.get_llvm_module(), &llvm::errs()))
+                throw Exception("\nErrors in LLVM Module.\n");
             const auto codegen_end = std::chrono::high_resolution_clock::now();
 
             const auto write_ir_start = std::chrono::high_resolution_clock::now();
@@ -164,10 +157,8 @@ bool handle_file(const std::filesystem::path& path) {
                 auto            file = llvm::raw_fd_ostream(ir_filepath.string(), err);
                 if(!err)
                     new_module.get_llvm_module().print(file, nullptr);
-                else {
-                    error("Error opening '{}': {}\n", ir_filepath.string(), err);
-                    return false;
-                }
+                else
+                    throw Exception(fmt::format("Error opening '{}': {}\n", ir_filepath.string(), err));
                 success("LLVM IR written to {}.\n", ir_filepath.string());
                 if(args['i'].set)
                     return true;
@@ -194,10 +185,8 @@ bool handle_file(const std::filesystem::path& path) {
             llvm::InitializeNativeTargetAsmPrinter();
             std::string error_str;
             auto        target = llvm::TargetRegistry::lookupTarget(target_triple, error_str);
-            if(!target) {
-                error("Could not lookup target: {}.\n", error_str);
-                return false;
-            }
+            if(!target)
+                throw Exception(fmt::format("Could not lookup target: {}.\n", error_str));
             auto cpu = "generic";
             auto features = "";
 
@@ -211,10 +200,8 @@ bool handle_file(const std::filesystem::path& path) {
             std::error_code      error_code;
             llvm::raw_fd_ostream dest(o_filepath.string(), error_code, llvm::sys::fs::OF_None);
 
-            if(error_code) {
-                error("Could not open file '{}': {}.\n", o_filepath.string(), error_code.message());
-                return false;
-            }
+            if(error_code)
+                throw Exception(fmt::format("Could not open file '{}': {}.\n", o_filepath.string(), error_code.message()));
 
             llvm::legacy::PassManager passManager;
             llvm::PassManagerBuilder  passManagerBuilder;
@@ -243,7 +230,10 @@ bool handle_file(const std::filesystem::path& path) {
             const auto object_gen_end = std::chrono::high_resolution_clock::now();
             const auto total_end = std::chrono::high_resolution_clock::now();
 
-            print(" {:<12} | {:<12} | {:<12} | {:<12} | {:<12} | {:<12} \n", "Tokenizer", "Parser", "LLVMCodegen", "IR", "ObjectGen", "Total");
+            print(" {:<12} | {:<12} | {:<12} | {:<12} | {:<12} | {:<12} \n", fmt::styled("Tokenizer", fmt::fg(fmt::color::aquamarine)),
+                  fmt::styled("Parser", fmt::fg(fmt::color::aquamarine)), fmt::styled("LLVMCodegen", fmt::fg(fmt::color::aquamarine)),
+                  fmt::styled("IR", fmt::fg(fmt::color::aquamarine)), fmt::styled("ObjectGen", fmt::fg(fmt::color::aquamarine)),
+                  fmt::styled("Total", fmt::fg(fmt::color::aquamarine)));
             print(" {:^12.2} | {:^12.2} | {:^12.2} | {:^12.2} | {:^12.2} | {:^12.2} \n", std::chrono::duration<double, std::milli>(tokenizing_end - tokenizing_start),
                   std::chrono::duration<double, std::milli>(parsing_end - parsing_start), std::chrono::duration<double, std::milli>(codegen_end - codegen_start),
                   std::chrono::duration<double, std::milli>(write_ir_end - write_ir_start), std::chrono::duration<double, std::milli>(object_gen_end - object_gen_start),
@@ -281,6 +271,8 @@ bool link(const std::string& final_outputfile) {
 
 // Returns true on success
 bool handle_all() {
+    const auto dependency_start = std::chrono::high_resolution_clock::now();
+
     DependencyTree dependency_tree;
     for(const auto& path : input_files)
         dependency_tree.construct(path);
@@ -292,14 +284,19 @@ bool handle_all() {
     }
     auto processing_stages = processing_stages_or_error.get();
 
+    const auto dependency_end = std::chrono::high_resolution_clock::now();
+    success("Generated dependency tree in {:.2}.\n", std::chrono::duration<double, std::milli>(dependency_end - dependency_start));
+
     processed_files = {};
     const auto start = std::chrono::high_resolution_clock::now();
 
-    // TODO: We could parallelize here.
+    // TODO: We could parallelize here. (GlobalTypeRegister will be a problem.)
     for(const auto& stage : processing_stages)
         for(const auto& file : stage)
-            if(!handle_file(file)) {
-                error("An error occured while processing {}. Compilation stopped.", file);
+            try {
+                handle_file(file);
+            } catch(Exception& e) {
+                error(e.what());
                 return false;
             }
 

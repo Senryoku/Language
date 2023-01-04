@@ -49,7 +49,7 @@ function main() {
 		str_builder.append('\n');
 	}
 		
-	let file : File;
+	let file : TextFile;
 	file.open("./mandelbrot.ppm", "w");
 	file.write(str_builder.ptr, str_builder.length);
 

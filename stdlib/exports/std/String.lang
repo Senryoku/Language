@@ -3,8 +3,9 @@ extern function __itoa(value: int) : cstr;
 import "std/memory"
 import "std/cstr"
 
+// TODO: Evolve to use UTF-8 internally
 export type String {
-	let length: u64 = 0;
+	let length: u64 = 0; // TODO: Rename to byte_length
 	let ptr: char*;
 }
 
@@ -100,6 +101,20 @@ export function append(this: StringBuilder*, str: String) : void {
 		++idx;
 	}
 	.length = .length + str.length;
+}
+
+export function to_string(this: StringBuilder*) : String {
+	// Transfer ownership to the String
+	let r : String;
+	r.length = .length;
+	r.ptr = .ptr; // Note: This is oversized
+
+	// Invalidate StringBuilder
+	.length = 0;
+	.capacity = 0;
+	.ptr = null_pointer();
+
+	return r;
 }
 
 export function clear(this: StringBuilder*) : void {

@@ -1,9 +1,9 @@
-// PASS: 128
+// PASS: Value: 321654987
 
 import "include/TemplateSpecializationExport"
 
 function main() {
-	let t = something();
-	printf("%d\n", t.value);
+	let t = get_specialized();
+	printf("Value: %d\n", t.value);
 	return 0;
 }

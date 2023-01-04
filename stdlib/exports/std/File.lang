@@ -1,83 +1,102 @@
-extern function __open_file(path: char*, mode: char*) : int;
+extern function __open_file(path: char*, mode: char*): int;
 extern function __close_file(fd: int);
 extern function __write_file(fd: int, data: cstr, count: u64);
-extern function __read_file(fd: int, data: u8*, count: u64) : int;
-extern function __read_file_buffer_offset(fd: int, data: u8*, offset: u64, count: u64) : int;
+extern function __read_file(fd: int, data: u8*, count: u64): int;
+extern function __read_text_file_buffer_offset(fd: int, data: char*, offset: u64, count: u64): int;
+extern function __read_file_buffer_offset(fd: int, data: u8*, offset: u64, count: u64): int;
 
 import "std/cstr"
 import "std/memory"
 import "std/Array"
 import "std/String"
 
+// Convoluted way to cast an int into a u64.
+function u64(val: int): u64 {
+    const v: u64 = val;
+    return v;
+}
+
 // Globals are not supported yet
 //const FileInnerBufferCapacity : u64 = 1024;
 
-// Convolluted way to cast an int into a u64.
-function u64(val: int) : u64 {
-	const v : u64 = val;
-	return v;
-}
+// TODO: TextFile and BinaryFile should inherit from a generic File type,
+//       once we get some basic inheritance.
 
-export type File {
-	let fd : int = 0;
+export type TextFile {
+	let fd: int = 0;
+
 	// TODO: Make these private.
-	let inner_buffer : u8* = malloc(u64(1024)); // malloc(FileInnerBufferCapacity);
-	let inner_pointer_start : u64 = 0; // These offsets could be smaller.
-	let inner_pointer_end : u64 = 0;
+	let inner_buffer: char* = malloc(u64(1024)); // malloc(FileInnerBufferCapacity);
+	let inner_pointer_start: u64 = 0; // These offsets could be smaller.
+	let inner_pointer_end: u64 = 0;
 }
 
-function _read_buffered(this: File*) {
-	if(.inner_pointer_start  == .inner_pointer_end) {
+export type BinaryFile {
+	let fd: int = 0;
+
+	// TODO: Make these private.
+	let inner_buffer: u8* = malloc(u64(1024)); // malloc(FileInnerBufferCapacity);
+	let inner_pointer_start: u64 = 0; // These offsets could be smaller.
+	let inner_pointer_end: u64 = 0;
+}
+
+function _read_buffered(this: TextFile*) {
+    if (.inner_pointer_start == .inner_pointer_end) {
 		.inner_pointer_start = 0;
 		.inner_pointer_end = 0;
-	}
-	let read_bytes = __read_file_buffer_offset(.fd, .inner_buffer, .inner_pointer_end, u64(1024));
+    }
+    let read_bytes = __read_text_file_buffer_offset(.fd, .inner_buffer, .inner_pointer_end, u64(1024));
 	.inner_pointer_end = .inner_pointer_end + read_bytes;
-	return read_bytes;
+    return read_bytes;
 }
 
 // FIXME: Change path to a String (or provide an overload?)
 //        Change mode to an enum
-export function open(this: File*, path: cstr, mode: cstr) {
+export function open(this: TextFile*, path: cstr, mode: cstr) {
 	.fd = __open_file(path, mode);
 }
 
-export function close(this: File*) {
-	if(.fd != 0) __close_file(.fd);
+export function TextFile(path: cstr, mode: cstr) {
+    let r: TextFile;
+    r.open(path, mode);
+    return r;
 }
 
-export function write(this: File*, data: String) {
-	__write_file(.fd, data.ptr, data.length);
+export function close(this: TextFile*) {
+    if (.fd != 0) __close_file(.fd);
 }
 
-export function write(this: File*, data: cstr) {
-	__write_file(.fd, data, strlen(data));
+export function write(this: TextFile*, data: String) {
+    __write_file(.fd, data.ptr, data.length);
 }
 
-export function write(this: File*, data: cstr, size: u64) {
-	__write_file(.fd, data, size);
+export function write(this: TextFile*, data: cstr) {
+    __write_file(.fd, data, strlen(data));
 }
 
-export function read_until(this: File*, delimiter: char) : Array<u8> {
-	let r : Array<u8>;
-
-	while(true) {
-		while(.inner_pointer_start != .inner_pointer_end) {
-			r.push_back(.inner_buffer[.inner_pointer_start]);
-			++.inner_pointer_start;
-			if(.inner_buffer[.inner_pointer_start - 1] == delimiter)
-				return r;
-		}
-		let read = ._read_buffered();
-		if(read == 0) return r;
-	}
-	
-	return r;
+export function write(this: TextFile*, data: cstr, size: u64) {
+    __write_file(.fd, data, size);
 }
 
-export function destructor(this: File*) {
+export function read_until(this: TextFile*, delimiter: char) : String {
+    let r: StringBuilder;
+
+    while (true) {
+        while (.inner_pointer_start != .inner_pointer_end) {
+            r.append(.inner_buffer[.inner_pointer_start]);
+            ++.inner_pointer_start;
+            if (.inner_buffer[.inner_pointer_start - 1] == delimiter)
+                return r.to_string();
+        }
+        let read = ._read_buffered();
+        if (read == 0) return r.to_string();
+    }
+    return r.to_string();
+}
+
+export function destructor(this: TextFile*) {
 	.close();
-	free(.inner_buffer);
+    free(.inner_buffer);
 	.inner_buffer = null_pointer();
 	.inner_pointer_start = 0;
 	.inner_pointer_end = 0;

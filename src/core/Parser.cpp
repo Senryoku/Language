@@ -1358,6 +1358,9 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
         auto       type = GlobalTypeRegistry::instance().get_type(type_id);
         // Automatic cast to pointee type (Could be a separate Node)
         auto base_type = GlobalTypeRegistry::instance().get_type(type->is_pointer() ? dynamic_cast<const PointerType*>(type)->pointee_type : type_id);
+        // TODO: Handle non-specialized templated types. We have to delay the MemberIdentifier creation afters specialization (member index cannot be know at this time, unless we have constraint on the placeholder, like contracts/traits, but we have nothing like that right now :)
+        if(is_placeholder(base_type->type_id))
+            throw Exception("TODO: Handle member access on non-specialized templated types.\n");
         assert(base_type->is_struct() || base_type->is_templated());
         auto as_struct_type = dynamic_cast<const StructType*>(
             base_type->is_templated() ? GlobalTypeRegistry::instance().get_type(dynamic_cast<const TemplatedType*>(base_type)->template_type_id) : base_type);

@@ -2,6 +2,6 @@ import "BasicGenericType"
 
 export function get_specialized() : BasicGenericType<int> {
 	let t: BasicGenericType<int>;
-	t.value = 128;
+	t.value = 321654987;
 	return t;
 }
