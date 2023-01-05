@@ -4,7 +4,7 @@
 extern "C" {
 
 void __print(char* ptr, uint64_t size) {
-    printf("%.*s", size, ptr);
+    printf("%.*s", (int) size, ptr);
 }
 
 } // extern "C"
