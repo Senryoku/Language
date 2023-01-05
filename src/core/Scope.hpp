@@ -8,8 +8,8 @@
 
 #include <AST.hpp>
 #include <FlyString.hpp>
-#include <GlobalTypeRegistry.hpp>
 #include <GlobalTemplateCache.hpp>
+#include <GlobalTypeRegistry.hpp>
 
 class Scope {
   public:
@@ -77,9 +77,6 @@ class Scope {
     bool is_valid(const het_unordered_map<AST::VariableDeclaration*>::iterator& it) const { return it != _variables.end(); }
     bool is_valid(const het_unordered_map<AST::VariableDeclaration*>::const_iterator& it) const { return it != _variables.end(); }
 
-    TypeID get_return_type() const { return _return_type; }
-    void   set_return_type(TypeID t) { _return_type = t; }
-
     void                            set_this(AST::VariableDeclaration* var) { _this = var; }
     const AST::VariableDeclaration* get_this() const { return _this; }
     AST::VariableDeclaration*       get_this() { return _this; }
@@ -97,9 +94,6 @@ class Scope {
     std::stack<AST::VariableDeclaration*> _ordered_variable_declarations;
 
     AST::VariableDeclaration* _this = nullptr;
-
-    // Return Type for type checking.
-    TypeID _return_type = InvalidTypeID;
 };
 
 // TODO: Fetch variables from others scopes

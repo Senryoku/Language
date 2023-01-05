@@ -32,7 +32,7 @@ int __open_file(const char* path, const char* mode) {
     if(fd < 0) {
         char errmsg[2048];
         strerror_s(errmsg, sizeof(errmsg), _errno);
-        printf("Error %d opening '%s': %s.\n", _errno, path, errmsg);
+        printf("[std/file::Debug] Error %d opening '%s': %s.\n", _errno, path, errmsg);
     }
     return fd;
 }
@@ -50,7 +50,7 @@ int __read_file(int fd, char* buff, size_t buff_size) {
     if(r < 0) {
         char errmsg[2048];
         strerror_s(errmsg, sizeof(errmsg), errno);
-        printf("Error %d reading %d: %s.\n", errno, fd, errmsg);
+        printf("[std/file::Debug] Error %d reading %d: %s.\n", errno, fd, errmsg);
     }
     return r;
 }

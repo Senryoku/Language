@@ -5,11 +5,17 @@
 
 #include <GlobalTypeRegistry.hpp>
 
-static const std::string _INVALID_TYPE_ID_STR_(fmt::format(fg(fmt::color::gray), "InvalidTypeID"));
+static const std::string _INVALID_TYPE_ID_COLORED_STR_(fmt::format(fg(fmt::color::gray), "InvalidTypeID"));
+
+std::string serialize_type_id(TypeID type_id) {
+    if(type_id == InvalidTypeID)
+        return std::string(INVALID_TYPE_ID_STR);
+    return GlobalTypeRegistry::instance().get_type(type_id)->designation;
+}
 
 std::string type_id_to_string(TypeID type_id) {
     if(type_id == InvalidTypeID)
-        return _INVALID_TYPE_ID_STR_;
+        return _INVALID_TYPE_ID_COLORED_STR_;
 
     auto type_name = GlobalTypeRegistry::instance().get_type(type_id)->designation;
     if(type_id < PrimitiveType::Count) {

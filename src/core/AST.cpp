@@ -54,7 +54,7 @@ std::string AST::FunctionDeclaration::mangled_name() const {
 }
 
 bool AST::FunctionDeclaration::is_templated() const {
-    if(GlobalTypeRegistry::instance().get_type(type_id)->is_placeholder())
+    if(type_id != InvalidTypeID && GlobalTypeRegistry::instance().get_type(type_id)->is_placeholder())
         return true;
     for(const auto& arg : arguments())
         if(GlobalTypeRegistry::instance().get_type(arg->type_id)->is_placeholder())

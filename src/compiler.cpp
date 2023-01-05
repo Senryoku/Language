@@ -43,10 +43,10 @@ std::set<std::filesystem::path> object_files; // List of all generated object fi
 
 std::set<std::filesystem::path> processed_files; // Cleared at the start of a run, makes sure we don't end up in a loop. FIXME: Shouldn't be useful anymore.
 
-// Returns true if new file were generated.
+// Returns true on success
 bool handle_file(const std::filesystem::path& path) {
     if(processed_files.contains(path))
-        return false;
+        return true;
     if(!std::filesystem::exists(path)) {
         throw Exception(fmt::format("Requested file {} does not exist.", path));
     }
@@ -74,7 +74,7 @@ bool handle_file(const std::filesystem::path& path) {
                     }
                 }
                 if(!updated_deps)
-                    return false;
+                    return true;
                 // Some dependencies were re-generated, continue processing anyway.
                 print_subtle(" * * Cache for {} is outdated, re-processing...\n", path.string());
             }
@@ -129,7 +129,7 @@ bool handle_file(const std::filesystem::path& path) {
                 out.print("{}", *ast);
                 fmt::print("AST written to '{}'.\n", args['o'].value());
                 std::system(fmt::format("cat \"{}\"", args['o'].value()).c_str());
-                return false;
+                return true;
             } else
                 fmt::print("{}", *ast);
         }
@@ -207,6 +207,7 @@ bool handle_file(const std::filesystem::path& path) {
             llvm::PassManagerBuilder  passManagerBuilder;
             auto                      file_type = llvm::CGFT_ObjectFile;
             passManagerBuilder.OptLevel = 3;
+            passManagerBuilder.PrepareForLTO = true;
             passManagerBuilder.populateModulePassManager(passManager);
 
             if(target_machine->addPassesToEmitFile(passManager, dest, nullptr, file_type)) {
@@ -255,7 +256,7 @@ bool link(const std::string& final_outputfile) {
         for(const auto& file : object_files) {
             cmd_input_files += " \"" + file.string() + "\"";
         }
-        const auto command = fmt::format("clang {} -flto {} -o \"{}\"", cmd_input_files, LANG_STDLIB_PATH, final_outputfile);
+        const auto command = fmt::format("clang {} -flto \"{}\" -o \"{}\"", cmd_input_files, LANG_STDLIB_PATH, final_outputfile);
         print("Running '{}'\n", command);
         if(auto retval = std::system(command.c_str()); retval != 0) {
             error("Error running clang: {}.\n", retval);
@@ -293,12 +294,8 @@ bool handle_all() {
     // TODO: We could parallelize here. (GlobalTypeRegister will be a problem.)
     for(const auto& stage : processing_stages)
         for(const auto& file : stage)
-            try {
-                handle_file(file);
-            } catch(Exception& e) {
-                error(e.what());
+            if(!handle_file(file))
                 return false;
-            }
 
     const auto clang_start = std::chrono::high_resolution_clock::now();
     auto       final_outputfile = args['o'].set ? args['o'].value() : input_files.size() == 1 ? (*input_files.begin()).filename().replace_extension(".exe").string() : "a.out";

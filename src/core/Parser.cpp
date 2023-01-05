@@ -8,6 +8,15 @@
 #include <GlobalTemplateCache.hpp>
 #include <ModuleInterface.hpp>
 
+const static std::unordered_map<PrimitiveType, std::vector<PrimitiveType>> AllowedAutomaticCasts = {
+    {PrimitiveType::U64, {PrimitiveType::Integer, PrimitiveType::U32, PrimitiveType::U16, PrimitiveType::U8}},
+    {PrimitiveType::U32, {PrimitiveType::Integer, PrimitiveType::U16, PrimitiveType::U8}},
+    {PrimitiveType::U16, {PrimitiveType::U8}},
+    {PrimitiveType::I64, {PrimitiveType::Integer, PrimitiveType::I32, PrimitiveType::I16, PrimitiveType::I8}},
+    {PrimitiveType::I32, {PrimitiveType::Integer, PrimitiveType::I16, PrimitiveType::I8}},
+    {PrimitiveType::I16, {PrimitiveType::I8}},
+};
+
 std::optional<AST> Parser::parse(const std::span<Token>& tokens) {
     std::optional<AST> ast(AST{});
     try {
@@ -127,7 +136,6 @@ bool Parser::parse(const std::span<Token>& tokens, AST::Node* curr_node) {
                     curr_node = curr_node->parent;
                 if(curr_node->type != AST::Node::Type::Scope)
                     throw Exception(fmt::format("[Parser] Syntax error: Unmatched '}}' on line {}.\n", it->line), point_error(*it));
-                curr_node->type_id = get_scope().get_return_type();
                 curr_node = curr_node->parent;
                 pop_scope();
                 ++it;
@@ -217,16 +225,9 @@ bool Parser::parse(const std::span<Token>& tokens, AST::Node* curr_node) {
 
                 to_rvalue->type_id = to_rvalue->children[0]->type_id;
                 return_node->type_id = return_node->children[0]->type_id;
-                auto scope_return_type = get_scope().get_return_type();
-                if(scope_return_type == InvalidTypeID) {
-                    get_scope().set_return_type(return_node->type_id);
-                } else if(scope_return_type != return_node->type_id) {
-                    throw Exception(fmt::format("[Parser] Syntax error: Incoherent return types, got {}, expected {}.\n",
-                                                GlobalTypeRegistry::instance().get_type(return_node->type_id)->designation, scope_return_type),
-                                    point_error(return_node->token));
-                }
 
                 curr_node->add_child(return_node.release());
+                update_return_type(curr_node->children.back());
                 break;
             }
 
@@ -405,11 +406,36 @@ bool Parser::parse_next_scope(const std::span<Token>& tokens, std::span<Token>::
     curr_node->add_child(scope);
     push_scope();
     bool r = parse({begin, end}, scope);
-    scope->type_id = get_scope().get_return_type();
 
     pop_scope();
     it = end + 1;
     return r;
+}
+
+AST::FunctionDeclaration* Parser::get_parent_function(AST::Node* node) {
+    auto it = node;
+    while(it && it->type != AST::Node::Type::FunctionDeclaration) {
+        it = it->parent;
+    }
+    if(!it)
+        throw Exception(fmt::format("[Parser] Node doesn't have a parent function: \n{}\n", *node));
+    return dynamic_cast<AST::FunctionDeclaration*>(it);
+}
+
+void Parser::update_return_type(AST::Node* return_node) {
+    auto parent_function = get_parent_function(return_node);
+    auto previous_return_type = parent_function->body()->type_id;
+    // Return not set yet, we'll use this return statement to infer it automatically.
+    if(previous_return_type == InvalidTypeID) {
+        parent_function->body()->type_id = return_node->type_id;
+    } else if(previous_return_type != return_node->type_id) {
+        auto type = GlobalTypeRegistry::instance().get_type(previous_return_type);
+        // If the return type is context dependent, we can't raise an error yet.
+        if(!type->is_placeholder())
+            throw Exception(fmt::format("[Parser] Syntax error: Incoherent return types, got {}, expected {}.\n", type_id_to_string(return_node->type_id),
+                                        type_id_to_string(previous_return_type)),
+                            point_error(return_node->token));
+    }
 }
 
 // TODO: Formely define wtf is an expression :)
@@ -767,15 +793,7 @@ bool Parser::parse_function_declaration(const std::span<Token>& tokens, std::spa
         // Function body
         parse_scope_or_single_statement(tokens, it, function_node);
 
-        // Return type deduction
-        auto return_type = function_node->body()->type_id;
-        if(return_type == InvalidTypeID)
-            return_type = PrimitiveType::Void;
-        if(function_node->type_id != InvalidTypeID && function_node->type_id != return_type)
-            throw Exception(fmt::format("[Parser] Syntax error: Incoherent return types for function {}, got {}, expected {}.\n", function_node->token.value,
-                                        type_id_to_string(return_type), type_id_to_string(function_node->type_id)),
-                            point_error(function_node->body()->token));
-        function_node->type_id = return_type;
+        check_function_return_type(function_node);
     }
 
     pop_scope();
@@ -1114,14 +1132,16 @@ const AST::FunctionDeclaration* Parser::resolve_or_instanciate_function(const st
             return nullptr;
 
         for(const auto& candidate : candidates) {
+            // Try to specialize matching templated functions.
             // TODO: Handle variadics
             if(candidate->is_templated() && candidate->arguments().size() == arguments.size()) {
                 std::vector<TypeID> deduced_types = deduce_placeholder_types(arguments, candidate);
-                if(deduced_types.empty())
+                if(deduced_types.empty()) // Argument types cannot match.
                     break;
 
                 auto specialized = candidate->body() ? candidate->clone() : GlobalTemplateCache::instance().get_function(std::string(candidate->token.value))->clone();
                 specialize(specialized, deduced_types);
+                check_function_return_type(specialized);
                 // Insert it right after the generic version.
                 if(candidate->parent)
                     candidate->parent->add_child_after(specialized, candidate);
@@ -1290,12 +1310,8 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
                     }
                 }
             };
-            allow_automatic_cast(PrimitiveType::U64, {PrimitiveType::Integer, PrimitiveType::U32, PrimitiveType::U16, PrimitiveType::U8});
-            allow_automatic_cast(PrimitiveType::U32, {PrimitiveType::Integer, PrimitiveType::U16, PrimitiveType::U8});
-            allow_automatic_cast(PrimitiveType::U16, {PrimitiveType::U8});
-            allow_automatic_cast(PrimitiveType::I64, {PrimitiveType::Integer, PrimitiveType::I32, PrimitiveType::I16, PrimitiveType::I8});
-            allow_automatic_cast(PrimitiveType::I32, {PrimitiveType::Integer, PrimitiveType::I16, PrimitiveType::I8});
-            allow_automatic_cast(PrimitiveType::I16, {PrimitiveType::I8});
+            for(const auto& [from, to] : AllowedAutomaticCasts)
+                allow_automatic_cast(from, to);
         }
 
         call_node->type_id = resolved_function->type_id;
@@ -1353,28 +1369,11 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
         // Only allow a single identifier, use subscript for more complex expressions?
         if(!(it->type == Token::Type::Identifier))
             throw Exception("[Parser] Syntax error: Expected identifier on the right side of '.' operator.\n", point_error(*it));
-        const auto identifier_name = it->value;
-        auto       type_id = prev_expr->type_id;
-        auto       type = GlobalTypeRegistry::instance().get_type(type_id);
+        auto type_id = prev_expr->type_id;
+        auto type = GlobalTypeRegistry::instance().get_type(type_id);
         // Automatic cast to pointee type (Could be a separate Node)
         auto base_type = GlobalTypeRegistry::instance().get_type(type->is_pointer() ? dynamic_cast<const PointerType*>(type)->pointee_type : type_id);
-        // TODO: Handle non-specialized templated types. We have to delay the MemberIdentifier creation afters specialization (member index cannot be know at this time, unless we have constraint on the placeholder, like contracts/traits, but we have nothing like that right now :)
-        if(is_placeholder(base_type->type_id))
-            throw Exception("TODO: Handle member access on non-specialized templated types.\n");
-        assert(base_type->is_struct() || base_type->is_templated());
-        auto as_struct_type = dynamic_cast<const StructType*>(
-            base_type->is_templated() ? GlobalTypeRegistry::instance().get_type(dynamic_cast<const TemplatedType*>(base_type)->template_type_id) : base_type);
-        auto member_it = as_struct_type->members.find(std::string(identifier_name));
-        if(member_it != as_struct_type->members.end()) {
-            auto member_identifier_node = new AST::MemberIdentifier(*it);
-            binary_operator_node->add_child(member_identifier_node);
-            member_identifier_node->index = member_it->second.index;
-            if(base_type->is_templated())
-                member_identifier_node->type_id = specialize(member_it->second.type_id, dynamic_cast<const TemplatedType*>(base_type)->parameters);
-            else
-                member_identifier_node->type_id = member_it->second.type_id;
-            ++it;
-        } else if(peek(tokens, it, Token::Type::OpenParenthesis)) {
+        if(peek(tokens, it, Token::Type::OpenParenthesis)) {
             auto binary_node = curr_node->pop_child();
             auto first_argument = binary_node->pop_child();
             delete binary_node;
@@ -1401,13 +1400,33 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
             }
 
             auto arg_types = call_node->get_argument_types();
+
+            bool has_placeholder = false;
+            for(const auto& arg : arg_types)
+                if(GlobalTypeRegistry::instance().get_type(arg)->is_placeholder()) {
+                    has_placeholder = true;
+                    break;
+                }
+            // Delay checking until specialization
+            if(has_placeholder)
+                return true;
+
             auto method = resolve_or_instanciate_function(call_node->token.value, arg_types, call_node);
             if(!method)
                 throw_unresolved_function(call_node->token, arg_types);
             check_function_call(call_node, method);
             return true;
         } else {
-            throw Exception(fmt::format("[Parser] Syntax error: Member '{}' does not exists on type {}.\n", identifier_name, base_type->designation), point_error(*it));
+            auto member_identifier_node = new AST::MemberIdentifier(*it);
+            binary_operator_node->add_child(member_identifier_node);
+            // TODO: Handle non-specialized templated types. We have to delay the MemberIdentifier creation afters specialization (member index cannot be known at this time,
+            //       unless we have constraint on the placeholder, like contracts/traits, but we have nothing like that right now :) )
+            if(is_placeholder(base_type->type_id)) {
+                // throw Exception("TODO: Handle member access on non-specialized templated types.\n", point_error(*it));
+            } else {
+                revolve_member_identifier(base_type, member_identifier_node);
+            }
+            ++it;
         }
     } else {
         // Lookahead for rhs
@@ -1431,12 +1450,8 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
             }
         }
     };
-    allow_automatic_cast(PrimitiveType::U64, {PrimitiveType::Integer, PrimitiveType::U32, PrimitiveType::U16, PrimitiveType::U8});
-    allow_automatic_cast(PrimitiveType::U32, {PrimitiveType::Integer, PrimitiveType::U16, PrimitiveType::U8});
-    allow_automatic_cast(PrimitiveType::U16, {PrimitiveType::U8});
-    allow_automatic_cast(PrimitiveType::I64, {PrimitiveType::Integer, PrimitiveType::I32, PrimitiveType::I16, PrimitiveType::I8});
-    allow_automatic_cast(PrimitiveType::I32, {PrimitiveType::Integer, PrimitiveType::I16, PrimitiveType::I8});
-    allow_automatic_cast(PrimitiveType::I16, {PrimitiveType::I8});
+    for(const auto& [from, to] : AllowedAutomaticCasts)
+        allow_automatic_cast(from, to);
 
     // Allow assignement of pointer to any pointer type.
     // FIXME: Should this be explicit in user code?
@@ -1488,11 +1503,37 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
             create_cast_node(1, PrimitiveType::Integer);
     }
 
-    if(binary_operator_node->token.type == Token::Type::Assignment && binary_operator_node->children[1]->type_id == PrimitiveType::Void) {
-        throw Exception(fmt::format("[Parser] Cannot assign void to a variable.\n"), point_error(binary_operator_node->token));
+    if(binary_operator_node->token.type == Token::Type::Assignment) {
+        if(binary_operator_node->children[1]->type_id == PrimitiveType::Void)
+            throw Exception(fmt::format("[Parser] Cannot assign void to a variable.\n"), point_error(binary_operator_node->token));
+
+        // Make sure both sides of the assignment are of the same type.
+        // FIXME: Do better (in regards to placeholders at least).
+        if(!is_placeholder(binary_operator_node->children[0]->type_id) && !is_placeholder(binary_operator_node->children[1]->type_id) &&
+           binary_operator_node->children[0]->type_id != binary_operator_node->children[1]->type_id)
+            throw Exception(fmt::format("[Parser] Cannot assign value of type {} to variable of type {}.\n", type_id_to_string(binary_operator_node->children[1]->type_id),
+                                        type_id_to_string(binary_operator_node->children[0]->type_id)),
+                            point_error(binary_operator_node->token));
     }
 
     return true;
+}
+
+void Parser::revolve_member_identifier(const Type* base_type, AST::MemberIdentifier* member_identifier_node) {
+    const auto& identifier_name = member_identifier_node->token.value;
+    assert(base_type->is_struct() || base_type->is_templated());
+    auto as_struct_type = dynamic_cast<const StructType*>(
+        base_type->is_templated() ? GlobalTypeRegistry::instance().get_type(dynamic_cast<const TemplatedType*>(base_type)->template_type_id) : base_type);
+    auto member_it = as_struct_type->members.find(std::string(identifier_name));
+    if(member_it != as_struct_type->members.end()) {
+        member_identifier_node->index = member_it->second.index;
+        if(base_type->is_templated())
+            member_identifier_node->type_id = specialize(member_it->second.type_id, dynamic_cast<const TemplatedType*>(base_type)->parameters);
+        else
+            member_identifier_node->type_id = member_it->second.type_id;
+    } else
+        throw Exception(fmt::format("[Parser] Syntax error: Member '{}' does not exists on type {}.\n", identifier_name, base_type->designation),
+                        point_error(member_identifier_node->token));
 }
 
 bool Parser::parse_variable_declaration(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node, bool is_const, bool allow_construtor) {
@@ -1681,20 +1722,21 @@ void Parser::resolve_operator_type(AST::UnaryOperator* op_node) {
     op_node->type_id = rhs;
 
     if(op_node->type_id == InvalidTypeID) {
-        error("[Parser] Couldn't resolve operator return type (Missing impl.) on line {}. Node:\n", op_node->token.line);
+        error("[Parser] Couldn't resolve unary operator return type (Missing impl.) on line {}. Node:\n", op_node->token.line);
         fmt::print("{}\n", *static_cast<AST::Node*>(op_node));
-        throw Exception(fmt::format("[Parser] Couldn't resolve operator return type (Missing impl.) on line {}.\n", op_node->token.line));
+        throw Exception(fmt::format("[Parser] Couldn't resolve unary operator return type (Missing impl.) on line {}.\n", op_node->token.line));
     }
 }
 
 void Parser::resolve_operator_type(AST::BinaryOperator* op_node) {
+    auto lhs = op_node->children[0]->type_id;
+    auto rhs = op_node->children[1]->type_id;
+
     if(op_node->token.type == Token::Type::MemberAccess) {
-        op_node->type_id = op_node->children[1]->type_id;
+        op_node->type_id = rhs;
         return;
     }
 
-    auto lhs = op_node->children[0]->type_id;
-    auto rhs = op_node->children[1]->type_id;
     op_node->type_id = resolve_operator_type(op_node->token.type, lhs, rhs);
 
     if(op_node->type_id == InvalidTypeID) {
@@ -1703,9 +1745,9 @@ void Parser::resolve_operator_type(AST::BinaryOperator* op_node) {
             op_node->children[0]->type_id = rhs;
             op_node->type_id = rhs;
         } else {
-            error("[Parser] Couldn't resolve operator return type (Missing impl.) on line {}. Node:\n", op_node->token.line);
+            error("[Parser] Couldn't resolve binary operator return type (Missing impl.) on line {}. Node:\n", op_node->token.line);
             fmt::print("{}\n", *static_cast<AST::Node*>(op_node));
-            throw Exception(fmt::format("[Parser] Couldn't resolve operator return type (Missing impl.) on line {}.\n", op_node->token.line));
+            throw Exception(fmt::format("[Parser] Couldn't resolve binary operator return type (Missing impl.) on line {}.\n", op_node->token.line));
         }
     }
 }
@@ -1768,6 +1810,22 @@ TypeID Parser::specialize(TypeID type_id, const std::vector<TypeID>& parameters)
     return r;
 }
 
+void Parser::check_function_return_type(AST::FunctionDeclaration* function_node) {
+    // Return type deduction
+    auto return_type = function_node->body()->type_id;
+
+    if(function_node->is_templated() && return_type == InvalidTypeID && function_node->type_id == InvalidTypeID)
+        return; // We cannot determine the return type yet, delay type checking on template spacialization.
+
+    if(return_type == InvalidTypeID)
+        return_type = PrimitiveType::Void;
+    if(function_node->type_id != InvalidTypeID && function_node->type_id != return_type)
+        throw Exception(fmt::format("[Parser] Syntax error: Incoherent return types for function {}, got {}, expected {}.\n", function_node->token.value,
+                                    type_id_to_string(return_type), type_id_to_string(function_node->type_id)),
+                        point_error(function_node->body()->token));
+    function_node->type_id = return_type;
+}
+
 void Parser::specialize(AST::Node* node, const std::vector<TypeID>& parameters) {
     for(auto c : node->children)
         specialize(c, parameters);
@@ -1775,14 +1833,37 @@ void Parser::specialize(AST::Node* node, const std::vector<TypeID>& parameters) 
         node->type_id = specialize(node->type_id, parameters);
 
     // Verify the updated node.
+    // FIXME: We also need to update/propagate a lot of types.
     switch(node->type) {
-        case AST::Node::Type::FunctionCall:
+        case AST::Node::Type::FunctionCall: {
             auto function_call_node = dynamic_cast<AST::FunctionCall*>(node);
             auto function = resolve_or_instanciate_function(function_call_node);
             if(!function)
                 throw Exception(fmt::format("[Parser] Could not find specialized function for:\n{}\n", *node));
             check_function_call(function_call_node, function);
             break;
+        }
+        case AST::Node::Type::BinaryOperator: {
+            resolve_operator_type(dynamic_cast<AST::BinaryOperator*>(node));
+            break;
+        }
+        case AST::Node::Type::LValueToRValue: {
+            node->type_id = node->children[0]->type_id;
+            break;
+        }
+        case AST::Node::Type::ReturnStatement: {
+            if(node->children.empty())
+                node->type_id = PrimitiveType::Void;
+            else
+                node->type_id = node->children[0]->type_id;
+            update_return_type(node);
+            break;
+        }
+        case AST::Node::Type::MemberIdentifier: {
+            auto member_identifier_node = dynamic_cast<AST::MemberIdentifier*>(node);
+            assert(node->parent && node->parent->type == AST::Node::Type::BinaryOperator && node->parent->token.type == Token::Type::MemberAccess);
+            revolve_member_identifier(GlobalTypeRegistry::instance().get_type(node->parent->children[0]->type_id), member_identifier_node);
+        }
             // TODO: Check Types Declarations
     }
 }

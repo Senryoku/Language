@@ -71,11 +71,17 @@ std::tuple<bool, std::span<AST::TypeDeclaration*>, std::span<AST::FunctionDeclar
         auto func_dec_node = external_nodes.emplace_back(new AST::FunctionDeclaration(token)).get(); // Keep it out of the AST
         imports.push_back(func_dec_node);
         func_dec_node->flags |= AST::FunctionDeclaration::Flag::Imported;
-        func_dec_node->type_id = GlobalTypeRegistry::instance().get_or_register_type(type)->type_id;
+        if(type == INVALID_TYPE_ID_STR)
+            func_dec_node->type_id = InvalidTypeID;
+        else
+            func_dec_node->type_id = GlobalTypeRegistry::instance().get_or_register_type(type)->type_id;
 
         while(iss >> type) {
             auto arg = func_dec_node->add_child(new AST::Node(AST::Node::Type::VariableDeclaration));
-            arg->type_id = GlobalTypeRegistry::instance().get_or_register_type(type)->type_id;
+            if(type == INVALID_TYPE_ID_STR)
+                arg->type_id = InvalidTypeID;
+            else
+                arg->type_id = GlobalTypeRegistry::instance().get_or_register_type(type)->type_id;
         }
     }
 
@@ -106,7 +112,7 @@ bool ModuleInterface::save(const std::filesystem::path& path) const {
         } else {
             interface_file << "type " << n->token.value << " { ";
             for(const auto& member : n->children) {
-                interface_file << "let " << member->token.value << ": " << GlobalTypeRegistry::instance().get_type(member->type_id)->designation << "; ";
+                interface_file << "let " << member->token.value << ": " << serialize_type_id(member->type_id) << "; ";
             }
             interface_file << "}" << std::endl;
         }
@@ -115,9 +121,9 @@ bool ModuleInterface::save(const std::filesystem::path& path) const {
 
     // Functions
     for(const auto& n : exports) {
-        interface_file << n->token.value << " " << GlobalTypeRegistry::instance().get_type(n->type_id)->designation;
+        interface_file << n->token.value << " " << serialize_type_id(n->type_id);
         for(auto i = 0u; i < n->arguments().size(); ++i) {
-            interface_file << " " << GlobalTypeRegistry::instance().get_type(n->arguments()[i]->type_id)->designation;
+            interface_file << " " << serialize_type_id(n->arguments()[i]->type_id);
         }
         interface_file << std::endl;
     }

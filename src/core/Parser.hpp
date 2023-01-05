@@ -162,10 +162,16 @@ class Parser : public Scoped {
     std::string get_overloads_hint_string(const std::string_view& name, const std::span<TypeID>& arguments, const std::vector<const AST::FunctionDeclaration*>& candidates);
     void        throw_unresolved_function(const Token& name, const std::span<TypeID>& arguments);
 
+    void revolve_member_identifier(const Type* base_type, AST::MemberIdentifier* member_identifier_node);
+
     void   insert_defer_node(AST::Node* curr_node);
     void   specialize(AST::Node* node, const std::vector<TypeID>& parameters);
     TypeID specialize(TypeID type_id, const std::vector<TypeID>& parameters);
 
     bool                deduce_placeholder_types(const Type* call_node, const Type* function_node, std::vector<TypeID>& deduced_types);
     std::vector<TypeID> deduce_placeholder_types(const std::span<TypeID>& arguments, const AST::FunctionDeclaration* function_node);
+
+    AST::FunctionDeclaration* get_parent_function(AST::Node* node);
+    void                      update_return_type(AST::Node* return_node);
+    void                      check_function_return_type(AST::FunctionDeclaration* function_node);
 };

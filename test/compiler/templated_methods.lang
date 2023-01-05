@@ -1,0 +1,25 @@
+// RET: 0
+
+type AType {
+	let val : int;
+}
+
+function member_func(this: AType*) : int {
+	return .val;
+}
+
+function templated_function_call<Ty>(this : Ty*) {
+	return .member_func();
+}
+
+function templated_member_access<Ty>(this : Ty*) {
+	return .val;
+}
+
+function main() {
+	let my_obj : AType;
+	my_obj.val = 123456789;
+	if(my_obj.templated_function_call() == my_obj.templated_member_access())
+		return 0;
+	return -1;
+}

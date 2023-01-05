@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <unordered_map>
 
 static inline std::unordered_map<std::string, std::unique_ptr<std::string>> _fly_strings;

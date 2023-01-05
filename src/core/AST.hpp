@@ -7,9 +7,9 @@
 #include <stack>
 #include <vector>
 
+#include <FlyString.hpp>
 #include <PrimitiveType.hpp>
 #include <Tokenizer.hpp>
-#include <FlyString.hpp>
 
 class AST {
   public:
