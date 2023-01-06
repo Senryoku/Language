@@ -188,35 +188,29 @@ llvm::Constant* Module::codegen_constant(const AST::Node* val) {
         }
         default: throw Exception(fmt::format("LLVM Codegen: Unsupported constant value type '{}'.\n", *type));
     }
-    assert(false);
-    return nullptr;
 }
 
 llvm::Value* Module::codegen(const AST::Node* node) {
     switch(node->type) {
         case AST::Node::Type::Root: [[fallthrough]];
         case AST::Node::Type::Statement: {
-            llvm::Value* ret = nullptr;
-            for(auto c : node->children) {
+            llvm::Value* ret = llvm::UndefValue::get(llvm::Type::getVoidTy(*_llvm_context));
+            for(auto c : node->children)
                 ret = codegen(c);
-            }
             return ret;
         }
         case AST::Node::Type::Scope: {
+            llvm::Value* ret = llvm::UndefValue::get(llvm::Type::getVoidTy(*_llvm_context));
             push_scope();
-            llvm::Value* ret = nullptr;
             for(auto c : node->children)
                 ret = codegen(c);
             pop_scope();
             return ret;
         }
-        case AST::Node::Type::Defer: throw Exception("[LLVMCodegen] Defer nodes should not be in the main AST.");
         case AST::Node::Type::ConstantValue: return codegen_constant(node);
         case AST::Node::Type::Cast: {
             assert(node->children.size() == 1);
             auto child = codegen(node->children[0]);
-            if(!child)
-                return nullptr;
             // TODO: Handle child's type.
             if(is_primitive(node->type_id)) {
                 switch(node->type_id) {
@@ -347,10 +341,9 @@ llvm::Value* Module::codegen(const AST::Node* node) {
             } else {
                 assert(((flags & AST::FunctionDeclaration::Flag::Extern) || (flags & AST::FunctionDeclaration::Flag::Imported)) &&
                        "Functions without a body should be marked as 'extern' or imported.");
-                _llvm_module->getOrInsertFunction(function_name, function_types);
+                return _llvm_module->getOrInsertFunction(function_name, function_types).getCallee();
             }
-            assert(false);
-            return nullptr;
+            break;
         }
         case AST::Node::Type::FunctionCall: {
             auto function_call_node = dynamic_cast<const AST::FunctionCall*>(node);
@@ -381,8 +374,6 @@ llvm::Value* Module::codegen(const AST::Node* node) {
             std::vector<llvm::Value*> parameters;
             for(auto arg_node : function_call_node->arguments()) {
                 auto v = codegen(arg_node);
-                if(!v)
-                    return nullptr;
                 // C Variadic functions promotes float to double (see https://stackoverflow.com/questions/63144506/printf-doesnt-work-for-floats-in-llvm-ir)
                 if(function_flags & AST::FunctionDeclaration::Flag::Variadic && v->getType()->isFloatTy())
                     v = _llvm_ir_builder.CreateFPExt(v, llvm::Type::getDoubleTy(*_llvm_context));
@@ -565,14 +556,11 @@ llvm::Value* Module::codegen(const AST::Node* node) {
             _llvm_ir_builder.SetInsertPoint(condition_block);
             auto condition_label = _llvm_ir_builder.GetInsertBlock();
             auto condition = codegen(node->children[0]);
-            if(!condition)
-                return nullptr;
             _llvm_ir_builder.CreateCondBr(condition, loop_block, after_block);
 
+            // Loop Body
             _llvm_ir_builder.SetInsertPoint(loop_block);
-            auto loop_code = codegen(node->children[1]);
-            if(!loop_code)
-                return nullptr;
+            codegen(node->children[1]);
             _llvm_ir_builder.CreateBr(condition_label);
 
             _llvm_ir_builder.SetInsertPoint(after_block);
@@ -580,8 +568,7 @@ llvm::Value* Module::codegen(const AST::Node* node) {
         }
         case AST::Node::Type::ForStatement: {
             // For Init
-            if(!codegen(node->children[0]))
-                return nullptr;
+            codegen(node->children[0]);
 
             llvm::Function* current_function = _llvm_ir_builder.GetInsertBlock()->getParent();
 
@@ -594,17 +581,13 @@ llvm::Value* Module::codegen(const AST::Node* node) {
             _llvm_ir_builder.SetInsertPoint(condition_block);
             auto condition_label = _llvm_ir_builder.GetInsertBlock();
             auto condition = codegen(node->children[1]);
-            if(!condition)
-                return nullptr;
             _llvm_ir_builder.CreateCondBr(condition, loop_block, after_block);
 
             _llvm_ir_builder.SetInsertPoint(loop_block);
             // Loop block
-            if(!codegen(node->children[3]))
-                return nullptr;
+            codegen(node->children[3]);
             // Iterator advance
-            if(!codegen(node->children[2]))
-                return nullptr;
+            codegen(node->children[2]);
             _llvm_ir_builder.CreateBr(condition_label);
 
             _llvm_ir_builder.SetInsertPoint(after_block);
@@ -618,9 +601,6 @@ llvm::Value* Module::codegen(const AST::Node* node) {
 
             // Condition evaluation and branch
             auto condition = codegen(node->children[0]);
-            if(!condition)
-                return nullptr;
-
             if(node->children.size() > 2) {
                 if_else_block = llvm::BasicBlock::Create(*_llvm_context, "if_else", current_function);
                 _llvm_ir_builder.CreateCondBr(condition, if_then_block, if_else_block);
@@ -631,9 +611,7 @@ llvm::Value* Module::codegen(const AST::Node* node) {
             // Then
             _llvm_ir_builder.SetInsertPoint(if_then_block);
             _generated_return = false;
-            auto then_value = codegen(node->children[1]);
-            if(!then_value)
-                return nullptr;
+            codegen(node->children[1]);
             if(!_generated_return) {
                 _llvm_ir_builder.CreateBr(if_end_block);
                 _generated_return = false;
@@ -648,9 +626,7 @@ llvm::Value* Module::codegen(const AST::Node* node) {
             if(if_else_block) {
                 _llvm_ir_builder.SetInsertPoint(if_else_block);
                 _generated_return = false;
-                auto else_value = codegen(node->children[2]);
-                if(!else_value)
-                    return nullptr;
+                codegen(node->children[2]);
                 if(!_generated_return) {
                     _llvm_ir_builder.CreateBr(if_end_block);
                     _generated_return = false;
@@ -660,7 +636,7 @@ llvm::Value* Module::codegen(const AST::Node* node) {
             _llvm_ir_builder.SetInsertPoint(if_end_block);
 
             // If statements do not return a value (Should we?)
-            return llvm::Constant::getNullValue(llvm::Type::getInt32Ty(*_llvm_context));
+            return llvm::UndefValue::get(llvm::Type::getVoidTy(*_llvm_context));
         }
         case AST::Node::Type::ReturnStatement: {
             _generated_return = true;
@@ -671,10 +647,10 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                 return _llvm_ir_builder.CreateRet(codegen(node->children[0]));
             }
         }
+        case AST::Node::Type::Defer: throw Exception("[LLVMCodegen] Defer nodes should not be in the main AST.");
         default: throw Exception(fmt::format("LLVM Codegen: Unsupported node type '{}'.\n", node->type));
     }
-    assert(false);
-    return nullptr;
+    return llvm::UndefValue::get(llvm::Type::getVoidTy(*_llvm_context));
 }
 
 llvm::Type* Module::get_llvm_type(TypeID type_id) const {
