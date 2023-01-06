@@ -42,7 +42,7 @@ std::string point_error_impl(const std::string_view& line, size_t at, size_t lin
     for(auto i = 0; i < std::min(point.size(), line.size()); ++i)
         if(line[i] == '\t' && point[i] == ' ')
             point[i] = '\t';
-    return_value += fmt::format("{}{}\n", padding, point);
+    return_value += fmt::format("{}{}\n", padding, fmt::styled(point, fmt::fg(fmt::color::dodger_blue)));
 
     return return_value;
 }

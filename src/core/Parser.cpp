@@ -751,8 +751,7 @@ bool Parser::parse_function_declaration(const std::span<Token>& tokens, std::spa
     if(it->type == Token::Type::Colon) {
         ++it;
         if(it->type != Token::Type::Identifier || !is_type(it->value))
-            throw Exception(fmt::format("[Parser] Expected type identifier after function '{}' declaration body, got '{}'.\n", function_node->token.value, it->value),
-                            point_error(*it));
+            throw Exception(fmt::format("[Parser] Expected type identifier after function '{}' declaration, got '{}'.\n", function_node->token.value, it->value), point_error(*it));
         function_node->type_id = parse_type(tokens, it, curr_node);
     }
 

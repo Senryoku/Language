@@ -28,13 +28,14 @@ class GlobalTypeRegistry {
   public:
     const Type* get_type(TypeID id) const;
     const Type* get_type(const std::string& name) const;
+    TypeID      get_type_id(const std::string& name) const;
 
     const Type* get_or_register_type(const std::string& name);
 
     TypeID get_pointer_to(TypeID id);
     TypeID get_array_of(TypeID id, uint32_t capacity);
     TypeID get_specialized_type(TypeID id, const std::vector<TypeID>& parameters);
-    bool specialized_type_exists(TypeID id, const std::vector<TypeID>& parameters) { return _specialized_types.contains({id, parameters}); }
+    bool   specialized_type_exists(TypeID id, const std::vector<TypeID>& parameters) { return _specialized_types.contains({id, parameters}); }
 
     TypeID register_type(AST::TypeDeclaration& type_node);
 

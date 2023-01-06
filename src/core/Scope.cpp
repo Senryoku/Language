@@ -78,7 +78,8 @@ TypeID Scoped::get_type(const std::string_view& name) const {
     }
     // Search built-ins
     if(type_id == InvalidTypeID)
-        return GlobalTypeRegistry::instance().get_type(std::string{name})->type_id;
+        type_id = GlobalTypeRegistry::instance().get_type_id(std::string{name});
+
     return type_id;
 }
 

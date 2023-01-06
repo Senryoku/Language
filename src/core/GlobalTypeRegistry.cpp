@@ -12,7 +12,17 @@ const Type* GlobalTypeRegistry::get_type(TypeID id) const {
 }
 
 const Type* GlobalTypeRegistry::get_type(const std::string& name) const {
-    return get_type(_types_by_designation.at(name));
+    auto it = _types_by_designation.find(name);
+    if(it == _types_by_designation.end())
+        throw Exception(fmt::format("[GlobalTypeRegistry::get_type] Unknown type '{}'.\n", name));
+    return get_type(it->second);
+}
+
+TypeID GlobalTypeRegistry::get_type_id(const std::string& name) const {
+    auto it = _types_by_designation.find(name);
+    if(it == _types_by_designation.end())
+        throw Exception(fmt::format("[GlobalTypeRegistry::get_type] Unknown type '{}'.\n", name));
+    return it->second;
 }
 
 const Type* GlobalTypeRegistry::get_or_register_type(const std::string& name) {
