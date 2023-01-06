@@ -1,4 +1,5 @@
 // PASS: a[3] = 1337
+// RET : 0
 
 import "std/memory"
 import "std/Array"

@@ -1,3 +1,33 @@
-function nothing_emited<T>(this: T*) {
-	return .val;
+// PASS: a[3] = 1337
+// RET : 0
+
+import "std/memory"
+import "std/Array"
+
+function dump<T>(this: Array<T>*) : void {
+	printf("----------------\n");
+	for(let idx : u64 = 0; idx < .length; ++idx) {
+		printf("  a[%d] = %d\n", idx, .get(idx));
+	}
+}
+
+function test() : Array<u64> {
+	let arr : Array<u64>;
+	
+	const forty_two : u64 = 42; // Forced Cast, otherwise the we can't resolve the function, yet.
+	const leet : u64 = 1337;
+	arr.push_back(forty_two);
+	arr.push_back(leet);
+	arr.dump();
+	arr.push_back(forty_two);
+	arr.push_back(leet);
+	arr.dump();
+	
+	return arr;
+}
+
+function main() {
+	let t = test();
+	t.dump();
+	return t.length;
 }

@@ -8,14 +8,96 @@
 #include <GlobalTemplateCache.hpp>
 #include <ModuleInterface.hpp>
 
-const static std::unordered_map<PrimitiveType, std::vector<PrimitiveType>> AllowedAutomaticCasts = {
-    {PrimitiveType::U64, {PrimitiveType::Integer, PrimitiveType::U32, PrimitiveType::U16, PrimitiveType::U8}},
-    {PrimitiveType::U32, {PrimitiveType::Integer, PrimitiveType::U16, PrimitiveType::U8}},
-    {PrimitiveType::U16, {PrimitiveType::U8}},
-    {PrimitiveType::I64, {PrimitiveType::Integer, PrimitiveType::I32, PrimitiveType::I16, PrimitiveType::I8}},
-    {PrimitiveType::I32, {PrimitiveType::Integer, PrimitiveType::I16, PrimitiveType::I8}},
-    {PrimitiveType::I16, {PrimitiveType::I8}},
-};
+const static std::array<std::vector<PrimitiveType>, PrimitiveType::Count> SafeAutomaticCasts = {{
+    // Void,
+    {},
+    // Char,
+    {},
+    // Boolean,
+    {},
+    // U8,
+    {},
+    // U16,
+    {PrimitiveType::U8},
+    // U32,
+    {PrimitiveType::U16, PrimitiveType::U8},
+    // U64,
+    {PrimitiveType::U32, PrimitiveType::U16, PrimitiveType::U8},
+    // I8,
+    {},
+    // I16,
+    {PrimitiveType::I8, PrimitiveType::U8},
+    // I32,
+    {PrimitiveType::Integer, PrimitiveType::I16, PrimitiveType::I8, PrimitiveType::U16, PrimitiveType::U8},
+    // I64,
+    {PrimitiveType::Integer, PrimitiveType::I32, PrimitiveType::I16, PrimitiveType::I8, PrimitiveType::U32, PrimitiveType::U16, PrimitiveType::U8},
+    // Integer,
+    {PrimitiveType::I32, PrimitiveType::I16, PrimitiveType::I8, PrimitiveType::U16, PrimitiveType::U8},
+    // Pointer,
+    {},
+    // Float,
+    {},
+    // Double,
+    {PrimitiveType::Float},
+    // CString,
+    {},
+}};
+
+// FIXME: Allowed for simplicity, but I'm still looking for a way to prevent these without being too obnoxious...
+const static std::array<std::vector<PrimitiveType>, PrimitiveType::Count> UnsafeAutomaticCasts = {{
+    // Void,
+    {},
+    // Char,
+    {},
+    // Boolean,
+    {},
+    // U8,
+    {},
+    // U16,
+    {PrimitiveType::I16, PrimitiveType::I8},
+    // U32,
+    {PrimitiveType::Integer, PrimitiveType::I32, PrimitiveType::I16, PrimitiveType::I8},
+    // U64,
+    {PrimitiveType::I64, PrimitiveType::Integer, PrimitiveType::I32, PrimitiveType::I16, PrimitiveType::I8},
+    // I8,
+    {},
+    // I16,
+    {},
+    // I32,
+    {},
+    // I64,
+    {},
+    // Integer,
+    {},
+    // Pointer,
+    {},
+    // Float,
+    {},
+    // Double,
+    {},
+    // CString,
+    {},
+}};
+
+bool is_safe_cast(TypeID to, TypeID from) {
+    if(to < SafeAutomaticCasts.size()) {
+        for(auto type_id : SafeAutomaticCasts[to]) {
+            if(from == type_id)
+                return true;
+        }
+    }
+    return false;
+}
+
+bool is_allowed_but_unsafe_cast(TypeID to, TypeID from) {
+    if(to < UnsafeAutomaticCasts.size()) {
+        for(auto type_id : UnsafeAutomaticCasts[to]) {
+            if(from == type_id)
+                return true;
+        }
+    }
+    return false;
+}
 
 std::optional<AST> Parser::parse(const std::span<Token>& tokens) {
     std::optional<AST> ast(AST{});
@@ -98,6 +180,8 @@ TypeID Parser::resolve_operator_type(Token::Type op, TypeID lhs, TypeID rhs) {
     if(is_integer(lhs) && is_integer(rhs)) {
         // Keep the signed nature of the expression
         if(lhs == PrimitiveType::I64 || rhs == PrimitiveType::I64)
+            return PrimitiveType::I64;
+        if((lhs == PrimitiveType::U64 && !is_unsigned(rhs)) || (rhs == PrimitiveType::U64 && !is_unsigned(lhs)))
             return PrimitiveType::I64;
         // Whole expression is unsigned, and at least one side is 64bits
         if((lhs == PrimitiveType::U64 && is_unsigned(rhs)) || (is_unsigned(lhs) && rhs == PrimitiveType::U64))
@@ -1105,6 +1189,8 @@ const AST::FunctionDeclaration* Parser::resolve_or_instanciate_function(const st
         if(candidates.size() == 0)
             return nullptr;
 
+        std::vector<const AST::FunctionDeclaration*> close_candidates;
+
         for(const auto& candidate : candidates) {
             // Try to specialize matching templated functions.
             // TODO: Handle variadics
@@ -1126,6 +1212,26 @@ const AST::FunctionDeclaration* Parser::resolve_or_instanciate_function(const st
                 get_root_scope().declare_function(*specialized);
                 if(specialized && specialized->arguments().size() > 0)
                     return specialized;
+            } else if(candidate->arguments().size() == arguments.size()) {
+                // Make sure this candidate couldn't match after some automatic casts.
+                bool matches = true;
+                for(auto i = 0u; i < arguments.size(); ++i) {
+                    if(candidate->arguments()[i]->type_id != arguments[i] && !is_safe_cast(candidate->arguments()[i]->type_id, arguments[i]) &&
+                       !is_allowed_but_unsafe_cast(candidate->arguments()[i]->type_id, arguments[i])) {
+                        matches = false;
+                        break;
+                    }
+                }
+                if(matches)
+                    close_candidates.push_back(candidate);
+            }
+
+            if(close_candidates.size() == 1)
+                return close_candidates[0];
+
+            if(close_candidates.size() > 1) {
+                warn("[Parser] Ambiguous call to '{}'.\n", name);
+                return nullptr;
             }
         }
     }
@@ -1141,6 +1247,33 @@ void Parser::check_function_call(AST::FunctionCall* call_node, const AST::Functi
         throw Exception(fmt::format("[Parser] Function '{}' expects {} argument(s), got {}.\n", function->name(), function->arguments().size(), call_node->arguments().size()),
                         point_error(call_node->token));
     }
+
+    // Some automatic casts
+    for(auto i = 0; i < std::min(call_node->arguments().size(), function->arguments().size()); ++i) {
+        // Automatically cast any pointer to 'opaque' pointer type for interfacing with C++
+        if(function->arguments()[i]->type_id == PrimitiveType::Pointer && GlobalTypeRegistry::instance().get_type(call_node->arguments()[i]->type_id)->is_pointer()) {
+            auto cast_node = new AST::Node(AST::Node::Type::Cast);
+            cast_node->type_id = PrimitiveType::Pointer;
+            call_node->insert_before_argument(i, cast_node);
+        }
+
+        // Automatically cast to larger types (always safe)
+        if(is_safe_cast(function->arguments()[i]->type_id, call_node->arguments()[i]->type_id)) {
+            auto cast_node = new AST::Node(AST::Node::Type::Cast);
+            cast_node->type_id = function->arguments()[i]->type_id;
+            call_node->insert_before_argument(i, cast_node);
+        }
+
+        // Convenient auto casts that I'd want to remove.
+        if(is_allowed_but_unsafe_cast(function->arguments()[i]->type_id, call_node->arguments()[i]->type_id)) {
+            warn("[Parser] Warning: Unsafe cast from {} to {}:\n{}", type_id_to_string(call_node->arguments()[i]->type_id), type_id_to_string(function->arguments()[i]->type_id),
+                 point_error(call_node->arguments()[i]->token));
+            auto cast_node = new AST::Node(AST::Node::Type::Cast);
+            cast_node->type_id = function->arguments()[i]->type_id;
+            call_node->insert_before_argument(i, cast_node);
+        }
+    }
+
     // Type Check
     // FIXME: Do better.
     if(!(function_flags & AST::FunctionDeclaration::Flag::Variadic))
@@ -1262,32 +1395,6 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
         if(!resolved_function)
             throw_unresolved_function(call_node->token, arguments_types);
 
-        // Automatically cast any pointer to 'opaque' pointer type for interfacing with C++
-        // Automatically cast to larger types (always safe)
-        for(auto i = 0; i < std::min(resolved_function->arguments().size(), call_node->arguments().size()); ++i) {
-            if(resolved_function->arguments()[i]->type_id == PrimitiveType::Pointer && GlobalTypeRegistry::instance().get_type(call_node->arguments()[i]->type_id)->is_pointer()) {
-                auto cast_node = new AST::Node(AST::Node::Type::Cast);
-                cast_node->type_id = PrimitiveType::Pointer;
-                call_node->insert_before_argument(i, cast_node);
-            }
-
-            // FIXME: Consolidate these automatic casts
-            const auto allow_automatic_cast = [&](PrimitiveType to, const std::vector<PrimitiveType>& from) {
-                if(resolved_function->arguments()[i]->type_id == to) {
-                    for(auto type_id : from) {
-                        if(call_node->arguments()[i]->type_id == type_id) {
-                            auto cast_node = new AST::Node(AST::Node::Type::Cast);
-                            cast_node->type_id = to;
-                            call_node->insert_before_argument(i, cast_node);
-                            break;
-                        }
-                    }
-                }
-            };
-            for(const auto& [from, to] : AllowedAutomaticCasts)
-                allow_automatic_cast(from, to);
-        }
-
         call_node->type_id = resolved_function->type_id;
         call_node->flags = resolved_function->flags;
 
@@ -1406,31 +1513,18 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
         parse_next_expression(tokens, it, binary_operator_node, precedence);
     }
 
-    // TODO: Test if types are compatible (with the operator and between each other)
-
-    // FIXME: Consolidate these automatic casts
-    const auto allow_automatic_cast = [&](PrimitiveType to, const std::vector<PrimitiveType>& from) {
-        if(binary_operator_node->children[0]->type_id == to) {
-            for(auto type_id : from) {
-                if(binary_operator_node->children[1]->type_id == type_id) {
-                    auto cast = binary_operator_node->insert_between(1, new AST::Node(AST::Node::Type::Cast));
-                    cast->type_id = to;
-                    // Insert load if we're dealing with a variable.
-                    if(cast->children[0]->type == AST::Node::Type::Variable)
-                        cast->insert_between(0, new AST::Node(AST::Node::Type::LValueToRValue));
-                    break;
-                }
-            }
-        }
+    auto create_cast_node = [&](int index, TypeID type) {
+        auto cast_node = binary_operator_node->insert_between(index, new AST::Node(AST::Node::Type::Cast));
+        cast_node->type_id = type;
+        if(cast_node->children[0]->type == AST::Node::Type::Variable)
+            cast_node->insert_between(0, new AST::Node(AST::Node::Type::LValueToRValue));
     };
-    for(const auto& [from, to] : AllowedAutomaticCasts)
-        allow_automatic_cast(from, to);
 
-    // Allow assignement of pointer to any pointer type.
-    // FIXME: Should this be explicit in user code?
-    if(binary_operator_node->children[1]->type_id == PrimitiveType::Pointer && binary_operator_node->children[0]->type_id != binary_operator_node->children[1]->type_id) {
-        auto cast = binary_operator_node->insert_between(1, new AST::Node(AST::Node::Type::Cast));
-        cast->type_id = binary_operator_node->children[0]->type_id;
+    // Make constant integer values match their variable destination.
+    // FIXME: Check that the actual value of the constant fits in the destination type.
+    if(operator_type == Token::Type::Assignment && binary_operator_node->children[1]->type == AST::Node::Type::ConstantValue &&
+       is_integer(binary_operator_node->children[0]->type_id) && is_integer(binary_operator_node->children[1]->type_id)) {
+        create_cast_node(1, binary_operator_node->children[0]->type_id);
     }
 
     // Convert l-values to r-values when necessary (will generate a Load on the LLVM backend)
@@ -1447,38 +1541,38 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
     }
 
     resolve_operator_type(binary_operator_node);
-    // Implicit casts
-    auto create_cast_node = [&](int index, TypeID type) {
-        auto cast_node = new AST::Node(AST::Node::Type::Cast);
-        cast_node->type_id = type;
-        cast_node->parent = binary_operator_node;
-        auto child = binary_operator_node->children[index];
-        child->parent = nullptr;
-        cast_node->add_child(child);
-        binary_operator_node->children[index] = cast_node;
-    };
-    // FIXME: Cleanup, like everything else :)
-    // Promotion from integer to float, either because of the binary_operator_node type, or the type of its operands.
-    if(binary_operator_node->type_id == PrimitiveType::Float ||
-       ((binary_operator_node->children[0]->type_id == PrimitiveType::Integer && binary_operator_node->children[1]->type_id == PrimitiveType::Float) ||
-        (binary_operator_node->children[0]->type_id == PrimitiveType::Float && binary_operator_node->children[1]->type_id == PrimitiveType::Integer))) {
 
-        if(binary_operator_node->token.type != Token::Type::Assignment && binary_operator_node->children[0]->type_id == PrimitiveType::Integer)
-            create_cast_node(0, PrimitiveType::Float);
-        if(binary_operator_node->children[1]->type_id == PrimitiveType::Integer)
-            create_cast_node(1, PrimitiveType::Float);
-    }
-    // Truncation to integer (in assignments for example)
-    if(binary_operator_node->type_id == PrimitiveType::Integer) {
-        if(binary_operator_node->token.type != Token::Type::Assignment && binary_operator_node->children[0]->type_id == PrimitiveType::Float)
-            create_cast_node(0, PrimitiveType::Integer);
-        if(binary_operator_node->children[1]->type_id == PrimitiveType::Float)
-            create_cast_node(1, PrimitiveType::Integer);
-    }
-
-    if(binary_operator_node->token.type == Token::Type::Assignment) {
+    if(operator_type == Token::Type::Assignment) {
         if(binary_operator_node->children[1]->type_id == PrimitiveType::Void)
             throw Exception(fmt::format("[Parser] Cannot assign void to a variable.\n"), point_error(binary_operator_node->token));
+
+        // Allow assignement of pointer to any pointer type.
+        // FIXME: Should this be explicit in user code?
+        if(binary_operator_node->children[1]->type_id == PrimitiveType::Pointer && binary_operator_node->children[0]->type_id != binary_operator_node->children[1]->type_id) {
+            create_cast_node(1, binary_operator_node->children[0]->type_id);
+        }
+
+        if(binary_operator_node->type_id != binary_operator_node->children[1]->type_id) {
+            if(is_safe_cast(binary_operator_node->type_id, binary_operator_node->children[1]->type_id)) {
+                create_cast_node(1, binary_operator_node->type_id);
+            } else if(is_allowed_but_unsafe_cast(binary_operator_node->type_id, binary_operator_node->children[1]->type_id)) {
+                warn("[Parser] Warning: Unsafe cast from {} to {}:\n{}", type_id_to_string(binary_operator_node->children[1]->type_id),
+                     type_id_to_string(binary_operator_node->type_id), point_error(binary_operator_node->children[1]->token));
+                create_cast_node(1, binary_operator_node->type_id);
+            }
+        }
+
+        // Truncation of float to integer in assignments
+        if(binary_operator_node->type_id == PrimitiveType::Integer) {
+            if(binary_operator_node->children[1]->type_id == PrimitiveType::Float)
+                create_cast_node(1, PrimitiveType::Integer);
+        }
+
+        // Allow assignment of integers to floats.
+        if(is_floating_point(binary_operator_node->type_id)) {
+            if(is_integer(binary_operator_node->children[1]->type_id))
+                create_cast_node(1, binary_operator_node->type_id);
+        }
 
         // Make sure both sides of the assignment are of the same type.
         // FIXME: Do better (in regards to placeholders at least).
@@ -1487,6 +1581,46 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
             throw Exception(fmt::format("[Parser] Cannot assign value of type {} to variable '{}' of type {}.\n", type_id_to_string(binary_operator_node->children[1]->type_id),
                                         binary_operator_node->children[0]->token.value, type_id_to_string(binary_operator_node->children[0]->type_id)),
                             point_error(binary_operator_node->token));
+    } else {
+        // Make sure both sides of the operator are of the same type for comparisons and arithmetic operations.
+        if(operator_type >= Token::Type::Xor && operator_type <= Token::Type::GreaterOrEqual) {
+            if(binary_operator_node->children[0]->type_id != binary_operator_node->children[1]->type_id) {
+                if(is_safe_cast(binary_operator_node->children[0]->type_id, binary_operator_node->children[1]->type_id))
+                    create_cast_node(1, binary_operator_node->children[0]->type_id);
+                else if(is_allowed_but_unsafe_cast(binary_operator_node->children[0]->type_id, binary_operator_node->children[1]->type_id)) {
+                    warn("[Parser] Warning: Unsafe cast from {} to {}:\n{}", type_id_to_string(binary_operator_node->children[1]->type_id),
+                         type_id_to_string(binary_operator_node->children[0]->type_id), point_error(binary_operator_node->children[1]->token));
+                    create_cast_node(1, binary_operator_node->children[0]->type_id);
+                } else if(is_safe_cast(binary_operator_node->children[1]->type_id, binary_operator_node->children[0]->type_id))
+                    create_cast_node(0, binary_operator_node->children[1]->type_id);
+                else if(is_allowed_but_unsafe_cast(binary_operator_node->children[1]->type_id, binary_operator_node->children[0]->type_id)) {
+                    warn("[Parser] Warning: Unsafe cast from {} to {}:\n{}", type_id_to_string(binary_operator_node->children[0]->type_id),
+                         type_id_to_string(binary_operator_node->children[1]->type_id), point_error(binary_operator_node->children[0]->token));
+                    create_cast_node(0, binary_operator_node->children[1]->type_id);
+                }
+            }
+        } else if(operator_type >= Token::Type::Addition && operator_type <= Token::Type::Modulus) {
+            for(int i = 0; i < 2; ++i)
+                if(binary_operator_node->type_id != binary_operator_node->children[i]->type_id)
+                    if(is_safe_cast(binary_operator_node->type_id, binary_operator_node->children[i]->type_id))
+                        create_cast_node(i, binary_operator_node->type_id);
+                    else if(is_allowed_but_unsafe_cast(binary_operator_node->type_id, binary_operator_node->children[i]->type_id)) {
+                        warn("[Parser] Warning: Unsafe cast from {} to {}:\n{}", type_id_to_string(binary_operator_node->children[i]->type_id),
+                             type_id_to_string(binary_operator_node->type_id), point_error(binary_operator_node->children[i]->token));
+                        create_cast_node(i, binary_operator_node->type_id);
+                    }
+        }
+
+        // Promotion from integer to float, either because of the binary_operator_node type, or the type of its operands.
+        if(binary_operator_node->type_id == PrimitiveType::Float ||
+           ((binary_operator_node->children[0]->type_id == PrimitiveType::Integer && binary_operator_node->children[1]->type_id == PrimitiveType::Float) ||
+            (binary_operator_node->children[0]->type_id == PrimitiveType::Float && binary_operator_node->children[1]->type_id == PrimitiveType::Integer))) {
+
+            if(binary_operator_node->token.type != Token::Type::Assignment && binary_operator_node->children[0]->type_id == PrimitiveType::Integer)
+                create_cast_node(0, PrimitiveType::Float);
+            if(binary_operator_node->children[1]->type_id == PrimitiveType::Integer)
+                create_cast_node(1, PrimitiveType::Float);
+        }
     }
 
     return true;

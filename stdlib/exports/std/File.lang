@@ -1,20 +1,14 @@
 extern function __open_file(path: char*, mode: char*): int;
 extern function __close_file(fd: int);
 extern function __write_file(fd: int, data: cstr, count: u64);
-extern function __read_file(fd: int, data: u8*, count: u64): int;
-extern function __read_text_file_buffer_offset(fd: int, data: char*, offset: u64, count: u64): int;
-extern function __read_file_buffer_offset(fd: int, data: u8*, offset: u64, count: u64): int;
+extern function __read_file(fd: int, data: u8*, count: u64): u64;
+extern function __read_text_file_buffer_offset(fd: int, data: char*, offset: u64, count: u64): u64;
+extern function __read_file_buffer_offset(fd: int, data: u8*, offset: u64, count: u64): u64;
 
 import "std/cstr"
 import "std/memory"
 import "std/Array"
 import "std/String"
-
-// Convoluted way to cast an int into a u64.
-function u64(val: int): u64 {
-    const v: u64 = val;
-    return v;
-}
 
 // Globals are not supported yet
 //const FileInnerBufferCapacity : u64 = 1024;
@@ -26,7 +20,7 @@ export type TextFile {
 	let fd: int = 0;
 
 	// TODO: Make these private.
-	let inner_buffer: char* = malloc(u64(1024)); // malloc(FileInnerBufferCapacity);
+	let inner_buffer: char* = malloc(1024); // malloc(FileInnerBufferCapacity);
 	let inner_pointer_start: u64 = 0; // These offsets could be smaller.
 	let inner_pointer_end: u64 = 0;
 }
@@ -35,7 +29,7 @@ export type BinaryFile {
 	let fd: int = 0;
 
 	// TODO: Make these private.
-	let inner_buffer: u8* = malloc(u64(1024)); // malloc(FileInnerBufferCapacity);
+	let inner_buffer: u8* = malloc(1024); // malloc(FileInnerBufferCapacity);
 	let inner_pointer_start: u64 = 0; // These offsets could be smaller.
 	let inner_pointer_end: u64 = 0;
 }
@@ -45,7 +39,7 @@ function _read_buffered(this: TextFile*) {
 		.inner_pointer_start = 0;
 		.inner_pointer_end = 0;
     }
-    let read_bytes = __read_text_file_buffer_offset(.fd, .inner_buffer, .inner_pointer_end, u64(1024));
+    let read_bytes = __read_text_file_buffer_offset(.fd, .inner_buffer, .inner_pointer_end, 1024);
 	.inner_pointer_end = .inner_pointer_end + read_bytes;
     return read_bytes;
 }
