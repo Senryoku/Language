@@ -186,8 +186,9 @@ llvm::Constant* Module::codegen_constant(const AST::Node* val) {
             // 4. Return a cast to an i8*
             return llvm::ConstantExpr::getBitCast(globalDeclaration, charType->getPointerTo());
         }
-        default: warn("LLVM Codegen: Unsupported constant value type '{}'.\n", *type);
+        default: throw Exception(fmt::format("LLVM Codegen: Unsupported constant value type '{}'.\n", *type));
     }
+    assert(false);
     return nullptr;
 }
 
@@ -209,10 +210,7 @@ llvm::Value* Module::codegen(const AST::Node* node) {
             pop_scope();
             return ret;
         }
-        case AST::Node::Type::Defer: {
-            assert(false); // Defer nodes should not be in the basic AST.
-            return nullptr;
-        }
+        case AST::Node::Type::Defer: throw Exception("[LLVMCodegen] Defer nodes should not be in the main AST.");
         case AST::Node::Type::ConstantValue: return codegen_constant(node);
         case AST::Node::Type::Cast: {
             assert(node->children.size() == 1);
@@ -266,8 +264,8 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                         [[fallthrough]];
                     }
                     default:
-                        error("[LLVMCodegen] LLVM::Codegen: Cast from {} to {} not supported.\n", type_id_to_string(node->children[0]->type_id), type_id_to_string(node->type_id));
-                        return nullptr;
+                        throw Exception(fmt::format("[LLVMCodegen] LLVM::Codegen: Cast from {} to {} not supported.\n", type_id_to_string(node->children[0]->type_id),
+                                                    type_id_to_string(node->type_id)));
                 }
             } else {
                 // Generic Pointer type to Typed Ptr
@@ -342,18 +340,16 @@ llvm::Value* Module::codegen(const AST::Node* node) {
 
                 _llvm_ir_builder.SetInsertPoint(current_block);
                 if(verifyFunction(*function, &llvm::errs())) {
-                    error("\n[LLVMCodegen] Error verifying function '{}'.\n", function_name);
                     dump(function);
-                    function->eraseFromParent();
-                    return nullptr;
+                    throw Exception(fmt::format("\n[LLVMCodegen] Error verifying function '{}'.\n", function_name));
                 }
                 return function;
             } else {
                 assert(((flags & AST::FunctionDeclaration::Flag::Extern) || (flags & AST::FunctionDeclaration::Flag::Imported)) &&
                        "Functions without a body should be marked as 'extern' or imported.");
                 _llvm_module->getOrInsertFunction(function_name, function_types);
-                return nullptr;
             }
+            assert(false);
             return nullptr;
         }
         case AST::Node::Type::FunctionCall: {
@@ -479,10 +475,8 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                 default: {
                     assert(is_primitive(node->children[0]->type_id));
                     auto primitive_type = static_cast<PrimitiveType>(node->children[0]->type_id);
-                    if(unary_ops[node->token.type].find(primitive_type) == unary_ops[node->token.type].end()) {
-                        error("[LLVMCodegen] Unsupported type {} for unary operator {}.\n", type_id_to_string(primitive_type), node->token.type);
-                        return nullptr;
-                    }
+                    if(unary_ops[node->token.type].find(primitive_type) == unary_ops[node->token.type].end())
+                        throw Exception(fmt::format("[LLVMCodegen] Unsupported type {} for unary operator {}.\n", type_id_to_string(primitive_type), node->token.type));
                     return unary_ops[node->token.type][primitive_type](_llvm_ir_builder, val);
                 }
             }
@@ -495,7 +489,7 @@ llvm::Value* Module::codegen(const AST::Node* node) {
             auto lhs = codegen(node->children[0]);
             auto rhs = codegen(node->children[1]);
             if(!lhs || !rhs)
-                return nullptr;
+                throw Exception(fmt::format("[LLVMCodegen] Invalid BinaryOperator node:\n{}\n", *node));
             // TODO: Overloads.
             switch(node->token.type) {
                 case Token::Type::Addition: [[fallthrough]];
@@ -512,11 +506,9 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                     // assert(node->children[0]->type_id == node->children[1]->type_id);
                     assert(is_primitive(node->children[0]->type_id));
                     auto primitive_type = static_cast<PrimitiveType>(node->children[0]->type_id);
-                    if(binary_ops[node->token.type].find(primitive_type) == binary_ops[node->token.type].end()) {
-                        error("[LLVMCodegen] Unsupported types {} and {} for binary operator {}.\n", type_id_to_string(node->children[0]->type_id),
-                              type_id_to_string(node->children[1]->type_id), node->token.type);
-                        return nullptr;
-                    }
+                    if(binary_ops[node->token.type].find(primitive_type) == binary_ops[node->token.type].end())
+                        throw Exception(fmt::format("[LLVMCodegen] Unsupported types {} and {} for binary operator {}.\n", type_id_to_string(node->children[0]->type_id),
+                                                    type_id_to_string(node->children[1]->type_id), node->token.type));
                     return binary_ops[node->token.type][primitive_type](_llvm_ir_builder, lhs, rhs);
                 }
                 case Token::Type::And: {
@@ -679,8 +671,9 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                 return _llvm_ir_builder.CreateRet(codegen(node->children[0]));
             }
         }
-        default: warn("LLVM Codegen: Unsupported node type '{}'.\n", node->type);
+        default: throw Exception(fmt::format("LLVM Codegen: Unsupported node type '{}'.\n", node->type));
     }
+    assert(false);
     return nullptr;
 }
 
@@ -713,7 +706,7 @@ llvm::Type* Module::get_llvm_type(TypeID type_id) const {
             case Float: return llvm::Type::getFloatTy(*_llvm_context);
             case Double: return llvm::Type::getDoubleTy(*_llvm_context);
             case CString: return llvm::Type::getInt8PtrTy(*_llvm_context);
-            default: throw(fmt::format("[Module] get_llvm_type: Unhandled primitive type '{}'.", type_id));
+            default: throw Exception(fmt::format("[Module] get_llvm_type: Unhandled primitive type '{}'.", type_id));
         }
     }
 

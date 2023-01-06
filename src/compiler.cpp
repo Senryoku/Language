@@ -55,7 +55,6 @@ bool handle_file(const std::filesystem::path& path) {
     auto cache_filename = ModuleInterface::get_cache_filename(path);
     auto o_filepath = cache_folder;
     o_filepath += cache_filename.replace_extension(".o");
-    object_files.insert(o_filepath);
     if(!args['t'].set && !args['a'].set && !args['i'].set && !args['b'].set) {
         if(!args["bypass-cache"].set && std::filesystem::exists(o_filepath)) {
             const auto o_file_last_write = std::filesystem::last_write_time(o_filepath);
@@ -73,8 +72,11 @@ bool handle_file(const std::filesystem::path& path) {
                         break;
                     }
                 }
-                if(!updated_deps)
+                if(!updated_deps) {
+                    object_files.insert(o_filepath);
+                    processed_files.insert(path);
                     return true;
+                }
                 // Some dependencies were re-generated, continue processing anyway.
                 print_subtle(" * * Cache for {} is outdated, re-processing...\n", path.string());
             }
@@ -141,8 +143,11 @@ bool handle_file(const std::filesystem::path& path) {
             new_module.codegen_imports(parser.get_module_interface().type_imports);
             new_module.codegen_imports(parser.get_module_interface().imports);
             auto result = new_module.codegen(*ast);
-            if(!result)
-                throw Exception("LLVM Codegen returned nullptr.\n");
+            if(!result) {
+                warn("LLVM Codegen returned nullptr. No object file generated for '{}'.\n", path);
+                processed_files.insert(path);
+                return true;
+            }
             if(llvm::verifyModule(new_module.get_llvm_module(), &llvm::errs()))
                 throw Exception("\nErrors in LLVM Module.\n");
             const auto codegen_end = std::chrono::high_resolution_clock::now();
@@ -216,6 +221,7 @@ bool handle_file(const std::filesystem::path& path) {
             }
 
             passManager.run(new_module.get_llvm_module());
+            object_files.insert(o_filepath);
             dest.flush();
             success("Wrote object file '{}' (Target Triple: {}).\n", o_filepath.string(), target_triple);
             if(args['b'].set)

@@ -1,7 +1,3 @@
-// RET: 0
-
-function main(dfg:char) {
-	let val_u64: u64 = qsdqd;
-	let val_int: int = val_u64;
-	return 0;
+function nothing_emited<T>(this: T*) {
+	return .val;
 }
