@@ -174,4 +174,9 @@ class Parser : public Scoped {
     AST::FunctionDeclaration* get_parent_function(AST::Node* node);
     void                      update_return_type(AST::Node* return_node);
     void                      check_function_return_type(AST::FunctionDeclaration* function_node);
+
+    void check_eof(const std::span<Token>& tokens, const std::span<Token>::iterator& it, const std::string_view expected) const {
+        if(it == tokens.end())
+            throw Exception(fmt::format("[Parser] Expected {}, got end-of-file.\n", expected));
+    }
 };

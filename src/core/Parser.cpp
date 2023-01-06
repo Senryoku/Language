@@ -376,11 +376,9 @@ bool Parser::parse(const std::span<Token>& tokens, AST::Node* curr_node) {
 }
 
 bool Parser::parse_next_scope(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node) {
-    if(it == tokens.end() || it->type != Token::Type::OpenScope) {
-        if(it == tokens.end())
-            error("[Parser] Syntax error: Expected scope opening, got end-of-document.\n");
-        else
-            error("[Parser] Syntax error: Expected scope opening on line {}, got {}.\n", it->line, it->value);
+    check_eof(tokens, it, "scope opening");
+    if(it->type != Token::Type::OpenScope) {
+        error("[Parser] Syntax error: Expected scope opening on line {}, got {}.\n", it->line, it->value);
         return false;
     }
     auto   begin = it + 1;
@@ -440,10 +438,7 @@ void Parser::update_return_type(AST::Node* return_node) {
 
 // TODO: Formely define wtf is an expression :)
 bool Parser::parse_next_expression(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node, uint32_t precedence, bool search_for_matching_bracket) {
-    if(it == tokens.end()) {
-        error("[Parser] Expected expression, got end-of-file.\n");
-        return false;
-    }
+    check_eof(tokens, it, "expression");
 
     // Temporary expression node. Will be replaced by its child when we're done parsing it.
     auto exprNode = curr_node->add_child(new AST::Node(AST::Node::Type::Expression));
@@ -547,10 +542,8 @@ bool Parser::parse_next_expression(const std::span<Token>& tokens, std::span<Tok
     }
 
     if(search_for_matching_bracket && (it == tokens.end() || it->type != Token::Type::CloseParenthesis)) {
-        if(it == tokens.end())
-            error("[Parser] Unmatched '(' after reaching end-of-document.\n");
-        else
-            error("[Parser] Unmatched '(' on line {}.\n", it->line);
+        check_eof(tokens, it, "closing parenthesis ')'");
+        error("[Parser] Unmatched '(' on line {}.\n", it->line);
         delete curr_node->pop_child();
         return false;
     }
@@ -639,9 +632,7 @@ bool Parser::parse_statement(const std::span<Token>& tokens, std::span<Token>::i
     auto end = it;
     while(end != tokens.end() && end->type != Token::Type::EndStatement)
         ++end;
-    // Include ',' in the sub-parsing
-    if(end != tokens.end())
-        ++end;
+    skip(tokens, end, Token::Type::EndStatement);
     if(!parse({it, end}, curr_node))
         return false;
     it = end;
@@ -662,40 +653,28 @@ bool Parser::parse_scope_or_single_statement(const std::span<Token>& tokens, std
 bool Parser::parse_while(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node) {
     auto whileNode = curr_node->add_child(new AST::Node(AST::Node::Type::WhileStatement, *it));
     ++it;
-    if(it->type != Token::Type::OpenParenthesis) {
-        error("Expected '(' after while on line {}, got {}.\n", it->line, it->value);
-        delete curr_node->pop_child();
-        return false;
-    }
+    check_eof(tokens, it, "open parenthesis");
+    if(it->type != Token::Type::OpenParenthesis)
+        throw Exception(fmt::format("Expected '(' after while on line {}, got {}.\n", it->line, it->value), point_error(*it));
+
     // Parse condition and add it as first child
     ++it; // Point to the beginning of the expression until ')' ('search_for_matching_bracket': true)
-    if(!parse_next_expression(tokens, it, whileNode, max_precedence, true)) {
-        delete curr_node->pop_child();
+    if(!parse_next_expression(tokens, it, whileNode, max_precedence, true))
         return false;
-    }
 
-    if(it == tokens.end()) {
-        error("Expected while body on line {}, got end-of-file.\n", it->line);
-        delete curr_node->pop_child();
-        return false;
-    }
+    check_eof(tokens, it, "while body");
 
-    if(!parse_scope_or_single_statement(tokens, it, whileNode)) {
-        delete curr_node->pop_child();
+    if(!parse_scope_or_single_statement(tokens, it, whileNode))
         return false;
-    }
+
     return true;
 }
 
 bool Parser::parse_for(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node) {
     auto forNode = curr_node->add_child(new AST::Node(AST::Node::Type::ForStatement, *it));
     ++it;
-    if(it->type != Token::Type::OpenParenthesis) {
-        error("Expected '(' after for on line {}, got {}.\n", it->line, it->value);
-        delete curr_node->pop_child();
-        return false;
-    }
-    ++it; // Skip '('
+    expect(tokens, it, Token::Type::OpenParenthesis);
+    check_eof(tokens, it, "for condition");
 
     push_scope(); // Encapsulate variable declaration from initialisation and single statement body.
 
@@ -715,10 +694,7 @@ bool Parser::parse_for(const std::span<Token>& tokens, std::span<Token>::iterato
     if(!parse_next_expression(tokens, it, forNode, max_precedence, true))
         return cleanup_on_error();
 
-    if(it == tokens.end()) {
-        error("Expected while body on line {}, got end-of-file.\n", it->line);
-        return cleanup_on_error();
-    }
+    check_eof(tokens, it, "for body");
 
     if(!parse_scope_or_single_statement(tokens, it, forNode))
         return cleanup_on_error();
@@ -770,8 +746,7 @@ bool Parser::parse_function_declaration(const std::span<Token>& tokens, std::spa
     }
     expect(tokens, it, Token::Type::CloseParenthesis);
 
-    if(it == tokens.end())
-        throw Exception("[Parser] Expected function body, got end-of-file.\n");
+    check_eof(tokens, it, "function body");
 
     if(it->type == Token::Type::Colon) {
         ++it;
@@ -1357,8 +1332,7 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
 
     auto precedence = operator_precedence.at(operator_type);
     ++it;
-    if(it == tokens.end())
-        throw Exception(fmt::format("[Parser::parse_operator] Syntax error: Reached end of document without a right-hand side operand for {}.\n", it->value));
+    check_eof(tokens, it, "right-hand side operand");
 
     if(operator_type == Token::Type::OpenSubscript) {
         parse_next_expression(tokens, it, binary_operator_node);
@@ -1597,9 +1571,7 @@ bool Parser::parse_variable_declaration(const std::span<Token>& tokens, std::spa
 bool Parser::parse_import(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node*) {
     assert(it->type == Token::Type::Import);
     ++it;
-
-    if(it == tokens.end())
-        throw Exception("[Parser] Syntax error: Module name expected after import statement, got end-of-file.\n");
+    check_eof(tokens, it, "module name");
 
     std::string module_name = std::string(it->value);
     _module_interface.dependencies.push_back(module_name);
