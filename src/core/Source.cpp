@@ -33,8 +33,9 @@ std::string point_error_impl(const std::string_view& line, size_t at, size_t lin
     if(to == std::numeric_limits<size_t>::max() || to < at)
         to = at;
     std::string point;
-    point.resize(line.size() + 1, ' ');
-    for(size_t i = from; i < std::min(to, point.size()); ++i)
+    auto        max = std::max(at, to) + 1;
+    point.resize(max, ' ');
+    for(size_t i = from; i < to; ++i)
         point[i] = '~';
     point[at] = '^';
     // Handle tabulations in input line by copying them.
@@ -47,7 +48,7 @@ std::string point_error_impl(const std::string_view& line, size_t at, size_t lin
 }
 
 std::string point_error_impl(const std::string_view& line, const Token& token) noexcept {
-    return point_error_impl(line, token.column, token.line, token.column - 1, token.column - 1 + token.value.size());
+    return point_error_impl(line, token.column, token.line, token.column, token.column + token.value.size());
 }
 
 std::string point_error(const std::string& source, const Token& token) noexcept {

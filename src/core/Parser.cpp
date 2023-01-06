@@ -1485,8 +1485,8 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
         // FIXME: Do better (in regards to placeholders at least).
         if(!is_placeholder(binary_operator_node->children[0]->type_id) && !is_placeholder(binary_operator_node->children[1]->type_id) &&
            binary_operator_node->children[0]->type_id != binary_operator_node->children[1]->type_id)
-            throw Exception(fmt::format("[Parser] Cannot assign value of type {} to variable of type {}.\n", type_id_to_string(binary_operator_node->children[1]->type_id),
-                                        type_id_to_string(binary_operator_node->children[0]->type_id)),
+            throw Exception(fmt::format("[Parser] Cannot assign value of type {} to variable '{}' of type {}.\n", type_id_to_string(binary_operator_node->children[1]->type_id),
+                                        binary_operator_node->children[0]->token.value, type_id_to_string(binary_operator_node->children[0]->type_id)),
                             point_error(binary_operator_node->token));
     }
 
