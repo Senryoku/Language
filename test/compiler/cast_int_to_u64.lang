@@ -1,0 +1,13 @@
+// PASS: Compiled successfully
+// RET: 0
+
+function main() {
+	let val_u64: u64 = 1337;
+	val_u64 = 1337;
+
+	let val_int: int = 1337;
+	let val_u64_from_int: u64 = val_int;
+	val_u64_from_int = val_int;
+
+	return 0;
+}

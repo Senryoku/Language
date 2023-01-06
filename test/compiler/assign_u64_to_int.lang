@@ -1,0 +1,11 @@
+// PASS: Cannot assign value of type
+// FAIL: Compiled successfully
+
+// This one should fail to compile: 
+//   Conversions from larger types should be explicit.
+
+function main() {
+	let val_u64: u64 = 1337;
+	let val_int: int = val_u64;
+	return 0;
+}
