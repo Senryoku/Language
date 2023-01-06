@@ -1,47 +1,7 @@
+// PASS: a[3] = 1337
+
 import "std/memory"
-
-type Array<T> {
-	let capacity : u64 = 0;
-	let length : u64 = 0;
-	let data : T* = null_pointer();
-}
-
-function reserve<T>(this: Array<T>*, size: u64) : void {
-	if(size <= .capacity)
-		return;
-	
-	// FIXME: Yeah, we don't have "sizeof" yet.
-	// let ptr : T* = malloc(size * sizeof(T));
-	let ptr : T* = malloc(size * 64);
-	
-	for(let idx : u64 = 0; idx < .length; ++idx) {
-		ptr[idx] = .data[idx];
-	}
-	if(.capacity > 0)
-		free(.data);
-	
-	.capacity = size;
-	.data = ptr;
-}
-
-function push_back<T>(this: Array<T>*, value: T) : u64 {
-	if(.capacity <= .length) 
-		.reserve((.capacity + 1) * 2);
-	
-	.data[.length] = value;
-	++.length;
-	return .length;
-}
-
-function get<T>(this: Array<T>*, index: u64) : T {
-	return .data[index];
-}
-
-function destructor<T>(this: Array<T>*) : void {
-	free(.data);
-	.length = 0;
-	.capacity = 0;
-}
+import "std/Array"
 
 function dump<T>(this: Array<T>*) : void {
 	printf("----------------\n");
