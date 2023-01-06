@@ -612,10 +612,8 @@ llvm::Value* Module::codegen(const AST::Node* node) {
             _llvm_ir_builder.SetInsertPoint(if_then_block);
             _generated_return = false;
             codegen(node->children[1]);
-            if(!_generated_return) {
+            if(!_generated_return)
                 _llvm_ir_builder.CreateBr(if_end_block);
-                _generated_return = false;
-            }
 
             // Note: The current block may have changed, this doesn't matter right now, but if the
             // if_then_block is reused in the future (to compute a PHI node holding a return value
@@ -627,10 +625,8 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                 _llvm_ir_builder.SetInsertPoint(if_else_block);
                 _generated_return = false;
                 codegen(node->children[2]);
-                if(!_generated_return) {
+                if(!_generated_return)
                     _llvm_ir_builder.CreateBr(if_end_block);
-                    _generated_return = false;
-                }
             }
 
             _llvm_ir_builder.SetInsertPoint(if_end_block);
