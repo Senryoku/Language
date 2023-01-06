@@ -13,7 +13,10 @@ function main() : int {
 
 	socket.connect("httpbin.org", 80);
 	socket.send("GET /get HTTP/1.0\r\n\r\n");
-	printf("Received: %s\n", socket.recv());
+	
+	let data = socket.recv();
+	// Assume the received data if a null terminated string.
+	printf("Received: %s\n", data.data);
 
 	return 0;
 }

@@ -2,8 +2,10 @@ extern function __socket_init() : void;
 extern function __socket_create() : int;
 extern function __socket_connect(sockfd: int, addr: char*, port: int) : int;
 extern function __socket_send(sockfd: int, data: cstr) : int; 
-extern function __socket_recv(sockfd: int) : cstr;
+extern function __socket_recv(sockfd: int, buff: u8*, buff_size: u64) : u64;
 extern function __socket_close(sockfd: int) : int;
+
+import "std/Array"
 
 export function socket_init() {
 	__socket_init();
@@ -26,8 +28,11 @@ export function send(this: Socket*, data: cstr) {
 }
 
 // FIXME: Should return an array of bytes, or something.
-export function recv(this: Socket*) : cstr {
-	return __socket_recv(.fd);
+export function recv(this: Socket*) : Array<u8> {
+	let r : Array<u8>;
+	r.reserve(2048);
+	let bytes_read = __socket_recv(.fd, r.data, r.capacity);
+	return r;
 }
 
 export function close(this: Socket*) {

@@ -1,33 +1,24 @@
-// PASS: a[3] = 1337
-// RET : 0
+// Pass: Received: HTTP/1.1 200 OK
 
-import "std/memory"
-import "std/Array"
+import "std/Socket"
 
-function dump<T>(this: Array<T>*) : void {
-	printf("----------------\n");
-	for(let idx : u64 = 0; idx < .length; ++idx) {
-		printf("  a[%d] = %d\n", idx, .get(idx));
-	}
-}
+function main() : int {
+	socket_init(); // How should we handle that?
 
-function test() : Array<u64> {
-	let arr : Array<u64>;
+	let socket : Socket;
+
+	socket.create();
+
+	printf("Got socket: %d\n", socket.fd);
+
+	socket.connect("httpbin.org", 80);
+	socket.send("GET /get HTTP/1.0\r\n\r\n");
 	
-	const forty_two : u64 = 42; // Forced Cast, otherwise the we can't resolve the function, yet.
-	const leet : u64 = 1337;
-	arr.push_back(forty_two);
-	arr.push_back(leet);
-	arr.dump();
-	arr.push_back(forty_two);
-	arr.push_back(leet);
-	arr.dump();
-	
-	return arr;
-}
+	let data = socket.recv();
+	let zero : u8 = 0;
+	data.push_back(zero);
+	// Assume the received data if a null terminated string.
+	printf("Received: %s\n", data.data);
 
-function main() {
-	let t = test();
-	t.dump();
-	return t.length;
+	return 0;
 }

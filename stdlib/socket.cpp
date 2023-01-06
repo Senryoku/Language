@@ -125,26 +125,24 @@ int __socket_connect(int sockfd, const char* addr, int port) {
 }
 
 int __socket_send(int sockfd, const char* req) {
-    printf("__socket_send on socket %d\n", sockfd);
+    //printf("__socket_send on socket %d\n", sockfd);
 
     const std::string request(req);
     return send(sockfd, request.c_str(), request.size(), 0);
 }
 
-// FIXME: Leaks.
-char* __socket_recv(int sockfd) {
-    printf("__socket_recv on socket %d\n", sockfd);
+size_t __socket_recv(int sockfd, char* buff, size_t buff_size) {
+    //printf("__socket_recv on socket %d\n", sockfd);
 
-    char* buff = new char[2048];
-    int   status = recv(sockfd, buff, 2048, 0);
+    int   status = recv(sockfd, buff, buff_size, 0);
     if(status == SOCKET_ERROR) {
         auto err = get_socket_error();
         printf("__socket_recv: error (%d): %s\n", err, get_error_string(err).c_str());
-        return nullptr;
+        return 0;
     }
-    printf("__socket_recv: received '%s'\n", buff);
+    //printf("__socket_recv: received \n-------------------------------------------\n%s\n-------------------------------------------\n", buff);
 
-    return buff;
+    return status;
 }
 
 int __socket_close(int sockfd) {

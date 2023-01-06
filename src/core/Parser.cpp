@@ -1733,7 +1733,9 @@ bool Parser::parse_import(const std::span<Token>& tokens, std::span<Token>::iter
     // FIXME: We'll want to add a way to also directly export the imported symbols.
     //        I don't think this should be the default behavior, but opt-in by using another keyword, or an additional marker.
     // FIXME: For now, we'll forward all the type definitions unconditionally.
+    // FIXME: And the functions also.
     _module_interface.type_exports.insert(_module_interface.type_exports.end(), new_type_imports.begin(), new_type_imports.end());
+    _module_interface.exports.insert(_module_interface.exports.end(), new_function_imports.begin(), new_function_imports.end());
 
     ++it;
 
