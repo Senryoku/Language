@@ -32,8 +32,7 @@ std::string type_id_to_string(TypeID type_id) {
             case I8: [[fallthrough]];
             case I16: [[fallthrough]];
             case I32: [[fallthrough]];
-            case I64: [[fallthrough]];
-            case Integer: out_color = fmt::color::golden_rod; break;
+            case I64: out_color = fmt::color::golden_rod; break;
             case Float: out_color = fmt::color::golden_rod; break;
             case Double: out_color = fmt::color::golden_rod; break;
             case CString: out_color = fmt::color::burly_wood; break;

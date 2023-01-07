@@ -1,9 +1,9 @@
 extern function __socket_init() : void;
-extern function __socket_create() : int;
-extern function __socket_connect(sockfd: int, addr: char*, port: int) : int;
-extern function __socket_send(sockfd: int, data: cstr) : int; 
-extern function __socket_recv(sockfd: int, buff: u8*, buff_size: u64) : u64;
-extern function __socket_close(sockfd: int) : int;
+extern function __socket_create() : i32;
+extern function __socket_connect(sockfd: i32, addr: char*, port: i32) : i32;
+extern function __socket_send(sockfd: i32, data: cstr) : i32; 
+extern function __socket_recv(sockfd: i32, buff: u8*, buff_size: u64) : u64;
+extern function __socket_close(sockfd: i32) : i32;
 
 import "std/Array"
 
@@ -12,14 +12,14 @@ export function socket_init() {
 }
 
 export type Socket {
-	let fd: int = 0;
+	let fd: i32 = 0;
 }
 
 export function create(this: Socket*) {
 	.fd = __socket_create();
 }
 
-export function connect(this: Socket*, addr: cstr, port: int) {
+export function connect(this: Socket*, addr: cstr, port: i32) {
 	__socket_connect(.fd, addr, port);
 }
 

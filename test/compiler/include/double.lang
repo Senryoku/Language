@@ -1,4 +1,4 @@
-export function double(i : int) {
+export function double(i : i32) {
 	return 2 * i;
 }
 

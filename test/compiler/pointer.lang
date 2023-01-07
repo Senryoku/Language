@@ -1,7 +1,7 @@
 // RET : 666
 
 type NewType {
-	let i : int;
+	let i : i32;
 	let f : float;
 }
 
@@ -9,7 +9,7 @@ function get_i(this : NewType*) {
 	return .i;
 }
 
-function set_i(this : NewType*, i : int) {
+function set_i(this : NewType*, i : i32) {
 	.i = i;
 }
 

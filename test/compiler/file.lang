@@ -1,6 +1,6 @@
 import "std/File"
 
-function main() : int {
+function main() : i32 {
 	printf("Trying to open a file...\n");
 	let file : TextFile;
 	printf("File Descriptor: %d.\n", file.fd);

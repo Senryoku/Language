@@ -93,7 +93,6 @@ class GlobalTypeRegistry {
         add_type(new ScalarType("i16", PrimitiveType::I16));
         add_type(new ScalarType("i32", PrimitiveType::I32));
         add_type(new ScalarType("i64", PrimitiveType::I64));
-        add_type(new ScalarType("int", PrimitiveType::Integer));
         add_type(new ScalarType("pointer", PrimitiveType::Pointer));
         add_type(new ScalarType("float", PrimitiveType::Float));
         add_type(new ScalarType("double", PrimitiveType::Double));

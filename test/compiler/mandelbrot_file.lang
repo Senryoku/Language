@@ -26,7 +26,7 @@ function main() {
 		const yz = -1.0 + (2.0 / sy) * py;
 		for(let px = 0; px < sx; ++px) {
 			const xz = -2.5 + (3.5 / sx) * px;
-			let iterations : int = 0;
+			let iterations : i32 = 0;
 			// Bulb test
 			const q = (xz - 1.0 / 4.0) * (xz - 1.0 / 4.0) + yz * yz;
 			if(q * (q + (xz - 1.0 / 4.0)) <= 1.0 / 4.0 * yz * yz) {
@@ -41,7 +41,7 @@ function main() {
 					++iterations;
 				}
 			}
-			const to_int : int = max_pixel_value * ((1.0 * iterations) / max_iterations);
+			const to_int : i32 = max_pixel_value * ((1.0 * iterations) / max_iterations);
 			
 			str_builder.append(to_string(to_int));
 			str_builder.append(' ');

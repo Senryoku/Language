@@ -3,7 +3,7 @@
 // FAIL: Destructor call #2.
 
 type Test {
-	let i : int = 0;
+	let i : i32 = 0;
 }
 
 function destructor(this: Test*) : void {

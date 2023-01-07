@@ -12,9 +12,9 @@ Working on a compiler using LLVM IR and clang to generate native executables.
   Examples in [test/compiler/](test/compiler/)
 
   - Primitive types
-    - Integer `int` (`u8`...`u64`, `i8`...`i64`)
+    - Integer `u8`...`u64`, `i8`...`i64`
     - Float `float`, `double`
-    - Array (fixed size) of other Primitive Types `int[32]`. Will be reworked.
+    - Array (fixed size) of other Primitive Types `i32[32]`. Will be reworked.
     - C-String `cstr`, null-terminated to interface with C/C++
   - Basic Control Flow
 <table>
@@ -45,7 +45,7 @@ while(condition_expression) {
 <td>
 	
 ```c
-for(let i : int = 0; i < length; ++i) {
+for(let i : i32 = 0; i < length; ++i) {
 	[...for_body]
 }
 ```
@@ -57,14 +57,14 @@ for(let i : int = 0; i < length; ++i) {
   - Variable Declaration
 ```c
 let variable_name : type = optional_initial_value;
-let a : int = 0;
+let a : i32 = 0;
 const b : float = 0.0;
 const c = 0.0; // Type derived from the initial value
 ```
 
   - Function Declaration
 ```c
-function name(param_0 : int, param_1 : float) : int {
+function name(param_0 : i32, param_1 : float) : i32 {
 	[...function body]
 }
 ```
@@ -80,11 +80,11 @@ function magnitude(this: Complex*) {
 	return sqrt(.i * .i + .j * .j); // Actually, there's no sqrt() yet
 }
 
-function main() : int {
+function main() : i32 {
 	let z : Complex;
 	z.i = 2;
 	z.j = 3;
-	let ret_val : int = z.magnitude();
+	let ret_val : i32 = z.magnitude();
 	return ret_val;
 }
 ```
@@ -127,7 +127,7 @@ export function function_name() : MyType {
    ```
  - Language support for array / dictionnary
    ```c
-   const array = [0, 1, 2, 3]; // Defaults to some kind of StaticArray<int>
+   const array = [0, 1, 2, 3]; // Defaults to some kind of StaticArray<i32>
    let dyn_array : Array<String> = ["A String", "Another One"];
    const dict = {key0: value0, key1: value1}; // Defaults to some kind of Dict<KeyType, ValueType>
    // Both keys and values of any type (hashable for the key), but of a single on for each.

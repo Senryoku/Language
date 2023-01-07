@@ -1,10 +1,10 @@
 // RET: 0
 
 type AType {
-	let val : int;
+	let val : i32;
 }
 
-function member_func(this: AType*) : int {
+function member_func(this: AType*) : i32 {
 	return .val;
 }
 

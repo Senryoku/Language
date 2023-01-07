@@ -5,7 +5,7 @@ function main() {
 	let val_u64: u64 = 1337;
 	val_u64 = 1337;
 
-	let val_int: int = 1337;
+	let val_int: i32 = 1337;
 	let val_u64_from_int: u64 = val_int; // Maybe we should prevent this when we can't check that the value actually fits.
 	val_u64_from_int = val_int;
 

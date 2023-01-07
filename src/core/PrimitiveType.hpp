@@ -20,7 +20,6 @@ enum PrimitiveType : TypeID {
     I16,
     I32,
     I64,
-    Integer, // Same as I32
     Pointer, // Same as U64, not sure if it's useful.
     Float,
     Double,
@@ -48,7 +47,7 @@ inline uint64_t get_placeholder_index(TypeID type_id) {
 }
 
 inline bool is_integer(TypeID type_id) {
-    return type_id >= U8 && type_id <= Integer;
+    return type_id >= U8 && type_id <= I64;
 }
 
 inline bool is_unsigned(TypeID type_id) {

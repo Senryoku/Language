@@ -28,11 +28,9 @@ const static std::array<std::vector<PrimitiveType>, PrimitiveType::Count> SafeAu
     // I16,
     {PrimitiveType::I8, PrimitiveType::U8},
     // I32,
-    {PrimitiveType::Integer, PrimitiveType::I16, PrimitiveType::I8, PrimitiveType::U16, PrimitiveType::U8},
-    // I64,
-    {PrimitiveType::Integer, PrimitiveType::I32, PrimitiveType::I16, PrimitiveType::I8, PrimitiveType::U32, PrimitiveType::U16, PrimitiveType::U8},
-    // Integer,
     {PrimitiveType::I32, PrimitiveType::I16, PrimitiveType::I8, PrimitiveType::U16, PrimitiveType::U8},
+    // I64,
+    {PrimitiveType::I32, PrimitiveType::I32, PrimitiveType::I16, PrimitiveType::I8, PrimitiveType::U32, PrimitiveType::U16, PrimitiveType::U8},
     // Pointer,
     {},
     // Float,
@@ -56,9 +54,9 @@ const static std::array<std::vector<PrimitiveType>, PrimitiveType::Count> Unsafe
     // U16,
     {PrimitiveType::I16, PrimitiveType::I8},
     // U32,
-    {PrimitiveType::Integer, PrimitiveType::I32, PrimitiveType::I16, PrimitiveType::I8},
+    {PrimitiveType::I32, PrimitiveType::I32, PrimitiveType::I16, PrimitiveType::I8},
     // U64,
-    {PrimitiveType::I64, PrimitiveType::Integer, PrimitiveType::I32, PrimitiveType::I16, PrimitiveType::I8},
+    {PrimitiveType::I64, PrimitiveType::I32, PrimitiveType::I32, PrimitiveType::I16, PrimitiveType::I8},
     // I8,
     {},
     // I16,
@@ -66,8 +64,6 @@ const static std::array<std::vector<PrimitiveType>, PrimitiveType::Count> Unsafe
     // I32,
     {},
     // I64,
-    {},
-    // Integer,
     {},
     // Pointer,
     {},
@@ -188,7 +184,7 @@ TypeID Parser::resolve_operator_type(Token::Type op, TypeID lhs, TypeID rhs) {
             return PrimitiveType::U64;
         if(is_unsigned(lhs) && is_unsigned(lhs))
             return PrimitiveType::U32;
-        return PrimitiveType::Integer;
+        return PrimitiveType::I32;
     }
 
     if(lhs == rhs && is_primitive(lhs))
@@ -696,11 +692,11 @@ bool Parser::parse_identifier(const std::span<Token>& tokens, std::span<Token>::
         ltor->type_id = ltor->children[0]->type_id;
 
         // TODO: Make sure this is an integer?
-        if(access_operator_node->children.back()->type_id != PrimitiveType::Integer &&
+        if(access_operator_node->children.back()->type_id != PrimitiveType::I32 &&
            !(access_operator_node->children.back()->type_id >= PrimitiveType::U8 && access_operator_node->children.back()->type_id <= PrimitiveType::I64)) {
             warn("[Parser] Subscript operator called with a non integer argument: {}", point_error(access_operator_node->token));
             auto cast_node = access_operator_node->insert_between(access_operator_node->children.size() - 1, new AST::Node(AST::Node::Type::Cast));
-            cast_node->type_id = PrimitiveType::Integer;
+            cast_node->type_id = PrimitiveType::I32;
         }
 
         expect(tokens, it, Token::Type::CloseSubscript);
@@ -1081,7 +1077,7 @@ AST::Node* Parser::parse_digits(const std::span<Token>&, std::span<Token>::itera
         else if(value > std::numeric_limits<int32_t>::max())
             type = PrimitiveType::U32;
         else
-            type = PrimitiveType::Integer;
+            type = PrimitiveType::I32;
     }
     switch(type) {
         case PrimitiveType::I8: integer = gen_integer_literal_node<int8_t>(*it, value, type); break;
@@ -1092,16 +1088,6 @@ AST::Node* Parser::parse_digits(const std::span<Token>&, std::span<Token>::itera
         case PrimitiveType::U16: integer = gen_integer_literal_node<uint16_t>(*it, value, type); break;
         case PrimitiveType::U32: integer = gen_integer_literal_node<uint32_t>(*it, value, type); break;
         case PrimitiveType::U64: integer = gen_integer_literal_node<uint64_t>(*it, value, type); break;
-        case PrimitiveType::Integer: {
-            if(static_cast<int64_t>(value) < std::numeric_limits<int32_t>::min() || static_cast<int64_t>(value) > std::numeric_limits<int32_t>::max())
-                throw Exception(fmt::format("Error parsing integer for target type {}: value '{}' out-of-bounds (range: [{}, {}]).", type_id_to_string(PrimitiveType::Integer),
-                                            value, std::numeric_limits<int32_t>::min(), std::numeric_limits<int32_t>::max()),
-                                point_error(*it));
-            auto local = new AST::IntegerLiteral(*it);
-            local->value = static_cast<int32_t>(value);
-            integer = local;
-            break;
-        }
         default: throw Exception(fmt::format("[Parser::parse_digits] Unexpected target type '{}'.\n", type));
     }
     curr_node->add_child(integer);
@@ -1595,9 +1581,9 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
         }
 
         // Truncation of float to integer in assignments
-        if(binary_operator_node->type_id == PrimitiveType::Integer) {
+        if(binary_operator_node->type_id == PrimitiveType::I32) {
             if(binary_operator_node->children[1]->type_id == PrimitiveType::Float)
-                create_cast_node(1, PrimitiveType::Integer);
+                create_cast_node(1, PrimitiveType::I32);
         }
 
         // Allow assignment of integers to floats.
@@ -1645,12 +1631,12 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
 
         // Promotion from integer to float, either because of the binary_operator_node type, or the type of its operands.
         if(binary_operator_node->type_id == PrimitiveType::Float ||
-           ((binary_operator_node->children[0]->type_id == PrimitiveType::Integer && binary_operator_node->children[1]->type_id == PrimitiveType::Float) ||
-            (binary_operator_node->children[0]->type_id == PrimitiveType::Float && binary_operator_node->children[1]->type_id == PrimitiveType::Integer))) {
+           ((binary_operator_node->children[0]->type_id == PrimitiveType::I32 && binary_operator_node->children[1]->type_id == PrimitiveType::Float) ||
+            (binary_operator_node->children[0]->type_id == PrimitiveType::Float && binary_operator_node->children[1]->type_id == PrimitiveType::I32))) {
 
-            if(binary_operator_node->token.type != Token::Type::Assignment && binary_operator_node->children[0]->type_id == PrimitiveType::Integer)
+            if(binary_operator_node->token.type != Token::Type::Assignment && binary_operator_node->children[0]->type_id == PrimitiveType::I32)
                 create_cast_node(0, PrimitiveType::Float);
-            if(binary_operator_node->children[1]->type_id == PrimitiveType::Integer)
+            if(binary_operator_node->children[1]->type_id == PrimitiveType::I32)
                 create_cast_node(1, PrimitiveType::Float);
         }
     }

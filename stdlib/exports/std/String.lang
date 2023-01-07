@@ -1,4 +1,4 @@
-extern function __itoa(value: int) : cstr;
+extern function __itoa(value: i32) : cstr;
 
 import "std/memory"
 import "std/cstr"
@@ -132,7 +132,7 @@ export function destructor(this: StringBuilder*) : void {
 
 // Misc. functions
 
-export function to_string(value: int) : String {
+export function to_string(value: i32) : String {
 	let str : String;
 	str.adopt_c_string(__itoa(value));
 	return str;

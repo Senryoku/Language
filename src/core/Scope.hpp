@@ -122,8 +122,8 @@ class Scoped {
             return s_builtins[name].get();
         };
 
-        register_builtin("put", PrimitiveType::Integer, {"character"}, {PrimitiveType::Char});
-        register_builtin("printf", PrimitiveType::Integer, {}, {}, AST::FunctionDeclaration::Flag::Variadic);
+        register_builtin("put", PrimitiveType::I32, {"character"}, {PrimitiveType::Char});
+        register_builtin("printf", PrimitiveType::I32, {}, {}, AST::FunctionDeclaration::Flag::Variadic);
     }
 
     const AST::VariableDeclaration* get_this() const {

@@ -6,6 +6,6 @@
 
 function main() {
 	let val_u64: u64 = 1337;
-	let val_int: int = val_u64;
+	let val_int: i32 = val_u64;
 	return 0;
 }

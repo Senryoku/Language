@@ -11,13 +11,14 @@ function templated<Integer>(value: Integer) {
 }
 
 function main() {
-	const my_u8 : u8 = 255;
+	const my_u8 : u8 = 255u8;
 	templated(my_u8);
-	const my_u16 : u16 = 65535;
+	const my_u16 : u16 = 65535u16;
 	templated(my_u16);
-	const my_u32 : u32 = 4294967295;
+	const my_u32 : u32 = 4294967295u32;
 	templated(my_u32);
-	const my_u64 : u64 = 18446744073709551615;
+	const my_u64 : u64 = 18446744073709551615u64;
 	templated(my_u64);
 	return 0;
 }
+

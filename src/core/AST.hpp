@@ -382,18 +382,6 @@ class AST {
         }
     };
 
-    struct IntegerLiteral : public Literal<int32_t> {
-        IntegerLiteral() : Literal() { type_id = PrimitiveType::Integer; }
-        IntegerLiteral(Token t) : Literal(t) { type_id = PrimitiveType::Integer; }
-
-        [[nodiscard]] virtual IntegerLiteral* clone() const override {
-            auto n = new IntegerLiteral();
-            clone_impl(n);
-            n->value = value;
-            return n;
-        }
-    };
-
     struct FloatLiteral : public Literal<float> {
         FloatLiteral() : Literal() { type_id = PrimitiveType::Float; }
         FloatLiteral(Token t) : Literal(t) { type_id = PrimitiveType::Float; }

@@ -1,9 +1,9 @@
-extern function __open_file(path: char*, mode: char*): int;
-extern function __close_file(fd: int);
-extern function __write_file(fd: int, data: cstr, count: u64);
-extern function __read_file(fd: int, data: u8*, count: u64): u64;
-extern function __read_text_file_buffer_offset(fd: int, data: char*, offset: u64, count: u64): u64;
-extern function __read_file_buffer_offset(fd: int, data: u8*, offset: u64, count: u64): u64;
+extern function __open_file(path: char*, mode: char*): i32;
+extern function __close_file(fd: i32);
+extern function __write_file(fd: i32, data: cstr, count: u64);
+extern function __read_file(fd: i32, data: u8*, count: u64): u64;
+extern function __read_text_file_buffer_offset(fd: i32, data: char*, offset: u64, count: u64): u64;
+extern function __read_file_buffer_offset(fd: i32, data: u8*, offset: u64, count: u64): u64;
 
 import "std/cstr"
 import "std/memory"
@@ -17,7 +17,7 @@ import "std/String"
 //       once we get some basic inheritance.
 
 export type TextFile {
-	let fd: int = 0;
+	let fd: i32 = 0;
 
 	// TODO: Make these private.
 	let inner_buffer: char* = malloc(1024); // malloc(FileInnerBufferCapacity);
@@ -26,7 +26,7 @@ export type TextFile {
 }
 
 export type BinaryFile {
-	let fd: int = 0;
+	let fd: i32 = 0;
 
 	// TODO: Make these private.
 	let inner_buffer: u8* = malloc(1024); // malloc(FileInnerBufferCapacity);

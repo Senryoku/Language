@@ -2,7 +2,7 @@
 
 import "std/Socket"
 
-function main() : int {
+function main() : i32 {
 	socket_init(); // How should we handle that?
 
 	let socket : Socket;

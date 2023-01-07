@@ -1,25 +1,25 @@
 // RET : 32
 
 function main() {
-	const sx : int = 192 / 2;
-	const sy : int = 64 / 2;
-	const max_iteration : int = 69;
+	const sx : i32 = 192 / 2;
+	const sy : i32 = 64 / 2;
+	const max_iteration : i32 = 69;
 	// FIXME: Turn this into a string.
 	const grey : cstr = "$@B%8&WM#*oahkbdpqwmZO0QLCJUYXzcvunxrjft/\\|()1{}[]?-_+~<>i!lI;:,^`'. ";
 
 	// FIXME: Since we got rid of the interpreter we can't resolve "sx * sy" at compile time.
-	// let results : int[sx * sy];
-	let results : int[3072];
+	// let results : i32[sx * sy];
+	let results : i32[3072];
 	
-	let py : int = 0;
+	let py : i32 = 0;
 	while(py < sy) {
-		let px :int = 0;
+		let px :i32 = 0;
 		const yz : float = -1.0 + (2.0 / sy) * py;
 		while(px < sx) {
 			const xz : float = -2.5 + (3.5 / sx) * px;
 			let x : float = 0;
 			let y : float = 0;
-			let iteration : int = 0;
+			let iteration : i32 = 0;
 			while(x * x + y * y <= 2 * 2  && iteration < max_iteration) {
 				const xtemp : float = x * x - y * y + xz;
 				y = 2 * x * y + yz;

@@ -18,11 +18,11 @@ static void dump(auto llvm_object) {
     }
 static std::unordered_map<Token::Type, std::unordered_map<PrimitiveType, std::function<llvm::Value*(llvm::IRBuilder<>&, llvm::Value*)>>> unary_ops = {
     {Token::Type::Addition,
-     {OP(Integer, (void)ir_builder; return val;), OP(I8, (void)ir_builder; return val;), OP(I16, (void)ir_builder; return val;), OP(I32, (void)ir_builder; return val;),
+     {OP(I32, (void)ir_builder; return val;), OP(I8, (void)ir_builder; return val;), OP(I16, (void)ir_builder; return val;), OP(I32, (void)ir_builder; return val;),
       OP(I64, (void)ir_builder; return val;), OP(U8, (void)ir_builder; return val;), OP(U16, (void)ir_builder; return val;), OP(U32, (void)ir_builder; return val;),
       OP(U64, (void)ir_builder; return val;), OP(Float, (void)ir_builder; return val;)}},
     {Token::Type::Substraction,
-     {OP(Integer, return ir_builder.CreateNeg(val, "neg");), OP(I8, return ir_builder.CreateNeg(val, "neg");), OP(I16, return ir_builder.CreateNeg(val, "neg");),
+     {OP(I32, return ir_builder.CreateNeg(val, "neg");), OP(I8, return ir_builder.CreateNeg(val, "neg");), OP(I16, return ir_builder.CreateNeg(val, "neg");),
       OP(I32, return ir_builder.CreateNeg(val, "neg");), OP(I64, return ir_builder.CreateNeg(val, "neg");), OP(U8, return ir_builder.CreateNeg(val, "neg");),
       OP(U16, return ir_builder.CreateNeg(val, "neg");), OP(U32, return ir_builder.CreateNeg(val, "neg");), OP(U64, return ir_builder.CreateNeg(val, "neg");),
       OP(Float, return ir_builder.CreateFNeg(val, "fneg");)}},
@@ -36,27 +36,27 @@ static std::unordered_map<Token::Type, std::unordered_map<PrimitiveType, std::fu
 
 static std::unordered_map<Token::Type, std::unordered_map<PrimitiveType, std::function<llvm::Value*(llvm::IRBuilder<>&, llvm::Value*, llvm::Value*)>>> binary_ops = {
     {Token::Type::Addition,
-     {OP(Integer, return ir_builder.CreateAdd(lhs, rhs, "add");), OP(U8, return ir_builder.CreateAdd(lhs, rhs, "add");), OP(U16, return ir_builder.CreateAdd(lhs, rhs, "add");),
+     {OP(I32, return ir_builder.CreateAdd(lhs, rhs, "add");), OP(U8, return ir_builder.CreateAdd(lhs, rhs, "add");), OP(U16, return ir_builder.CreateAdd(lhs, rhs, "add");),
       OP(U32, return ir_builder.CreateAdd(lhs, rhs, "add");), OP(U64, return ir_builder.CreateAdd(lhs, rhs, "add");), OP(I8, return ir_builder.CreateAdd(lhs, rhs, "add");),
       OP(I16, return ir_builder.CreateAdd(lhs, rhs, "add");), OP(I32, return ir_builder.CreateAdd(lhs, rhs, "add");), OP(I64, return ir_builder.CreateAdd(lhs, rhs, "add");),
       OP(Float, return ir_builder.CreateFAdd(lhs, rhs, "fadd");)}},
     {Token::Type::Substraction,
-     {OP(Integer, return ir_builder.CreateSub(lhs, rhs, "sub");), OP(U8, return ir_builder.CreateSub(lhs, rhs, "sub");), OP(U16, return ir_builder.CreateSub(lhs, rhs, "sub");),
+     {OP(I32, return ir_builder.CreateSub(lhs, rhs, "sub");), OP(U8, return ir_builder.CreateSub(lhs, rhs, "sub");), OP(U16, return ir_builder.CreateSub(lhs, rhs, "sub");),
       OP(U32, return ir_builder.CreateSub(lhs, rhs, "sub");), OP(U64, return ir_builder.CreateSub(lhs, rhs, "sub");), OP(I8, return ir_builder.CreateSub(lhs, rhs, "sub");),
       OP(I16, return ir_builder.CreateSub(lhs, rhs, "sub");), OP(I32, return ir_builder.CreateSub(lhs, rhs, "sub");), OP(I64, return ir_builder.CreateSub(lhs, rhs, "sub");),
       OP(Float, return ir_builder.CreateFSub(lhs, rhs, "fsub");)}},
     {Token::Type::Multiplication,
-     {OP(Integer, return ir_builder.CreateMul(lhs, rhs, "mul");), OP(U8, return ir_builder.CreateMul(lhs, rhs, "mul");), OP(U16, return ir_builder.CreateMul(lhs, rhs, "mul");),
+     {OP(I32, return ir_builder.CreateMul(lhs, rhs, "mul");), OP(U8, return ir_builder.CreateMul(lhs, rhs, "mul");), OP(U16, return ir_builder.CreateMul(lhs, rhs, "mul");),
       OP(U32, return ir_builder.CreateMul(lhs, rhs, "mul");), OP(U64, return ir_builder.CreateMul(lhs, rhs, "mul");), OP(I8, return ir_builder.CreateMul(lhs, rhs, "mul");),
       OP(I16, return ir_builder.CreateMul(lhs, rhs, "mul");), OP(I32, return ir_builder.CreateMul(lhs, rhs, "mul");), OP(I64, return ir_builder.CreateMul(lhs, rhs, "mul");),
       OP(Float, return ir_builder.CreateFMul(lhs, rhs, "fmul");)}},
     {Token::Type::Division,
-     {OP(Integer, return ir_builder.CreateSDiv(lhs, rhs, "div");), OP(I8, return ir_builder.CreateSDiv(lhs, rhs, "div");), OP(I16, return ir_builder.CreateSDiv(lhs, rhs, "div");),
+     {OP(I32, return ir_builder.CreateSDiv(lhs, rhs, "div");), OP(I8, return ir_builder.CreateSDiv(lhs, rhs, "div");), OP(I16, return ir_builder.CreateSDiv(lhs, rhs, "div");),
       OP(I32, return ir_builder.CreateSDiv(lhs, rhs, "div");), OP(I64, return ir_builder.CreateSDiv(lhs, rhs, "div");), OP(U8, return ir_builder.CreateUDiv(lhs, rhs, "div");),
       OP(U16, return ir_builder.CreateUDiv(lhs, rhs, "div");), OP(U32, return ir_builder.CreateUDiv(lhs, rhs, "div");), OP(U64, return ir_builder.CreateUDiv(lhs, rhs, "div");),
 
       OP(Float, return ir_builder.CreateFDiv(lhs, rhs, "fdiv");)}},
-    {Token::Type::Modulus, {OP(Integer, return ir_builder.CreateSRem(lhs, rhs, "srem");)}},
+    {Token::Type::Modulus, {OP(I32, return ir_builder.CreateSRem(lhs, rhs, "srem");)}},
     // Comparisons
     {Token::Type::Equal,
      {OP(Char, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_EQ, lhs, rhs, "ICMP_EQ");),
@@ -68,7 +68,7 @@ static std::unordered_map<Token::Type, std::unordered_map<PrimitiveType, std::fu
       OP(U16, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_EQ, lhs, rhs, "ICMP_EQ");),
       OP(U32, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_EQ, lhs, rhs, "ICMP_EQ");),
       OP(U64, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_EQ, lhs, rhs, "ICMP_EQ");),
-      OP(Integer, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_EQ, lhs, rhs, "ICMP_EQ");),
+      OP(I32, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_EQ, lhs, rhs, "ICMP_EQ");),
       OP(Float, return ir_builder.CreateFCmp(llvm::CmpInst::Predicate::FCMP_OEQ, lhs, rhs, "FCMP_OEQ");)}},
     {Token::Type::Different,
      {OP(Char, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_NE, lhs, rhs, "ICMP_NE");),
@@ -80,11 +80,11 @@ static std::unordered_map<Token::Type, std::unordered_map<PrimitiveType, std::fu
       OP(I16, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_NE, lhs, rhs, "ICMP_NE");),
       OP(I32, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_NE, lhs, rhs, "ICMP_NE");),
       OP(I64, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_NE, lhs, rhs, "ICMP_NE");),
-      OP(Integer, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_NE, lhs, rhs, "ICMP_NE");),
+      OP(I32, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_NE, lhs, rhs, "ICMP_NE");),
       OP(Char, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_NE, lhs, rhs, "ICMP_NE");),
       OP(Float, return ir_builder.CreateFCmp(llvm::CmpInst::Predicate::FCMP_ONE, lhs, rhs, "FCMP_ONE");)}},
     {Token::Type::Lesser,
-     {OP(Integer, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_SLT, lhs, rhs, "ICMP_SLT");),
+     {OP(I32, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_SLT, lhs, rhs, "ICMP_SLT");),
       OP(U8, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_ULT, lhs, rhs, "ICMP_ULT");),
       OP(U16, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_ULT, lhs, rhs, "ICMP_ULT");),
       OP(U32, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_ULT, lhs, rhs, "ICMP_ULT");),
@@ -95,7 +95,7 @@ static std::unordered_map<Token::Type, std::unordered_map<PrimitiveType, std::fu
       OP(I64, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_SLT, lhs, rhs, "ICMP_SLT");),
       OP(Float, return ir_builder.CreateFCmp(llvm::CmpInst::Predicate::FCMP_OLT, lhs, rhs, "FCMP_OLT");)}},
     {Token::Type::LesserOrEqual,
-     {OP(Integer, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_SLE, lhs, rhs, "ICMP_SLE");),
+     {OP(I32, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_SLE, lhs, rhs, "ICMP_SLE");),
       OP(U8, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_ULE, lhs, rhs, "ICMP_ULE");),
       OP(U16, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_ULE, lhs, rhs, "ICMP_ULE");),
       OP(U32, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_ULE, lhs, rhs, "ICMP_ULE");),
@@ -106,7 +106,7 @@ static std::unordered_map<Token::Type, std::unordered_map<PrimitiveType, std::fu
       OP(I64, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_SLE, lhs, rhs, "ICMP_SLE");),
       OP(Float, return ir_builder.CreateFCmp(llvm::CmpInst::Predicate::FCMP_OLE, lhs, rhs, "FCMP_OLE");)}},
     {Token::Type::Greater,
-     {OP(Integer, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_SGT, lhs, rhs, "ICMP_SGT");),
+     {OP(I32, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_SGT, lhs, rhs, "ICMP_SGT");),
       OP(U8, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_UGT, lhs, rhs, "ICMP_UGT");),
       OP(U16, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_UGT, lhs, rhs, "ICMP_UGT");),
       OP(U32, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_UGT, lhs, rhs, "ICMP_UGT");),
@@ -117,7 +117,7 @@ static std::unordered_map<Token::Type, std::unordered_map<PrimitiveType, std::fu
       OP(I64, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_SGT, lhs, rhs, "ICMP_SGT");),
       OP(Float, return ir_builder.CreateFCmp(llvm::CmpInst::Predicate::FCMP_OGT, lhs, rhs, "FCMP_OGT");)}},
     {Token::Type::GreaterOrEqual,
-     {OP(Integer, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_SGE, lhs, rhs, "ICMP_SGE");),
+     {OP(I32, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_SGE, lhs, rhs, "ICMP_SGE");),
       OP(Float, return ir_builder.CreateFCmp(llvm::CmpInst::Predicate::FCMP_OGE, lhs, rhs, "FCMP_OGE");)}},
 };
 #undef OP
@@ -157,7 +157,6 @@ llvm::Constant* Module::codegen_constant(const AST::Node* val) {
         case I16: return llvm::ConstantInt::get(*_llvm_context, llvm::APInt(16, dynamic_cast<const AST::Literal<int16_t>*>(val)->value));
         case I32: return llvm::ConstantInt::get(*_llvm_context, llvm::APInt(32, dynamic_cast<const AST::Literal<int32_t>*>(val)->value));
         case I64: return llvm::ConstantInt::get(*_llvm_context, llvm::APInt(64, dynamic_cast<const AST::Literal<int64_t>*>(val)->value));
-        case Integer: return llvm::ConstantInt::get(*_llvm_context, llvm::APInt(32, dynamic_cast<const AST::IntegerLiteral*>(val)->value));
         case CString: {
             // FIXME: Take a look at llvm::StringRef and llvm::Twine
             auto        str_node = dynamic_cast<const AST::StringLiteral*>(val);
@@ -215,16 +214,12 @@ llvm::Value* Module::codegen(const AST::Node* node) {
             if(is_primitive(node->type_id)) {
                 switch(node->type_id) {
                     case PrimitiveType::Float: {
-                        assert(node->children[0]->type_id == PrimitiveType::Integer); // TEMP
+                        assert(node->children[0]->type_id == PrimitiveType::I32); // TEMP
                         return _llvm_ir_builder.CreateSIToFP(child, llvm::Type::getFloatTy(*_llvm_context), "castSIToFP");
                     }
                     case PrimitiveType::U8: [[fallthrough]];
                     case PrimitiveType::U16: [[fallthrough]];
-                    case PrimitiveType::U32:
-                        // Allow initializing variables from LiteralInteger
-                        if(node->children[0]->type_id == PrimitiveType::Integer)
-                            return _llvm_ir_builder.CreateCast(llvm::Instruction::Trunc, child, get_llvm_type(node->type_id), "castTrunc");
-                        [[fallthrough]];
+                    case PrimitiveType::U32: [[fallthrough]];
                     case PrimitiveType::U64: {
                         if(is_floating_point(node->children[0]->type_id))
                             return _llvm_ir_builder.CreateCast(llvm::Instruction::UIToFP, child, get_llvm_type(node->type_id), "castUIToFP");
@@ -233,15 +228,12 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                             return _llvm_ir_builder.CreateCast(llvm::Instruction::Trunc, child, get_llvm_type(node->type_id), "castTrunc");
                         return _llvm_ir_builder.CreateCast(llvm::Instruction::ZExt, child, get_llvm_type(node->type_id), "castZeroExt");
                     }
-                    case PrimitiveType::Integer: {
-                        if(is_floating_point(node->children[0]->type_id))
-                            return _llvm_ir_builder.CreateFPToSI(child, llvm::Type::getInt32Ty(*_llvm_context), "castFPToSI");
-                        [[fallthrough]];
-                    }
                     case PrimitiveType::I8: [[fallthrough]];
                     case PrimitiveType::I16: [[fallthrough]];
                     case PrimitiveType::I32: [[fallthrough]];
                     case PrimitiveType::I64: {
+                        if(is_floating_point(node->children[0]->type_id))
+                            return _llvm_ir_builder.CreateFPToSI(child, get_llvm_type(node->type_id), "castFPToSI");
                         return _llvm_ir_builder.CreateCast(llvm::Instruction::SExt, child, get_llvm_type(node->type_id), "castSignExt");
                     }
                     case PrimitiveType::Pointer: {
@@ -673,7 +665,6 @@ llvm::Type* Module::get_llvm_type(TypeID type_id) const {
             case I16: return llvm::Type::getInt16Ty(*_llvm_context);
             case I32: return llvm::Type::getInt32Ty(*_llvm_context);
             case I64: return llvm::Type::getInt64Ty(*_llvm_context);
-            case Integer: return llvm::Type::getInt32Ty(*_llvm_context);
             case Pointer: return llvm::Type::getInt64Ty(*_llvm_context); // FIXME ?
             case Float: return llvm::Type::getFloatTy(*_llvm_context);
             case Double: return llvm::Type::getDoubleTy(*_llvm_context);
