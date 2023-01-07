@@ -12,12 +12,12 @@ export function reserve<T>(this: Array<T>*, size: u64) : void {
 	
 	// FIXME: Yeah, we don't have "sizeof" yet.
 	// let ptr : T* = malloc(size * sizeof(T));
-	let ptr : T* = malloc(size * 64);
+	let ptr : T* = malloc(size * 64u64);
 	
 	for(let idx : u64 = 0; idx < .length; ++idx) {
 		ptr[idx] = .data[idx];
 	}
-	if(.capacity > 0)
+	if(.capacity > 0u64)
 		free(.data);
 	
 	.capacity = size;
@@ -26,7 +26,7 @@ export function reserve<T>(this: Array<T>*, size: u64) : void {
 
 export function push_back<T>(this: Array<T>*, value: T) : u64 {
 	if(.capacity <= .length) 
-		.reserve((.capacity + 1) * 2);
+		.reserve((.capacity + 1u64) * 2u64);
 	
 	.data[.length] = value;
 	++.length;
