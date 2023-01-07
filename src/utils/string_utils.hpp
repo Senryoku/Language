@@ -1,16 +1,19 @@
 #pragma once
 
-std::string longest_common_prefix(auto arr) {
+#include <string>
+
+std::string longest_common_prefix(const auto& arr) {
     if(arr.size() == 0)
         return "";
-    std::string r = arr[0];
+    const std::string& r = arr[0];
+    auto               prefix_size = r.size();
     for(auto i = 1; i < arr.size(); ++i) {
         auto j = 0;
-        while(j < r.size() && j < arr[i].size() && r[j] == arr[i][j])
+        while(j < std::min(prefix_size, arr[i].size()) && r[j] == arr[i][j])
             ++j;
         if(j == 0)
             return "";
-        r.resize(j);
+        prefix_size = j;
     }
-    return r;
+    return r.substr(0, prefix_size);
 }

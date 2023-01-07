@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <strsafe.h>
 #include <tchar.h>
+#define NOMINMAX
 #include <windows.h>
 #endif
 

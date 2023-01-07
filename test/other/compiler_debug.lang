@@ -1,12 +1,31 @@
-function main() : i32 {
-	let my_u8 = 0u8;
-	let my_u16 = 0u16;
-	let my_u32 = 0u32;
-	let my_u64 = 0u64;
-	let my_i8 = 0i8;
-	let my_i16 = 0i16;
-	let my_i32 = 0i32;
-	let my_i64 = 0i64;
-	let my_float = 0f;
-	return my_i32;
+// PASS: a[3] = 1337
+// RET : 0
+
+import "std/memory"
+import "std/Array"
+
+function dump<T>(this: Array<T>*) : void {
+	printf("----------------\n");
+	for(let idx : u64 = 0; idx < .length; ++idx) {
+		printf("  a[%d] = %d\n", idx, .get(idx));
+	}
+}
+
+function test() : Array<u64> {
+	let arr : Array<u64>;
+	
+	arr.push_back(42u64);
+	arr.push_back(1337u64);
+	arr.dump();
+	arr.push_back(42u64);
+	arr.push_back(1337u64);
+	arr.dump();
+	
+	return arr;
+}
+
+function main() {
+	let t = test();
+	t.dump();
+	return t.length;
 }
