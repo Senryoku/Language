@@ -1035,7 +1035,39 @@ AST::BoolLiteral* Parser::parse_boolean(const std::span<Token>&, std::span<Token
 
 AST::Node* Parser::parse_digits(const std::span<Token>&, std::span<Token>::iterator& it, AST::Node* curr_node, PrimitiveType type) {
     uint64_t value;
-    auto [ptr, error_code] = std::from_chars(&*(it->value.begin()), &*(it->value.begin()) + it->value.length(), value);
+    // Search for an explicit type specification, from the end of the token.
+    int size_idx = -1;
+    bool force_unsigned = false;
+    for(int idx = static_cast<int>(it->value.length()) - 1; idx >= 0 && idx >= std::max(0, static_cast<int>(it->value.length()) - 3); --idx) {
+            switch(it->value[idx]) {
+                case 'i': 
+                    size_idx = idx + 1;
+                    force_unsigned = false;
+                    break;
+                case 'u': 
+                    size_idx = idx + 1;
+                    force_unsigned = true;
+                    break;
+                default: break;
+        }
+    }
+    auto length = it->value.length();
+    if (size_idx >= 0) {
+        auto size_str = it->value.substr(size_idx);
+        if(size_str == "8")
+            type = force_unsigned ? PrimitiveType::U8 : PrimitiveType::I8;
+        else if(size_str == "16")
+            type = force_unsigned ? PrimitiveType::U16 : PrimitiveType::I16;
+        else if(size_str == "32")
+            type = force_unsigned ? PrimitiveType::U32 : PrimitiveType::I32;
+        else if(size_str == "64")
+            type = force_unsigned ? PrimitiveType::U64 : PrimitiveType::I64;
+        else
+            throw Exception(fmt::format("[Parser] Syntax error: expected integer size hint in integer literal '{}', got '{}'.", it->value, size_str), point_error(*it));
+        length = size_idx - 1;
+    }
+
+    auto [ptr, error_code] = std::from_chars(&*(it->value.begin()), &*(it->value.begin()) + length, value);
     if(error_code == std::errc::invalid_argument)
         throw Exception("[Parser::parse_digits] std::from_chars returned invalid_argument.\n", point_error(*it));
     else if(error_code == std::errc::result_out_of_range)
@@ -1557,7 +1589,7 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
                 create_cast_node(1, binary_operator_node->type_id);
             } else if(is_allowed_but_unsafe_cast(binary_operator_node->type_id, binary_operator_node->children[1]->type_id)) {
                 warn("[Parser] Warning: Unsafe cast from {} to {}:\n{}", type_id_to_string(binary_operator_node->children[1]->type_id),
-                     type_id_to_string(binary_operator_node->type_id), point_error(binary_operator_node->children[1]->token));
+                     type_id_to_string(binary_operator_node->type_id), point_error(binary_operator_node->token));
                 create_cast_node(1, binary_operator_node->type_id);
             }
         }
@@ -1589,13 +1621,13 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
                     create_cast_node(1, binary_operator_node->children[0]->type_id);
                 else if(is_allowed_but_unsafe_cast(binary_operator_node->children[0]->type_id, binary_operator_node->children[1]->type_id)) {
                     warn("[Parser] Warning: Unsafe cast from {} to {}:\n{}", type_id_to_string(binary_operator_node->children[1]->type_id),
-                         type_id_to_string(binary_operator_node->children[0]->type_id), point_error(binary_operator_node->children[1]->token));
+                         type_id_to_string(binary_operator_node->children[0]->type_id), point_error(binary_operator_node->token));
                     create_cast_node(1, binary_operator_node->children[0]->type_id);
                 } else if(is_safe_cast(binary_operator_node->children[1]->type_id, binary_operator_node->children[0]->type_id))
                     create_cast_node(0, binary_operator_node->children[1]->type_id);
                 else if(is_allowed_but_unsafe_cast(binary_operator_node->children[1]->type_id, binary_operator_node->children[0]->type_id)) {
                     warn("[Parser] Warning: Unsafe cast from {} to {}:\n{}", type_id_to_string(binary_operator_node->children[0]->type_id),
-                         type_id_to_string(binary_operator_node->children[1]->type_id), point_error(binary_operator_node->children[0]->token));
+                         type_id_to_string(binary_operator_node->children[1]->type_id), point_error(binary_operator_node->token));
                     create_cast_node(0, binary_operator_node->children[1]->type_id);
                 }
             }
@@ -1606,7 +1638,7 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
                         create_cast_node(i, binary_operator_node->type_id);
                     else if(is_allowed_but_unsafe_cast(binary_operator_node->type_id, binary_operator_node->children[i]->type_id)) {
                         warn("[Parser] Warning: Unsafe cast from {} to {}:\n{}", type_id_to_string(binary_operator_node->children[i]->type_id),
-                             type_id_to_string(binary_operator_node->type_id), point_error(binary_operator_node->children[i]->token));
+                             type_id_to_string(binary_operator_node->type_id), point_error(binary_operator_node->token));
                         create_cast_node(i, binary_operator_node->type_id);
                     }
         }

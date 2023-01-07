@@ -1,24 +1,12 @@
-// Pass: Received: HTTP/1.1 200 OK
-
-import "std/Socket"
-
-function main() : int {
-	socket_init(); // How should we handle that?
-
-	let socket : Socket;
-
-	socket.create();
-
-	printf("Got socket: %d\n", socket.fd);
-
-	socket.connect("httpbin.org", 80);
-	socket.send("GET /get HTTP/1.0\r\n\r\n");
-	
-	let data = socket.recv();
-	let zero : u8 = 0;
-	data.push_back(zero);
-	// Assume the received data if a null terminated string.
-	printf("Received: %s\n", data.data);
-
-	return 0;
+function main() : i32 {
+	let my_u8 = 0u8;
+	let my_u16 = 0u16;
+	let my_u32 = 0u32;
+	let my_u64 = 0u64;
+	let my_i8 = 0i8;
+	let my_i16 = 0i16;
+	let my_i32 = 0i32;
+	let my_i64 = 0i64;
+	let my_float = 0f;
+	return my_i32;
 }

@@ -101,17 +101,34 @@ Token Tokenizer::search_next() {
                 [[fallthrough]];
             default: {
                 if(is_digit(first_char)) {
+                    bool force_float = false;
+                    bool force_integer = false;
                     bool found_decimal_separator = false;
-                    while(!eof() && (is_digit(peek()) || peek() == '.')) {
-                        if(peek() == '.') {
-                            if(found_decimal_separator)
-                                throw Exception(fmt::format("[Tokenizer] Error: Unexpected supernumerary '.' in float constant on line {}.", _current_line),
-                                                point_error(_current_column, _current_line));
-                            found_decimal_separator = true;
+                    while(!eof() && (is_digit(peek()) || peek() == '.' || peek() == 'i' || peek() == 'u' || peek() == 'f')) {
+                        switch(peek()) {
+                            case 'u': [[fallthrough]];
+                            case 'i':
+                                if(force_integer || force_float)
+                                    throw Exception(fmt::format("[Tokenizer] Error: Unexpected supernumerary '{}' in literal constant on line {}.", peek(), _current_line),
+                                                    point_error(_current_column, _current_line));
+                                force_integer = true;
+                                break;
+                            case 'f':
+                                if(force_float || force_integer)
+                                    throw Exception(fmt::format("[Tokenizer] Error: Unexpected supernumerary 'f' in float constant on line {}.", _current_line),
+                                                    point_error(_current_column, _current_line));
+                                force_float = true;
+                                break;
+                            case '.':
+                                if(found_decimal_separator || force_integer)
+                                    throw Exception(fmt::format("[Tokenizer] Error: Unexpected supernumerary '.' in float constant on line {}.", _current_line),
+                                                    point_error(_current_column, _current_line));
+                                found_decimal_separator = true;
+                                break;
                         }
                         advance();
                     }
-                    type = found_decimal_separator ? Token::Type::Float : Token::Type::Digits;
+                    type = (force_float || found_decimal_separator) ? Token::Type::Float : Token::Type::Digits;
                 } else {
                     auto temp_cursor = _current_pos;
                     // Operators
