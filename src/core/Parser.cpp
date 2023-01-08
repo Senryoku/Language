@@ -989,11 +989,9 @@ bool Parser::parse_type_declaration(const std::span<Token>& tokens, std::span<To
         auto type = dynamic_cast<const StructType*>(GlobalTypeRegistry::instance().get_type(type_node->type_id));
 
         for(auto idx = 0; idx < type->members.size(); ++idx) {
-            if(default_values[idx]) {
-                auto assignment = new AST::BinaryOperator(Token(Token::Type::Assignment, *internalize_string("="), 0, 0));
-                function_scope->add_child(assignment);
+            if(default_values[idx] || constructors[idx]) {
+                assert(default_values[idx] != nullptr xor constructors[idx] != nullptr);
                 auto member_access = new AST::BinaryOperator(Token(Token::Type::MemberAccess, *internalize_string("."), 0, 0));
-                assignment->add_child(member_access);
                 auto dereference = new AST::Node(AST::Node::Type::Dereference);
                 member_access->add_child(dereference);
                 dereference->type_id = this_base_type;
@@ -1003,12 +1001,27 @@ bool Parser::parse_type_declaration(const std::span<Token>& tokens, std::span<To
                 member_access->add_child(member_identifier);
                 member_identifier->index = idx;
                 member_identifier->type_id = type_node->members()[idx]->type_id;
-                assignment->add_child(default_values[idx]);
                 resolve_operator_type(member_access);
-                resolve_operator_type(assignment);
+                if(default_values[idx]) {
+                    auto assignment = new AST::BinaryOperator(Token(Token::Type::Assignment, *internalize_string("="), 0, 0));
+                    function_scope->add_child(assignment);
+                    assignment->add_child(member_access);
+                    assignment->add_child(default_values[idx]);
+                    resolve_operator_type(assignment);
+                }
+                if(constructors[idx]) {
+                    // Patch the variable access with our member access
+                    // FIXME: Once again, this is kinda hackish.
+                    //        Some asserts on the function call structure, in case we end up changing it.
+                    assert(constructors[idx]->children.back()->type == AST::Node::Type::GetPointer);
+                    assert(constructors[idx]->children.back()->children.size() == 1);
+                    assert(constructors[idx]->children.back()->children[0]->type == AST::Node::Type::Variable);
+                    delete constructors[idx]->children.back()->children[0];
+                    constructors[idx]->children.back()->children.pop_back();
+                    constructors[idx]->children.back()->add_child(member_access);
+                    function_scope->add_child(constructors[idx]);
+                }
             }
-            if(constructors[idx])
-                function_scope->add_child(constructors[idx]);
         }
 
         if(!get_scope().declare_function(*function_node))
@@ -1032,23 +1045,23 @@ AST::BoolLiteral* Parser::parse_boolean(const std::span<Token>&, std::span<Token
 AST::Node* Parser::parse_digits(const std::span<Token>&, std::span<Token>::iterator& it, AST::Node* curr_node, PrimitiveType type) {
     uint64_t value;
     // Search for an explicit type specification, from the end of the token.
-    int size_idx = -1;
+    int  size_idx = -1;
     bool force_unsigned = false;
     for(int idx = static_cast<int>(it->value.length()) - 1; idx >= 0 && idx >= std::max(0, static_cast<int>(it->value.length()) - 3); --idx) {
-            switch(it->value[idx]) {
-                case 'i': 
-                    size_idx = idx + 1;
-                    force_unsigned = false;
-                    break;
-                case 'u': 
-                    size_idx = idx + 1;
-                    force_unsigned = true;
-                    break;
-                default: break;
+        switch(it->value[idx]) {
+            case 'i':
+                size_idx = idx + 1;
+                force_unsigned = false;
+                break;
+            case 'u':
+                size_idx = idx + 1;
+                force_unsigned = true;
+                break;
+            default: break;
         }
     }
     auto length = it->value.length();
-    if (size_idx >= 0) {
+    if(size_idx >= 0) {
         auto size_str = it->value.substr(size_idx);
         if(size_str == "8")
             type = force_unsigned ? PrimitiveType::U8 : PrimitiveType::I8;
