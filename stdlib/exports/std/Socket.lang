@@ -4,8 +4,12 @@ extern function __socket_connect(sockfd: i32, addr: char*, port: i32) : i32;
 extern function __socket_send(sockfd: i32, data: cstr) : i32; 
 extern function __socket_recv(sockfd: i32, buff: u8*, buff_size: u64) : u64;
 extern function __socket_close(sockfd: i32) : i32;
+extern function __socket_bind(sockfd: i32, addr: cstr, port: i32) : i32;
+extern function __socket_listen(sockfd: i32) : i32;
+extern function __socket_accept(sockfd: i32) : i32;
 
 import "std/Array"
+import "std/String"
 
 export function socket_init() {
 	__socket_init();
@@ -32,6 +36,20 @@ export function recv(this: Socket*) : Array<u8> {
 	let r : Array<u8>;
 	r.reserve(2048);
 	let bytes_read = __socket_recv(.fd, r.data, r.capacity);
+	return r;
+}
+
+export function bind(this: Socket*, addr: String, port: i32) {
+	return __socket_bind(.fd, addr.ptr, port);
+}
+
+export function listen(this: Socket*) {
+	return __socket_listen(.fd);
+}
+
+export function accept(this: Socket*) : Socket {
+	let r: Socket;
+	r.fd = __socket_accept(.fd);
 	return r;
 }
 

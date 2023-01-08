@@ -72,10 +72,25 @@ int __socket_create() {
     int sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if(sockfd < 0) {
         auto err = get_socket_error();
+        // __socket_init was not called, try to call it before giving up.
+        if (err == 10093) {
+            if (__socket_init() == 0) {
+                // Try again
+                sockfd = socket(AF_INET, SOCK_STREAM, 0);
+                // Yay! We recovered!
+                if(sockfd >= 0)
+                    return sockfd;
+            }
+        }
         printf("Error getting socket (%d): %s.\n", err, get_error_string(err).c_str());
         return 0;
     }
     return sockfd;
+}
+
+int __socket_close(int sockfd) {
+    // FIXME: Check return value.
+    return closesocket(sockfd);
 }
 
 int __socket_connect(int sockfd, const char* addr, int port) {
@@ -125,10 +140,16 @@ int __socket_connect(int sockfd, const char* addr, int port) {
 }
 
 int __socket_send(int sockfd, const char* req) {
-    //printf("__socket_send on socket %d\n", sockfd);
+    printf("__socket_send on socket %d: \n%s\n", sockfd, req);
 
     const std::string request(req);
-    return send(sockfd, request.c_str(), request.size(), 0);
+    auto r = send(sockfd, request.c_str(), request.size(), 0);
+    if(r == SOCKET_ERROR) {
+        auto err = get_socket_error();
+        printf("Error %d sending data on socket %d: %s.\n", err, sockfd, get_error_string(err).c_str());
+    }
+    shutdown(sockfd, SD_SEND);
+    return r;
 }
 
 size_t __socket_recv(int sockfd, char* buff, size_t buff_size) {
@@ -145,9 +166,21 @@ size_t __socket_recv(int sockfd, char* buff, size_t buff_size) {
     return status;
 }
 
-int __socket_close(int sockfd) {
-    // FIXME: Check return value.
-    return closesocket(sockfd);
+int __socket_bind(int sockfd, const char* addr, int port) {
+    sockaddr_in service;
+    service.sin_family = AF_INET;
+    service.sin_addr.s_addr = inet_addr(addr);
+    service.sin_port = htons(port);
+    return bind(sockfd, (SOCKADDR*)&service, sizeof(service));
 }
+
+int __socket_listen(int sockfd) {
+    return listen(sockfd, SOMAXCONN);
+}
+
+int __socket_accept(int sockfd) {
+    return accept(sockfd, nullptr, nullptr);
+}
+
 
 } // extern "C"

@@ -38,6 +38,12 @@ export function from_c_string(this: String*, value: cstr) : void {
 	}
 }
 
+export function String(c_str: cstr) {
+	let r : String;
+	r.from_c_string(c_str);
+	return r;
+}
+
 export function destructor(this: String*) : void {
 	.clear();
 }
