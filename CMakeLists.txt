@@ -26,8 +26,8 @@ endif()
 
 set(STDLIB_BASE_FOLDER "${PROJECT_SOURCE_DIR}/stdlib/exports/")
 configure_file(
-    "${PROJECT_SOURCE_DIR}/src/core/Config.hpp.in"
-    "${PROJECT_SOURCE_DIR}/src/core/Config.hpp"
+    "${PROJECT_SOURCE_DIR}/src/compiler/Config.hpp.in"
+    "${PROJECT_SOURCE_DIR}/src/compiler/Config.hpp"
 )
 
 # Define sources
