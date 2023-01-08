@@ -8,11 +8,14 @@ function listen(this: HTTPServer*, addr: String, port: i32) {
 	.socket.create();
 	.socket.bind(addr, port);
 	.socket.listen();
+	// FIXME: As addr is 'moved' in there (should we make it explicit?), its destructor should be called automatically here.
+	//        This is not the case yet.
 }	
 
 function main() {
 	let http_server : HTTPServer;
 
+	// FIXME: This leaks v--------------- the temporaty String should be moved and the destructor should be called in the listen function.
 	http_server.listen(String("127.0.0.1"), 12345);
 	
 	let client = http_server.socket.accept();
