@@ -53,8 +53,8 @@ class AST {
         };
 
         Node() = default;
-        Node(Token t) noexcept : token(t) {}
-        Node(Type type) noexcept : type(type) {}
+        explicit Node(Token t) noexcept : token(t) {}
+        explicit Node(Type type) noexcept : type(type) {}
         Node(Type type, Node& parent) noexcept : type(type), parent(&parent) {}
         Node(Type type, Token token, SubType subtype = SubType::Undefined) noexcept : type(type), subtype(subtype), token(token) {}
         Node(Node&& o) noexcept : type(o.type), subtype(o.subtype), parent(o.parent), token(std::move(o.token)), children(std::move(o.children)) {}
@@ -86,6 +86,11 @@ class AST {
         std::vector<Node*> children;
 
         Node* add_child(Node* n);
+        template<typename T>
+        T* add_child(T* n) {
+            add_child(static_cast<Node*>(n));
+            return n;
+        }
         Node* add_child_front(Node* n);
         Node* add_child_after(Node* n, const Node* prev);
         Node* pop_child();
@@ -108,7 +113,7 @@ class AST {
 
     struct TypeDeclaration : public Node {
         TypeDeclaration() : Node(Node::Type::TypeDeclaration) {}
-        TypeDeclaration(Token t) : Node(Node::Type::TypeDeclaration, t) {}
+        explicit TypeDeclaration(Token t) : Node(Node::Type::TypeDeclaration, t) {}
 
         const auto& name() const { return token.value; }
         const auto& members() const { return children; }
@@ -126,7 +131,7 @@ class AST {
     */
     struct FunctionDeclaration : public Node {
         FunctionDeclaration() : Node(Node::Type::FunctionDeclaration){};
-        FunctionDeclaration(Token t) : Node(Node::Type::FunctionDeclaration, t) {}
+        explicit FunctionDeclaration(Token t) : Node(Node::Type::FunctionDeclaration, t) {}
 
         enum Flag : uint8_t {
             None = 0,
@@ -180,7 +185,7 @@ class AST {
 
     struct FunctionCall : public Node {
         FunctionCall() : Node(Node::Type::FunctionCall) {}
-        FunctionCall(Token t) : Node(Node::Type::FunctionCall, t) {}
+        explicit FunctionCall(Token t) : Node(Node::Type::FunctionCall, t) {}
 
         FunctionDeclaration::Flag flags = FunctionDeclaration::None;
 
@@ -225,7 +230,7 @@ class AST {
 
     struct Defer : public Node {
         Defer() : Node(Node::Type::Defer) {}
-        Defer(Token t) : Node(Node::Type::Defer, t) {}
+        explicit Defer(Token t) : Node(Node::Type::Defer, t) {}
 
         [[nodiscard]] virtual Defer* clone() const override {
             auto n = new Defer();
@@ -236,7 +241,7 @@ class AST {
 
     struct Scope : public Node {
         Scope() : Node(Node::Type::Scope) {}
-        Scope(Token t) : Node(Node::Type::Scope, t) {}
+        explicit Scope(Token t) : Node(Node::Type::Scope, t) {}
 
         AST::Defer* defer = nullptr;
 
@@ -258,7 +263,8 @@ class AST {
 
     struct VariableDeclaration : public Node {
         VariableDeclaration() : Node(Node::Type::VariableDeclaration) {}
-        VariableDeclaration(Token t) : Node(Node::Type::VariableDeclaration, t) {}
+        explicit VariableDeclaration(Token t) : Node(Node::Type::VariableDeclaration, t) {}
+        VariableDeclaration(Token token, TypeID _type_id) : Node(Node::Type::VariableDeclaration, token) { type_id = _type_id; }
 
         enum Flag : uint8_t {
             None = 0,
@@ -279,7 +285,8 @@ class AST {
 
     struct Variable : public Node {
         Variable() : Node(Node::Type::Variable) {}
-        Variable(Token t) : Node(Node::Type::Variable, t) {}
+        explicit Variable(Token t) : Node(Node::Type::Variable, t) {}
+        explicit Variable(const VariableDeclaration* var_dec) : Node(Node::Type::Variable, var_dec->token) { type_id = var_dec->type_id; }
 
         std::string_view name;
 
@@ -293,7 +300,7 @@ class AST {
 
     struct BinaryOperator : public Node {
         BinaryOperator() : Node(Node::Type::BinaryOperator) {}
-        BinaryOperator(Token t) : Node(Node::Type::BinaryOperator, t) {}
+        explicit BinaryOperator(Token t) : Node(Node::Type::BinaryOperator, t) {}
 
         Token::Type operation() const { return token.type; }
         Node*       lhs() const { return children[0]; }
@@ -308,7 +315,7 @@ class AST {
 
     struct UnaryOperator : public Node {
         UnaryOperator() : Node(Node::Type::UnaryOperator) {}
-        UnaryOperator(Token t) : Node(Node::Type::UnaryOperator, t) {}
+        explicit UnaryOperator(Token t) : Node(Node::Type::UnaryOperator, t) {}
 
         enum class Flag {
             None = 0,
@@ -330,7 +337,7 @@ class AST {
 
     struct MemberIdentifier : public Node {
         MemberIdentifier() : Node(Node::Type::MemberIdentifier) {}
-        MemberIdentifier(Token t) : Node(Node::Type::MemberIdentifier, t) {}
+        explicit MemberIdentifier(Token t) : Node(Node::Type::MemberIdentifier, t) {}
 
         uint32_t index = 0;
 
@@ -347,7 +354,7 @@ class AST {
     template<typename T>
     struct Literal : public Node {
         Literal() : Node(Type::ConstantValue) {}
-        Literal(Token t) : Node(Type::ConstantValue, t) {}
+        explicit Literal(Token t) : Node(Type::ConstantValue, t) {}
         T value = T{};
 
         [[nodiscard]] virtual Literal<typename T>* clone() const override {
@@ -360,7 +367,7 @@ class AST {
 
     struct BoolLiteral : public Literal<bool> {
         BoolLiteral() : Literal() { type_id = PrimitiveType::Boolean; }
-        BoolLiteral(Token t) : Literal(t) { type_id = PrimitiveType::Boolean; }
+        explicit BoolLiteral(Token t) : Literal(t) { type_id = PrimitiveType::Boolean; }
 
         [[nodiscard]] virtual BoolLiteral* clone() const override {
             auto n = new BoolLiteral();
@@ -372,7 +379,7 @@ class AST {
 
     struct CharLiteral : public Literal<char> {
         CharLiteral() : Literal() { type_id = PrimitiveType::Char; }
-        CharLiteral(Token t) : Literal(t) { type_id = PrimitiveType::Char; }
+        explicit CharLiteral(Token t) : Literal(t) { type_id = PrimitiveType::Char; }
 
         [[nodiscard]] virtual CharLiteral* clone() const override {
             auto n = new CharLiteral();
@@ -384,7 +391,7 @@ class AST {
 
     struct FloatLiteral : public Literal<float> {
         FloatLiteral() : Literal() { type_id = PrimitiveType::Float; }
-        FloatLiteral(Token t) : Literal(t) { type_id = PrimitiveType::Float; }
+        explicit FloatLiteral(Token t) : Literal(t) { type_id = PrimitiveType::Float; }
 
         [[nodiscard]] virtual FloatLiteral* clone() const override {
             auto n = new FloatLiteral();
@@ -396,7 +403,7 @@ class AST {
 
     struct StringLiteral : public Literal<std::string_view> {
         StringLiteral() : Literal() { type_id = PrimitiveType::CString; }
-        StringLiteral(Token t) : Literal(t) { type_id = PrimitiveType::CString; }
+        explicit StringLiteral(Token t) : Literal(t) { type_id = PrimitiveType::CString; }
 
         [[nodiscard]] virtual StringLiteral* clone() const override {
             auto n = new StringLiteral();
@@ -408,10 +415,24 @@ class AST {
 
     struct Cast : public Node {
         Cast() = default;
-        Cast(TypeID _type_id) : Node(Type::Cast) { type_id = _type_id; }
+        explicit Cast(TypeID _type_id) : Node(Type::Cast) { type_id = _type_id; }
 
         [[nodiscard]] virtual Cast* clone() const override {
             auto n = new Cast();
+            clone_impl(n);
+            return n;
+        }
+    };
+
+    struct LValueToRValue : public Node {
+        LValueToRValue() = default;
+        explicit LValueToRValue(AST::Node* child) : Node(Type::LValueToRValue) {
+            add_child(child);
+            type_id = child->type_id;
+        }
+
+        [[nodiscard]] virtual LValueToRValue* clone() const override {
+            auto n = new LValueToRValue();
             clone_impl(n);
             return n;
         }
