@@ -171,15 +171,30 @@ int __socket_bind(int sockfd, const char* addr, int port) {
     service.sin_family = AF_INET;
     service.sin_addr.s_addr = inet_addr(addr);
     service.sin_port = htons(port);
-    return bind(sockfd, (SOCKADDR*)&service, sizeof(service));
+    auto r = bind(sockfd, (SOCKADDR*)&service, sizeof(service));
+    if(r == SOCKET_ERROR) {
+        auto err = get_socket_error();
+        printf("__socket_bind(%d, \"%s\", %d): error (%d): %s\n", sockfd, addr, port, err, get_error_string(err).c_str());
+    }
+    return r;
 }
 
 int __socket_listen(int sockfd) {
-    return listen(sockfd, SOMAXCONN);
+    auto r = listen(sockfd, SOMAXCONN);
+    if(r == SOCKET_ERROR) {
+        auto err = get_socket_error();
+        printf("__socket_listen(%d): error (%d): %s\n", sockfd, err, get_error_string(err).c_str());
+    }
+    return r;
 }
 
 int __socket_accept(int sockfd) {
-    return accept(sockfd, nullptr, nullptr);
+    auto r = accept(sockfd, nullptr, nullptr);
+    if(r == INVALID_SOCKET) {
+        auto err = get_socket_error();
+        printf("__socket_accept(%d): error (%d): %s\n", sockfd, err, get_error_string(err).c_str());
+    }
+    return r;
 }
 
 

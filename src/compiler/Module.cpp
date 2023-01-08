@@ -397,6 +397,13 @@ llvm::Value* Module::codegen(const AST::Node* node) {
             ret = create_entry_block_alloca(parent_function, type, std::string{node->token.value});
             if(!set(node->token.value, ret))
                 throw Exception(fmt::format("[LLVMCodegen] Variable '{}' already declared (line {}).\n", node->token.value, node->token.line));
+
+            // Codegen assignment of default value.
+            if(!node->children.empty()) {
+                assert(node->children.size() == 1);
+                codegen(node->children[0]);
+            }
+
             return ret;
         }
         case AST::Node::Type::Variable: {
@@ -583,6 +590,11 @@ llvm::Value* Module::codegen(const AST::Node* node) {
             _llvm_ir_builder.CreateBr(condition_label);
 
             _llvm_ir_builder.SetInsertPoint(after_block);
+
+            // For node might generate some destructors calls
+            for(auto idx = 4; idx < node->children.size(); ++idx)
+                codegen(node->children[idx]);
+
             return llvm::Constant::getNullValue(llvm::Type::getInt32Ty(*_llvm_context));
         }
         case AST::Node::Type::IfStatement: {

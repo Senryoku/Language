@@ -267,44 +267,57 @@ bool Parser::parse(const std::span<Token>& tokens, AST::Node* curr_node) {
             case Token::Type::Return: {
                 std::unique_ptr<AST::Node> return_node(new AST::Node(AST::Node::Type::ReturnStatement, *it));
                 ++it;
-                if(it->type == Token::Type::EndStatement) {
-                    return_node->type_id = PrimitiveType::Void;
-                    curr_node->add_child(return_node.release());
-                    break;
-                }
-                auto to_rvalue = return_node->add_child(new AST::Node(AST::Node::Type::LValueToRValue));
-                if(!parse_next_expression(tokens, it, to_rvalue))
-                    return false;
 
-                // FIXME: Detect return of structs to mark them as 'moved' and avoid calling their destructor.
-                //        There's probably a more elegant way to do this... And it will probably not be the only way to move a local value.
-                AST::VariableDeclaration* return_variable = nullptr;
-                if(to_rvalue->children[0]->type == AST::Node::Type::Variable) {
-                    auto ret_type = GlobalTypeRegistry::instance().get_type(to_rvalue->children[0]->type_id);
-                    if(ret_type->is_struct() ||
-                       (ret_type->is_templated() && GlobalTypeRegistry::instance().get_type(dynamic_cast<const TemplatedType*>(ret_type)->template_type_id)->is_struct())) {
-                        return_variable = get(to_rvalue->children[0]->token.value);
-                        if(!return_variable) {
-                            warn("[Parser] Uh?! Returning a non-existant variable '{}' ?\n", to_rvalue->children[0]->token.value);
-                        } else {
-                            // FIXME: This could be completely fine for type without destructors (or with another set of compile time constraints? Traits?)
-                            if(return_variable->flags & AST::VariableDeclaration::Flag::Moved)
-                                throw Exception(fmt::format("[Parser] Returning variable '{}' which was already moved!\n", return_variable->token.value),
-                                                point_error(return_node->token));
-
-                            return_variable->flags |= AST::VariableDeclaration::Flag::Moved;
+                auto insert_destructors = [&]() { 
+                    // Pop scopes until parent function
+                    auto parent = curr_node;
+                    auto scope_it = get_scope_rbegin();
+                    while(parent != nullptr && parent->type != AST::Node::Type::FunctionDeclaration) {
+                        if(parent->type == AST::Node::Type::Scope || parent->type == AST::Node::Type::FunctionDeclaration) {
+                            insert_defer_node(*scope_it, curr_node);
+                            ++scope_it;
                         }
+                        parent = parent->parent;
                     }
+                    if(parent->type == AST::Node::Type::FunctionDeclaration)
+                        insert_defer_node(*scope_it, curr_node);
+                };
+
+                if(it->type == Token::Type::EndStatement || it->type == Token::Type::CloseScope) {
+                    return_node->type_id = PrimitiveType::Void;
+                    insert_destructors();
+                } else {
+                    std::unique_ptr<AST::Node> to_rvalue(new AST::Node(AST::Node::Type::LValueToRValue));
+                    if(!parse_next_expression(tokens, it, to_rvalue.get()))
+                        return false;
+                    to_rvalue->type_id = to_rvalue->children[0]->type_id;
+
+                    // FIXME: Detect return of structs to mark them as 'moved' and avoid calling their destructor.
+                    //        There's probably a more elegant way to do this... And it will probably not be the only way to move a local value.
+                    AST::VariableDeclaration* return_variable = mark_variable_as_moved(to_rvalue->children[0]);
+
+                    // The returned value might depend on objects that will be destroyed with this return,
+                    // we have to cache the result of the expression before calling local destructors.
+                    // FIXME: This there a better way to do this than creating a dummy variable? (especially since we have to make sure the name is unique in this scope...
+                    //        At least the invalid characters in a standard identifier prevents a user from creating a variable with the same name.)
+                    //   let __return_expression_result_XX:YY = our_return_value;
+                    const auto& var_name = *internalize_string(fmt::format("#return_expression_result_{}:{}", return_node->token.line, return_node->token.column));
+                    auto        var_dec = curr_node->add_child(
+                               new AST::VariableDeclaration(Token(Token::Type::Identifier, var_name, return_node->token.line, return_node->token.column), to_rvalue->type_id));
+                    auto assignment = var_dec->add_child(new AST::BinaryOperator(Token(Token::Type::Assignment, *internalize_string("="), 0, 0)));
+                    assignment->type_id = var_dec->type_id;
+                    assignment->add_child(new AST::Variable(var_dec));
+                    assignment->add_child(to_rvalue.release());
+                    //   return __return_expression_result_XX:YY;
+                    return_node->add_child(new AST::LValueToRValue(new AST::Variable(var_dec)));
+                    return_node->type_id = return_node->children[0]->type_id;
+
+                    insert_destructors();
+
+                    // The return value is moved only if this return is actually taken, restore the original value for the rest of this scope.
+                    if(return_variable)
+                        return_variable->flags &= ~AST::VariableDeclaration::Flag::Moved;
                 }
-
-                insert_defer_node(curr_node);
-
-                // The return value is moved only if this return is actually taken, restore the original value for the rest of this scope.
-                if(return_variable)
-                    return_variable->flags &= ~AST::VariableDeclaration::Flag::Moved;
-
-                to_rvalue->type_id = to_rvalue->children[0]->type_id;
-                return_node->type_id = return_node->children[0]->type_id;
 
                 curr_node->add_child(return_node.release());
                 update_return_type(curr_node->children.back());
@@ -484,6 +497,13 @@ bool Parser::parse_next_scope(const std::span<Token>& tokens, std::span<Token>::
     curr_node->add_child(scope);
     push_scope();
     bool r = parse({begin, end}, scope);
+
+    // FIXME: We want to insert call to destructors relevant to this scope here... Unless a return statement already did!
+    //        Not sure how keep track of this yet... Here we're checking if the block ends with a return statement...
+    if(!scope->children.empty() && scope->children.back()->type != AST::Node::Type::ReturnStatement &&
+       !(scope->children.back()->type == AST::Node::Type::Statement &&
+         (!scope->children.back()->children.empty() && scope->children.back()->children.back()->type == AST::Node::Type::ReturnStatement)))
+        insert_defer_node(get_scope(), scope);
 
     pop_scope();
     it = end + 1;
@@ -751,7 +771,7 @@ bool Parser::parse_while(const std::span<Token>& tokens, std::span<Token>::itera
 }
 
 bool Parser::parse_for(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node) {
-    auto forNode = curr_node->add_child(new AST::Node(AST::Node::Type::ForStatement, *it));
+    auto for_node = curr_node->add_child(new AST::Node(AST::Node::Type::ForStatement, *it));
     ++it;
     expect(tokens, it, Token::Type::OpenParenthesis);
     check_eof(tokens, it, "for condition");
@@ -765,20 +785,24 @@ bool Parser::parse_for(const std::span<Token>& tokens, std::span<Token>::iterato
     };
 
     // Initialisation
-    if(!parse_statement(tokens, it, forNode))
+    if(!parse_statement(tokens, it, for_node))
         return cleanup_on_error();
     // Condition
-    if(!parse_statement(tokens, it, forNode))
+    if(!parse_statement(tokens, it, for_node))
         return cleanup_on_error();
     // Increment (until bracket)
-    if(!parse_next_expression(tokens, it, forNode, max_precedence, true))
+    if(!parse_next_expression(tokens, it, for_node, max_precedence, true))
         return cleanup_on_error();
 
     check_eof(tokens, it, "for body");
 
-    if(!parse_scope_or_single_statement(tokens, it, forNode))
+    if(!parse_scope_or_single_statement(tokens, it, for_node))
         return cleanup_on_error();
 
+    // All first three child of the for node might declare variables,
+    // the ForStatement node act as a Scope node, all local might generate destructor calls:
+    insert_defer_node(get_scope(), for_node);
+    
     pop_scope();
     return true;
 }
@@ -846,7 +870,6 @@ bool Parser::parse_function_declaration(const std::span<Token>& tokens, std::spa
     } else {
         // Function body
         parse_scope_or_single_statement(tokens, it, function_node);
-
         check_function_return_type(function_node);
     }
 
@@ -933,19 +956,25 @@ bool Parser::parse_type_declaration(const std::span<Token>& tokens, std::span<To
                 skip(tokens, it, Token::Type::EndStatement);
 
                 // parse_variable_declaration may add an initialisation node, we'll extract the default value and use it to create a default constructor.
-                if(type_node->children.back()->type == AST::Node::Type::BinaryOperator) {
-                    auto assignment_node = type_node->pop_child();
-                    auto rhs = assignment_node->pop_child();
-                    default_values.push_back(rhs);
-                    delete assignment_node;
-                    has_at_least_one_default_value = true;
-                    constructors.push_back(nullptr);
-                } else if(type_node->children.back()->type == AST::Node::Type::FunctionCall) {
-                    // parse_variable_declaration generated a constructor call
-                    auto constructor_node = type_node->pop_child();
-                    constructors.push_back(constructor_node);
-                    has_at_least_one_default_value = true;
-                    default_values.push_back(nullptr);
+                if(!type_node->children.back()->children.empty()) {
+                    auto var_dec = type_node->children.back();
+                    assert(var_dec->children.size() == 1);
+                    if(var_dec->children.front()->type == AST::Node::Type::BinaryOperator) {
+                        // Initialized with a default value
+                        assert(var_dec->children.front()->token.type == Token::Type::Assignment);
+                        auto assignment_node = var_dec->pop_child();
+                        auto rhs = assignment_node->pop_child();
+                        default_values.push_back(rhs);
+                        delete assignment_node;
+                        has_at_least_one_default_value = true;
+                        constructors.push_back(nullptr);
+                    } else if(var_dec->children.front()->type == AST::Node::Type::FunctionCall) {
+                        // parse_variable_declaration generated a constructor call
+                        auto constructor_node = var_dec->pop_child();
+                        constructors.push_back(constructor_node);
+                        has_at_least_one_default_value = true;
+                        default_values.push_back(nullptr);
+                    } else assert(false && "VariableDeclaration node with a child that's neither a Assignement, nor a constructor call.");
                 } else {
                     default_values.push_back(nullptr); // Still push a null node to keep the indices in sync
                     constructors.push_back(nullptr);
@@ -990,7 +1019,7 @@ bool Parser::parse_type_declaration(const std::span<Token>& tokens, std::span<To
 
         for(auto idx = 0; idx < type->members.size(); ++idx) {
             if(default_values[idx] || constructors[idx]) {
-                assert(default_values[idx] != nullptr xor constructors[idx] != nullptr);
+                assert((default_values[idx] != nullptr) xor (constructors[idx] != nullptr));
                 auto member_access = new AST::BinaryOperator(Token(Token::Type::MemberAccess, *internalize_string("."), 0, 0));
                 auto dereference = new AST::Node(AST::Node::Type::Dereference);
                 member_access->add_child(dereference);
@@ -1168,6 +1197,7 @@ bool Parser::parse_function_arguments(const std::span<Token>& tokens, std::span<
     while(it != tokens.end() && it->type != Token::Type::CloseParenthesis) {
         auto arg_index = curr_node->children.size();
         parse_next_expression(tokens, it, curr_node);
+        mark_variable_as_moved(curr_node->children[arg_index]);
         auto to_rvalue = curr_node->insert_between(arg_index, new AST::Node(AST::Node::Type::LValueToRValue, curr_node->token));
         to_rvalue->type_id = to_rvalue->children[0]->type_id;
         skip(tokens, it, Token::Type::Comma);
@@ -1693,16 +1723,21 @@ bool Parser::parse_variable_declaration(const std::span<Token>& tokens, std::spa
     if(is_const && !has_initializer)
         throw Exception(fmt::format("[Parser] Syntax error: Variable '{}' declared as const but not initialized.\n", identifier.value), point_error(identifier));
     if(has_initializer) {
-        auto variable_node = curr_node->add_child(new AST::Node(AST::Node::Type::Variable, identifier));
+        auto variable_node = var_declaration_node->add_child(new AST::Node(AST::Node::Type::Variable, identifier));
         variable_node->type_id = var_declaration_node->type_id;
-        parse_operator(tokens, it, curr_node);
+        parse_operator(tokens, it, var_declaration_node);
         // Deduce variable type from initial value
         if(var_declaration_node->type_id == InvalidTypeID)
             var_declaration_node->type_id = variable_node->type_id;
         else {
-            auto assignment_node = curr_node->children.back();
-            if(var_declaration_node->type_id != assignment_node->children.back()->type_id) {
-                // FIXME: Check and warn (or prevent) against unsafe implicit casts
+            auto assignment_node = var_declaration_node->children.back();
+            if(var_declaration_node->type_id != assignment_node->children.back()->type_id &&
+                   (is_safe_cast(var_declaration_node->type_id, assignment_node->children.back()->type_id) || is_allowed_but_unsafe_cast(var_declaration_node->type_id, assignment_node->children.back()->type_id))
+                ) {
+                if (is_allowed_but_unsafe_cast(var_declaration_node->type_id, assignment_node->children.back()->type_id)) {
+                    warn("[Parser] Warning: Unsafe cast from {} to {}:\n{}", type_id_to_string(assignment_node->children.back()->type_id),
+                         type_id_to_string(var_declaration_node->type_id), point_error(assignment_node->token));
+                }
                 assignment_node->insert_between(assignment_node->children.size() - 1, new AST::Cast(var_declaration_node->type_id));
             }
         }
@@ -1715,7 +1750,7 @@ bool Parser::parse_variable_declaration(const std::span<Token>& tokens, std::spa
         if(constructor) {
             auto call_node = new AST::FunctionCall(fake_token);
 
-            curr_node->add_child(call_node);
+            var_declaration_node->add_child(call_node);
             // Constructor method designation
             auto constructor_node = new AST::Variable(fake_token); // FIXME: Still using the token to get the function...
             call_node->add_child(constructor_node);
@@ -1875,6 +1910,12 @@ void Parser::resolve_operator_type(AST::BinaryOperator* op_node) {
         return;
     }
 
+    // Delay type checking after specialization.
+    if (op_node->children[0]->type_id == InvalidTypeID || op_node->children[1]->type_id == InvalidTypeID) {
+        op_node->type_id = InvalidTypeID;
+        return;
+    }
+
     op_node->type_id = resolve_operator_type(op_node->token.type, lhs, rhs);
 
     if(op_node->type_id == InvalidTypeID) {
@@ -1890,13 +1931,18 @@ void Parser::resolve_operator_type(AST::BinaryOperator* op_node) {
     }
 }
 
-void Parser::insert_defer_node(AST::Node* curr_node) {
-    auto ordered_variable_declarations = get_scope().get_ordered_variable_declarations();
+void Parser::insert_defer_node(const Scope& scope, AST::Node* curr_node) {
+    auto ordered_variable_declarations = scope.get_ordered_variable_declarations();
     while(!ordered_variable_declarations.empty()) {
         auto dec = ordered_variable_declarations.top();
         ordered_variable_declarations.pop();
 
         if(dec->flags & AST::VariableDeclaration::Flag::Moved)
+            continue;
+
+        // FIXME: Final type isn't known yet, we have to delay destructor insertion...
+        //        Right now it will never be inserted!
+        if (dec->type_id == InvalidTypeID)
             continue;
 
         std::vector<TypeID> span;
@@ -2001,7 +2047,55 @@ void Parser::specialize(AST::Node* node, const std::vector<TypeID>& parameters) 
             auto member_identifier_node = dynamic_cast<AST::MemberIdentifier*>(node);
             assert(node->parent && node->parent->type == AST::Node::Type::BinaryOperator && node->parent->token.type == Token::Type::MemberAccess);
             revolve_member_identifier(GlobalTypeRegistry::instance().get_type(node->parent->children[0]->type_id), member_identifier_node);
+            break;
         }
-            // TODO: Check Types Declarations
+        case AST::Node::Type::VariableDeclaration: {
+            // Type is deduced from the following assignment
+            if(node->type_id == InvalidTypeID) {
+                if(node->children.empty())
+                    throw Exception(fmt::format("[Parser] Could not specialize VariableDeclaration:\n{}\n", *node));
+                if(node->children[0]->type == AST::Node::Type::BinaryOperator) {
+                    node->children[0]->children.front()->type_id = node->children[0]->children.back()->type_id;
+                    node->children[0]->type_id = node->children[0]->children.front()->type_id;
+                    node->type_id = node->children[0]->type_id;
+                } else if(node->children[0]->type == AST::Node::Type::FunctionCall) {
+                    node->type_id = node->children[0]->type_id;
+                } else
+                    throw Exception(fmt::format("[Parser] Could not specialize VariableDeclaration:\n{}\n", *node));
+            }
+            break;
+        }
+        case AST::Node::Type::Variable: {
+            // Type is context dependent...
+            if(node->type_id == InvalidTypeID) {
+                // FIXME: We have to find the corresponding VariableDeclaration... But we don't have scopes.
+                warn("[Parser] Warning: Specialization cannot deduce type of variable '{}' (Missing implementation).\n{}", node->token.value, point_error(node->token));
+            }
+            break;
+        }
+        // TODO: Check Types Declarations
     }
+}
+
+AST::VariableDeclaration* Parser::mark_variable_as_moved(AST::Node* variable_node) {
+    if(variable_node->type == AST::Node::Type::Variable) {
+        auto ret_type = GlobalTypeRegistry::instance().get_type(variable_node->type_id);
+        // FIXME: Introduce some sort of 'CanBeTriviallyCopied'? Which will be true for all primitive types, except pointers, and transitive.
+        if(ret_type->is_struct() ||
+           (ret_type->is_templated() && GlobalTypeRegistry::instance().get_type(dynamic_cast<const TemplatedType*>(ret_type)->template_type_id)->is_struct())) {
+            auto var = get(variable_node->token.value);
+            if(!var) {
+                warn("[Parser] Uh?! Moving a non-existant variable '{}' ?\n", variable_node->token.value);
+                return nullptr;
+            } else {
+                // FIXME: This could be completely fine for type without destructors (or with another set of compile time constraints? Traits?)
+                if(var->flags & AST::VariableDeclaration::Flag::Moved)
+                    throw Exception(fmt::format("[Parser] Returning variable '{}' which was already moved!\n", var->token.value), point_error(variable_node->token));
+
+                var->flags |= AST::VariableDeclaration::Flag::Moved;
+                return var;
+            }
+        }
+    }
+    return nullptr;
 }

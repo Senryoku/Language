@@ -149,6 +149,9 @@ class Scoped {
     Scope&       get_scope() { return _scopes.back(); }
     const Scope& get_scope() const { return _scopes.back(); }
 
+    auto         get_scope_rend() const { return _scopes.rend(); }
+    auto         get_scope_rbegin() const { return _scopes.rbegin(); }
+
     Scope& push_scope() {
         _scopes.emplace_back();
         return get_scope();

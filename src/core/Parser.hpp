@@ -164,7 +164,7 @@ class Parser : public Scoped {
 
     void revolve_member_identifier(const Type* base_type, AST::MemberIdentifier* member_identifier_node);
 
-    void   insert_defer_node(AST::Node* curr_node);
+    void   insert_defer_node(const Scope& scope, AST::Node* curr_node);
     void   specialize(AST::Node* node, const std::vector<TypeID>& parameters);
     TypeID specialize(TypeID type_id, const std::vector<TypeID>& parameters);
 
@@ -179,4 +179,8 @@ class Parser : public Scoped {
         if(it == tokens.end())
             throw Exception(fmt::format("[Parser] Expected {}, got end-of-file.\n", expected));
     }
+
+    // 
+    // FIXME: This is probably not what we want to do.
+    AST::VariableDeclaration* mark_variable_as_moved(AST::Node* variable_node);
 };

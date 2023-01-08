@@ -1,27 +1,25 @@
-import "std/Socket"
+// RET: 0
 
-type HTTPServer {
-	let socket: Socket;
+type AType {
+	let val : i32;
 }
 
-function listen(this: HTTPServer*, addr: String, port: i32) {
-	.socket.create();
-	.socket.bind(addr, port);
-	.socket.listen();
-	// FIXME: As addr is 'moved' in there (should we make it explicit?), its destructor should be called automatically here.
-	//        This is not the case yet.
-}	
+function member_func(this: AType*) : i32 {
+	return .val;
+}
+
+function templated_function_call<Ty>(this : Ty*) {
+	return .member_func();
+}
+
+function templated_member_access<Ty>(this : Ty*) {
+	return .val;
+}
 
 function main() {
-	let http_server : HTTPServer;
-
-	// FIXME: This leaks v--------------- the temporaty String should be moved and the destructor should be called in the listen function.
-	http_server.listen(String("127.0.0.1"), 12345);
-	
-	let client = http_server.socket.accept();
-	let received = client.recv();
-	printf("Received: %s\n", received.data);
-	client.send("HTTP/1.1 200 OK\nServer: LangServer (Win64)\nContent-Length: 52\nContent-Type: text/html\nConnection: Closed\n\n<html>\n<body>\n<h1>Hello, World!</h1>\n</body>\n</html>\n");
-	
-	return 0;
+	let my_obj : AType;
+	my_obj.val = 123456789;
+	if(my_obj.templated_function_call() == my_obj.templated_member_access())
+		return 0;
+	return -1;
 }
