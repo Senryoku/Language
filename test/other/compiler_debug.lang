@@ -1,25 +1,9 @@
-// RET: 0
+// PASS: Value: 1337. Destructor called.
 
-type AType {
-	let val : i32;
-}
-
-function member_func(this: AType*) : i32 {
-	return .val;
-}
-
-function templated_function_call<Ty>(this : Ty*) {
-	return .member_func();
-}
-
-function templated_member_access<Ty>(this : Ty*) {
-	return .val;
-}
+import "../compiler/include/TemplateTest"
 
 function main() {
-	let my_obj : AType;
-	my_obj.val = 123456789;
-	if(my_obj.templated_function_call() == my_obj.templated_member_access())
-		return 0;
-	return -1;
+	let val : TemplateTest<u64>;
+	val.print();
+	return 0;
 }

@@ -12,11 +12,10 @@
 #include <Exception.hpp>
 #include <Logger.hpp>
 #include <ModuleInterface.hpp>
-#include <Scope.hpp>
 #include <Source.hpp>
 #include <Tokenizer.hpp>
 
-class Parser : public Scoped {
+class Parser {
   public:
     Parser() = default;
     Parser(const Parser&) = default;
@@ -57,13 +56,14 @@ class Parser : public Scoped {
     AST::Node*        _hoisted_declarations = nullptr;
     inline AST::Node* get_hoisted_declarations_node(AST::Node* curr_node) {
         if(!_hoisted_declarations) {
-            auto parent = curr_node;
-            while(parent->parent)
-                parent = parent->parent;
+            auto parent = curr_node->get_root_scope();
             _hoisted_declarations = parent->add_child_front(new AST::Node(AST::Node::Type::Root));
         }
         return _hoisted_declarations;
     }
+
+    // FIXME: I'd like to get rid of this at some point.
+    void declare_builtins(AST::Scope*);
 
     bool parse(const std::span<Token>& tokens, AST::Node* curr_node);
 
@@ -80,7 +80,7 @@ class Parser : public Scoped {
                                                         AST::FunctionDeclaration::Flag flags = AST::FunctionDeclaration::Flag::None);
     bool                     parse_function_arguments(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::FunctionCall* curr_node);
     std::vector<TypeID>      parse_template_types(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
-    std::vector<std::string> declare_template_types(const std::span<Token>& tokens, std::span<Token>::iterator& it);
+    std::vector<std::string> declare_template_types(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
     bool                     parse_type_declaration(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
     TypeID                   parse_type(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
     AST::BoolLiteral*        parse_boolean(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
@@ -160,11 +160,13 @@ class Parser : public Scoped {
     const AST::FunctionDeclaration* resolve_or_instanciate_function(const std::string_view& name, const std::span<TypeID>& arguments, AST::Node* curr_node);
     void                            check_function_call(AST::FunctionCall*, const AST::FunctionDeclaration*);
     std::string get_overloads_hint_string(const std::string_view& name, const std::span<TypeID>& arguments, const std::vector<const AST::FunctionDeclaration*>& candidates);
-    void        throw_unresolved_function(const Token& name, const std::span<TypeID>& arguments);
+    void        throw_unresolved_function(const Token& name, const std::span<TypeID>& arguments, const AST::Node* curr_node);
+
+    void type_check_assignment(AST::BinaryOperator* binary_operator_node);
 
     void revolve_member_identifier(const Type* base_type, AST::MemberIdentifier* member_identifier_node);
 
-    void   insert_defer_node(const Scope& scope, AST::Node* curr_node);
+    void   insert_defer_node(const AST::Scope& scope, AST::Node* curr_node);
     void   specialize(AST::Node* node, const std::vector<TypeID>& parameters);
     TypeID specialize(TypeID type_id, const std::vector<TypeID>& parameters);
 
@@ -180,7 +182,6 @@ class Parser : public Scoped {
             throw Exception(fmt::format("[Parser] Expected {}, got end-of-file.\n", expected));
     }
 
-    // 
     // FIXME: This is probably not what we want to do.
     AST::VariableDeclaration* mark_variable_as_moved(AST::Node* variable_node);
 };

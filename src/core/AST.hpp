@@ -13,6 +13,8 @@
 
 class AST {
   public:
+    struct Scope;
+
     struct Node {
         enum class Type {
             Root,
@@ -97,6 +99,11 @@ class AST {
         // Insert a node between this and its nth child
         Node* insert_between(size_t n, Node* node);
 
+        [[nodiscard]] Scope*       get_scope();
+        [[nodiscard]] const Scope* get_scope() const;
+        [[nodiscard]] Scope*       get_root_scope();
+        [[nodiscard]] const Scope* get_root_scope() const;
+
       protected:
         void clone_impl(Node* n) const {
             n->type = type;
@@ -116,7 +123,7 @@ class AST {
         explicit TypeDeclaration(Token t) : Node(Node::Type::TypeDeclaration, t) {}
 
         const auto& name() const { return token.value; }
-        const auto& members() const { return children; }
+        const auto& members() const { return children[0]->children; }
 
         [[nodiscard]] virtual TypeDeclaration* clone() const override {
             auto n = new TypeDeclaration();
@@ -124,14 +131,9 @@ class AST {
             return n;
         }
     };
-    /*
-    struct TemplatedTypeDeclaration : public TypeDeclaration {
-        TemplatedTypeDeclaration(Token t) : TypeDeclaration(t) {}
-    };
-    */
+
     struct FunctionDeclaration : public Node {
-        FunctionDeclaration() : Node(Node::Type::FunctionDeclaration){};
-        explicit FunctionDeclaration(Token t) : Node(Node::Type::FunctionDeclaration, t) {}
+        explicit FunctionDeclaration(Token t) : Node(Node::Type::FunctionDeclaration, t) { add_child(new AST::Scope()); }
 
         enum Flag : uint8_t {
             None = 0,
@@ -151,36 +153,49 @@ class AST {
             return n;
         }
 
-        auto       name() const { return token.value; }
+        auto   name() const { return token.value; }
+        Scope* function_scope() {
+            assert(!children.empty());
+            return dynamic_cast<Scope*>(children[0]);
+        }
+        const Scope* function_scope() const {
+            assert(!children.empty());
+            return dynamic_cast<const Scope*>(children[0]);
+        }
         AST::Node* body() {
-            if(children.empty() || (children.back()->type != AST::Node::Type::Scope && children.back()->type != AST::Node::Type::Root))
+            if(function_scope()->children.empty() ||
+               function_scope()->children.back()->type != AST::Node::Type::Scope && function_scope()->children.back()->type != AST::Node::Type::Root)
                 return nullptr;
-            return children.back();
+            return function_scope()->children.back();
         }
         const AST::Node* body() const {
             // FIXME: This is really bad. There should be a consistent way to tell if a function is defined (i.e. has a body) or not.
-            if(children.empty() || (children.back()->type != AST::Node::Type::Scope && children.back()->type != AST::Node::Type::Root))
+            if(function_scope()->children.empty() ||
+               function_scope()->children.back()->type != AST::Node::Type::Scope && function_scope()->children.back()->type != AST::Node::Type::Root)
                 return nullptr;
-            return children.back();
+            return function_scope()->children.back();
         }
         auto arguments() {
-            if(children.size() == 0)
+            if(function_scope()->children.size() == 0)
                 return std::span<AST::Node*>();
             if(!body())
-                return std::span<AST::Node*>(children);
-            return std::span<AST::Node*>(children.data(), std::max<int>(0, static_cast<int>(children.size()) - 1));
+                return std::span<AST::Node*>(function_scope()->children);
+            return std::span<AST::Node*>(function_scope()->children.data(), std::max<int>(0, static_cast<int>(function_scope()->children.size()) - 1));
         }
         const auto arguments() const {
-            if(children.size() == 0)
+            if(function_scope()->children.size() == 0)
                 return std::span<const AST::Node* const>();
             if(!body())
-                return std::span<const AST::Node* const>(children);
-            return std::span<const AST::Node* const>(children.data(), std::max<int>(0, static_cast<int>(children.size()) - 1));
+                return std::span<const AST::Node* const>(function_scope()->children);
+            return std::span<const AST::Node* const>(function_scope()->children.data(), std::max<int>(0, static_cast<int>(function_scope()->children.size()) - 1));
         }
 
         std::string mangled_name() const;
 
         bool is_templated() const;
+
+      private:
+        FunctionDeclaration() : Node(Node::Type::FunctionDeclaration){}; // Only used for cloning
     };
 
     struct FunctionCall : public Node {
@@ -236,28 +251,6 @@ class AST {
             auto n = new Defer();
             clone_impl(n);
             return n;
-        }
-    };
-
-    struct Scope : public Node {
-        Scope() : Node(Node::Type::Scope) {}
-        explicit Scope(Token t) : Node(Node::Type::Scope, t) {}
-
-        AST::Defer* defer = nullptr;
-
-        [[nodiscard]] virtual Scope* clone() const override {
-            auto n = new Scope();
-            clone_impl(n);
-            if(defer)
-                n->defer = defer->clone();
-            else
-                n->defer = nullptr;
-            return n;
-        }
-
-        ~Scope() override {
-            if(defer)
-                delete defer;
         }
     };
 
@@ -436,6 +429,65 @@ class AST {
             clone_impl(n);
             return n;
         }
+    };
+
+    struct Scope : public Node {
+      public:
+        Scope() : Node(Node::Type::Scope) {}
+        explicit Scope(Token t) : Node(Node::Type::Scope, t) {}
+
+        bool declare_variable(VariableDeclaration& decNode);
+        bool declare_function(FunctionDeclaration& node);
+        bool declare_type(TypeDeclaration& node);
+        bool declare_template_placeholder_type(const std::string& name);
+
+        bool                                     is_valid(const het_unordered_map<std::vector<FunctionDeclaration*>>::iterator& it) const { return it != _functions.end(); }
+        bool                                     is_valid(const het_unordered_map<std::vector<FunctionDeclaration*>>::const_iterator& it) const { return it != _functions.cend(); }
+        [[nodiscard]] const FunctionDeclaration* resolve_function(const std::string_view& name, const std::span<TypeID>& arguments) const;
+        [[nodiscard]] const FunctionDeclaration* resolve_function(const std::string_view& name, const std::span<AST::Node*>& arguments) const;
+
+        [[nodiscard]] const FunctionDeclaration*              get_function(const std::string_view& name, const std::span<TypeID>& arguments) const;
+        [[nodiscard]] const FunctionDeclaration*              get_function(const std::string_view& name, const std::span<AST::Node*>& arguments) const;
+        [[nodiscard]] std::vector<const FunctionDeclaration*> get_functions(const std::string_view& name) const;
+
+        [[nodiscard]] TypeID find_type(const std::string_view& name) const;
+        [[nodiscard]] TypeID get_type(const std::string_view& name) const;
+        bool                 is_type(const std::string_view& name) const;
+
+        bool is_declared(const std::string_view& name) const { return _variables.find(name) != _variables.end(); }
+
+        VariableDeclaration*       get_variable(const std::string_view& name);
+        const VariableDeclaration* get_variable(const std::string_view& name) const;
+
+        const het_unordered_map<VariableDeclaration*>& get_variables() const { return _variables; }
+
+        inline het_unordered_map<VariableDeclaration*>::iterator       find(const std::string_view& name) { return _variables.find(name); }
+        inline het_unordered_map<VariableDeclaration*>::const_iterator find(const std::string_view& name) const { return _variables.find(name); }
+        bool is_valid(const het_unordered_map<VariableDeclaration*>::iterator& it) const { return it != _variables.end(); }
+        bool is_valid(const het_unordered_map<VariableDeclaration*>::const_iterator& it) const { return it != _variables.end(); }
+
+        void                       set_this(VariableDeclaration* var) { _this = var; }
+        const VariableDeclaration* get_this() const;
+        VariableDeclaration*       get_this();
+
+        // Note: Returns a copy.
+        std::stack<VariableDeclaration*> get_ordered_variable_declarations() const { return _ordered_variable_declarations; }
+
+        [[nodiscard]] virtual Scope* clone() const override;
+
+        AST::Scope*       get_parent_scope();
+        const AST::Scope* get_parent_scope() const;
+
+      private:
+        // FIXME: At some point we'll have ton consolidate these string_view to their final home... Maybe the lexer should have done it already.
+        het_unordered_map<VariableDeclaration*>              _variables;
+        het_unordered_map<std::vector<FunctionDeclaration*>> _functions;
+        het_unordered_map<TypeID>                            _types;
+        std::vector<std::string>                             _template_placeholder_types; // Local names for placeholder types
+
+        std::stack<VariableDeclaration*> _ordered_variable_declarations;
+
+        VariableDeclaration* _this = nullptr;
     };
 
     inline Node&       get_root() { return _root; }

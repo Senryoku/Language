@@ -263,14 +263,15 @@ llvm::Value* Module::codegen(const AST::Node* node) {
             }
         }
         case AST::Node::Type::TypeDeclaration: {
-            auto type = GlobalTypeRegistry::instance().get_type(node->type_id);
+            auto type_node = dynamic_cast<const AST::TypeDeclaration*>(node);
+            auto type = GlobalTypeRegistry::instance().get_type(type_node->type_id);
             // Ignore Template definitions, we only care about actual instanciations.
             if(type->is_placeholder())
                 break;
             std::vector<llvm::Type*> members;
-            for(const auto c : node->children)
+            for(const auto c : type_node->members())
                 members.push_back(get_llvm_type(c->type_id));
-            std::string type_name(node->token.value);
+            std::string type_name(type_node->token.value);
             llvm::StructType::create(*_llvm_context, members, type_name);
             break;
         }

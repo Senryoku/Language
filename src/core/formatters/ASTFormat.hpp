@@ -81,12 +81,6 @@ struct fmt::formatter<AST::Node> {
         for(size_t i = 0; i < t.children.size(); ++i)
             r = fmt::format_to(r, fmt::runtime("{:" + indent + (i == t.children.size() - 1 ? "e" : "i") + "}"), *t.children[i]);
 
-        // Display the defer block of Scope nodes.
-        // FIXME: Yes, this is horrible.
-        if(t.type == AST::Node::Type::Scope && dynamic_cast<const AST::Scope*>(&t)->defer != nullptr) {
-            fmt::format_to(r, fmt::runtime("{:" + indent + "e}"), *dynamic_cast<const AST::Node*>(dynamic_cast<const AST::Scope*>(&t)->defer));
-        }
-
         return r;
     }
 };

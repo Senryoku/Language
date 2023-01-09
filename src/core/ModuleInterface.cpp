@@ -18,6 +18,7 @@ std::tuple<bool, std::span<AST::TypeDeclaration*>, std::span<AST::FunctionDeclar
         dependencies.push_back(line);
     }
 
+    // Types
     auto type_begin = type_imports.size();
     {
         AST    type_ast;
@@ -59,6 +60,7 @@ std::tuple<bool, std::span<AST::TypeDeclaration*>, std::span<AST::FunctionDeclar
         }
     }
 
+    // Functions
     auto        begin = imports.size();
     std::string name, type;
     while(std::getline(module_file, line)) {
@@ -77,7 +79,7 @@ std::tuple<bool, std::span<AST::TypeDeclaration*>, std::span<AST::FunctionDeclar
             func_dec_node->type_id = GlobalTypeRegistry::instance().get_or_register_type(type)->type_id;
 
         while(iss >> type) {
-            auto arg = func_dec_node->add_child(new AST::Node(AST::Node::Type::VariableDeclaration));
+            auto arg = func_dec_node->function_scope()->add_child(new AST::Node(AST::Node::Type::VariableDeclaration));
             if(type == INVALID_TYPE_ID_STR)
                 arg->type_id = InvalidTypeID;
             else
@@ -111,7 +113,7 @@ bool ModuleInterface::save(const std::filesystem::path& path) const {
             interface_file << type->designation << std::endl;
         } else {
             interface_file << "type " << n->token.value << " { ";
-            for(const auto& member : n->children) {
+            for(const auto& member : n->members()) {
                 interface_file << "let " << member->token.value << ": " << serialize_type_id(member->type_id) << "; ";
             }
             interface_file << "}" << std::endl;

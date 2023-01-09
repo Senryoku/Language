@@ -57,7 +57,10 @@ export function TextFile(path: cstr, mode: cstr) {
 }
 
 export function close(this: TextFile*) {
-    if (.fd != 0) __close_file(.fd);
+    if (.fd != 0) {
+		__close_file(.fd);
+		.fd = 0;
+	}
 }
 
 export function write(this: TextFile*, data: String) {

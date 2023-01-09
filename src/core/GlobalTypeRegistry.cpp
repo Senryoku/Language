@@ -93,7 +93,7 @@ TypeID GlobalTypeRegistry::register_type(AST::TypeDeclaration& type_node) {
     std::string type_designation(type_node.token.value);
     StructType* tr = dynamic_cast<StructType*>(_types.emplace_back(new StructType{type_designation, next_id()}).get());
     uint32_t    index = 0;
-    for(const auto child : type_node.children) {
+    for(const auto child : type_node.members()) {
         StructType::Member member = {.name = std::string(child->token.value), .index = index, .type_id = child->type_id};
         tr->members[std::string(child->token.value)] = member;
         ++index;
