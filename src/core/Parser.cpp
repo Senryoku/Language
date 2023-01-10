@@ -1282,14 +1282,18 @@ const AST::FunctionDeclaration* Parser::resolve_or_instanciate_function(const st
 
                 auto specialized = candidate->body() ? candidate->clone() : GlobalTemplateCache::instance().get_function(std::string(candidate->token.value))->clone();
 
-                // Insert it right after the generic version.
-                // if(candidate->parent)
-                //    candidate->parent->add_child_after(specialized, candidate);
-                // else
+                // FIXME: Should be after but specialize can create more specialization, but it also need to be in the AST to access scope data. 
                 get_hoisted_declarations_node(curr_node)->add_child(specialized);
 
                 specialize(specialized, deduced_types);
                 check_function_return_type(specialized);
+
+                // HACK: Specialize() may have added more hoisted declaration, this function should be declared after.
+                //       Remove it and re-insert it at the end:
+                auto it = std::find(get_hoisted_declarations_node(curr_node)->children.begin(), get_hoisted_declarations_node(curr_node)->children.end(), specialized);
+                get_hoisted_declarations_node(curr_node)->children.erase(it);
+                specialized->parent = nullptr;
+                get_hoisted_declarations_node(curr_node)->add_child(specialized);
 
                 // FIXME: Idealy, it should be declared in the scope of the original function declaration.
                 //    candidate->get_scope()->declare_function(*specialized);
