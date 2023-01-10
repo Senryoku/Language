@@ -332,6 +332,7 @@ bool Parser::parse(const std::span<Token>& tokens, AST::Node* curr_node) {
                     const auto& var_name = *internalize_string(fmt::format("#return_expression_result_{}:{}", return_node->token.line, return_node->token.column));
                     auto        var_dec = curr_node->add_child(
                                new AST::VariableDeclaration(Token(Token::Type::Identifier, var_name, return_node->token.line, return_node->token.column), to_rvalue->type_id));
+                    var_dec->flags = AST::VariableDeclaration::Flag::Moved; // Declare it as moved immediatly.
                     auto assignment = var_dec->add_child(new AST::BinaryOperator(Token(Token::Type::Assignment, *internalize_string("="), 0, 0)));
                     assignment->type_id = var_dec->type_id;
                     assignment->add_child(new AST::Variable(var_dec));
@@ -1282,18 +1283,25 @@ const AST::FunctionDeclaration* Parser::resolve_or_instanciate_function(const st
 
                 auto specialized = candidate->body() ? candidate->clone() : GlobalTemplateCache::instance().get_function(std::string(candidate->token.value))->clone();
 
-                // FIXME: Should be after but specialize can create more specialization, but it also need to be in the AST to access scope data. 
-                get_hoisted_declarations_node(curr_node)->add_child(specialized);
+                auto parent = candidate->parent ? candidate->parent : get_hoisted_declarations_node(curr_node);
+                // FIXME: Should be after because specialize can create more function specialization that this function will depend on, but it also need to be in the AST to access
+                // scope data.
+                if(candidate->parent)
+                    parent->add_child_after(specialized, candidate);
+                else
+                    parent->add_child(specialized);
 
                 specialize(specialized, deduced_types);
                 check_function_return_type(specialized);
 
                 // HACK: Specialize() may have added more hoisted declaration, this function should be declared after.
                 //       Remove it and re-insert it at the end:
-                auto it = std::find(get_hoisted_declarations_node(curr_node)->children.begin(), get_hoisted_declarations_node(curr_node)->children.end(), specialized);
-                get_hoisted_declarations_node(curr_node)->children.erase(it);
-                specialized->parent = nullptr;
-                get_hoisted_declarations_node(curr_node)->add_child(specialized);
+                if(!candidate->parent) {
+                    auto it = std::find(parent->children.begin(), parent->children.end(), specialized);
+                    parent->children.erase(it);
+                    specialized->parent = nullptr;
+                    parent->add_child(specialized);
+                }
 
                 // FIXME: Idealy, it should be declared in the scope of the original function declaration.
                 //    candidate->get_scope()->declare_function(*specialized);
