@@ -1,11 +1,17 @@
-extern function __malloc(size: u64): pointer;
-extern function __free(ptr: pointer): void;
 export extern function null_pointer(): pointer;
 
-export function malloc(size: u64) : pointer {
-	return __malloc(size);
-}
+export extern function malloc(size: u64): pointer;
+export extern function free(ptr: pointer): void;
 
-export function free(ptr: pointer) : void {
-	__free(ptr);
-}
+// Debug malloc and free:
+
+// extern function __malloc(size: u64): pointer;
+// extern function __free(ptr: pointer): void;
+// 
+// export function malloc(size: u64) : pointer {
+// 	return __malloc(size);
+// }
+// 
+// export function free(ptr: pointer) : void {
+// 	__free(ptr);
+// }

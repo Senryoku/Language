@@ -121,6 +121,8 @@ void Parser::declare_builtins(AST::Scope* scope_node) {
 
     register_builtin("put", PrimitiveType::I32, {"character"}, {PrimitiveType::Char});
     register_builtin("printf", PrimitiveType::I32, {}, {}, AST::FunctionDeclaration::Flag::Variadic);
+    // register_builtin("malloc", PrimitiveType::Pointer, {"len"}, {PrimitiveType::U64});
+    // register_builtin("free", PrimitiveType::Void, {"ptr"}, {PrimitiveType::Pointer});
     register_builtin("memcpy", PrimitiveType::I32, {"dest", "src", "len"}, {PrimitiveType::Pointer, PrimitiveType::Pointer, PrimitiveType::U64});
 }
 

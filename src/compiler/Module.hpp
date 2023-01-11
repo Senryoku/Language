@@ -13,15 +13,6 @@ class Module {
     using Scope = het_unordered_map<llvm::AllocaInst*>;
 
     Module(const std::string& name, llvm::LLVMContext* context) : _llvm_context(context), _llvm_module(new llvm::Module{name, *context}), _llvm_ir_builder{*context} {
-        // Creates an implicit main function
-        //   Maybe we should turn this into an implicit "__init" function, for globals and module initialisation, and allow the declaration of an actual main function?
-        //   One consideration is: How to handle repl and most importantly the return type?
-        // std::vector<llvm::Type*> main_param_types; //(1, llvm::Type::getInt32Ty(*_llvm_context));
-        // auto                     main_return_type = llvm::FunctionType::get(llvm::Type::getInt32Ty(*_llvm_context), main_param_types, false); // Returns void right now
-        // auto                     main_function = llvm::Function::Create(main_return_type, llvm::Function::ExternalLinkage, "main", _llvm_module.get());
-        // auto*                    mainblock = llvm::BasicBlock::Create(*_llvm_context, "entrypoint", main_function);
-        //_llvm_ir_builder.SetInsertPoint(mainblock);
-
         _builtins["memcpy"] = std::bind(&Module::intrinsic_memcpy, this, std::placeholders::_1);
     }
 
@@ -89,17 +80,18 @@ class Module {
         // Make libc printf available
         std::vector<llvm::Type*> printf_args_types({llvm::Type::getInt8PtrTy(*_llvm_context)});
         llvm::FunctionType*      printf_type = llvm::FunctionType::get(llvm::Type::getInt32Ty(*_llvm_context), printf_args_types, true);
-        auto                     printf_func = _llvm_module->getOrInsertFunction("printf", printf_type);
+        _llvm_module->getOrInsertFunction("printf", printf_type);
         // put
         std::vector<llvm::Type*> put_args_types({llvm::Type::getInt8Ty(*_llvm_context)});
         llvm::FunctionType*      put_type = llvm::FunctionType::get(llvm::Type::getInt32Ty(*_llvm_context), put_args_types, false);
-        auto                     put_func = _llvm_module->getOrInsertFunction("put", put_type);
+        _llvm_module->getOrInsertFunction("put", put_type);
+
+        // Register libc malloc and free
+        _llvm_module->getOrInsertFunction("malloc", llvm::FunctionType::get(llvm::Type::getInt64Ty(*_llvm_context), {llvm::Type::getInt64Ty(*_llvm_context)}, false));
+        _llvm_module->getOrInsertFunction("free", llvm::FunctionType::get(llvm::Type::getVoidTy(*_llvm_context), {llvm::Type::getInt64Ty(*_llvm_context)}, false));
 
         // Actual codegen
         auto r = codegen(&ast.get_root());
-        // Add a return to our generated main (from constructor) if needed (FIXME?)
-        // if(!_generated_return)
-        //    _llvm_ir_builder.CreateRet(llvm::ConstantInt::get(*_llvm_context, llvm::APInt(32, 0)));
         return r;
     }
 

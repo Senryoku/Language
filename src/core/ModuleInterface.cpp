@@ -62,17 +62,25 @@ std::tuple<bool, std::span<AST::TypeDeclaration*>, std::span<AST::FunctionDeclar
 
     // Functions
     auto        begin = imports.size();
-    std::string name, type;
+    std::string name_or_extern, name, type;
     while(std::getline(module_file, line)) {
-        std::istringstream iss(line);
-        iss >> name >> type;
+        AST::FunctionDeclaration::Flag flags = AST::FunctionDeclaration::Flag::Imported;
+        std::istringstream             iss(line);
+        iss >> name_or_extern;
+        if(name_or_extern == "extern") {
+            iss >> name >> type;
+            flags = AST::FunctionDeclaration::Flag::Extern;
+        } else {
+            name = name_or_extern;
+            iss >> type;
+        }
 
         Token token;
         token.type = Token::Type::Identifier;
         token.value = *internalize_string(name);
         auto func_dec_node = external_nodes.emplace_back(new AST::FunctionDeclaration(token)).get(); // Keep it out of the AST
         imports.push_back(func_dec_node);
-        func_dec_node->flags |= AST::FunctionDeclaration::Flag::Imported;
+        func_dec_node->flags = flags;
         if(type == INVALID_TYPE_ID_STR)
             func_dec_node->type_id = InvalidTypeID;
         else
@@ -123,6 +131,8 @@ bool ModuleInterface::save(const std::filesystem::path& path) const {
 
     // Functions
     for(const auto& n : exports) {
+        if(n->flags & AST::FunctionDeclaration::Extern)
+            interface_file << "extern ";
         interface_file << n->token.value << " " << serialize_type_id(n->type_id);
         for(auto i = 0u; i < n->arguments().size(); ++i) {
             interface_file << " " << serialize_type_id(n->arguments()[i]->type_id);

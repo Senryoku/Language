@@ -1,6 +1,6 @@
 #include <cstdlib>
 
-// #define DEBUG_TRACE
+#define DEBUG_TRACE
 
 #ifdef DEBUG_TRACE
 #include <cstdio>
