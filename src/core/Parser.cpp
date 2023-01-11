@@ -2073,6 +2073,7 @@ void Parser::specialize(AST::Node* node, const std::vector<TypeID>& parameters) 
             auto binary_operator = dynamic_cast<AST::BinaryOperator*>(node);
             resolve_operator_type(binary_operator);
             if(binary_operator->token.type == Token::Type::Assignment)
+                // FIXME: If the type was previously unknown, it's possible we may have to generate a destructor call here.
                 type_check_assignment(binary_operator);
             break;
         }
@@ -2085,6 +2086,7 @@ void Parser::specialize(AST::Node* node, const std::vector<TypeID>& parameters) 
                 node->type_id = PrimitiveType::Void;
             else
                 node->type_id = node->children[0]->type_id;
+            // FIXME: If some variable types were previously unknown, it's possible we may have to generate some destructor calls here.
             update_return_type(node);
             break;
         }
@@ -2123,6 +2125,7 @@ void Parser::specialize(AST::Node* node, const std::vector<TypeID>& parameters) 
             break;
         }
             // TODO: Check Types Declarations
+            // FIXME: If some variable types were previously unknown, it's possible we may have to generate some destructor calls here.
     }
 }
 
