@@ -96,7 +96,7 @@ bool is_allowed_but_unsafe_cast(TypeID to, TypeID from) {
 }
 
 void Parser::declare_builtins(AST::Scope* scope_node) {
-    // FIXME: We have to stash these somewhere. Ultimatly, we'll just get rid of it hopefully, so this will do in the meantime.
+    // FIXME: We have to stash these somewhere. Ultimately, we'll just get rid of it hopefully, so this will do in the meantime.
     static std::unordered_map<std::string, std::unique_ptr<AST::FunctionDeclaration>> s_builtins;
 
     const auto register_builtin = [&](const std::string& name, TypeID type = PrimitiveType::Void, std::vector<std::string> args_names = {}, std::vector<TypeID> args_types = {},
@@ -121,6 +121,7 @@ void Parser::declare_builtins(AST::Scope* scope_node) {
 
     register_builtin("put", PrimitiveType::I32, {"character"}, {PrimitiveType::Char});
     register_builtin("printf", PrimitiveType::I32, {}, {}, AST::FunctionDeclaration::Flag::Variadic);
+    register_builtin("memcpy", PrimitiveType::I32, {"dest", "src", "len"}, {PrimitiveType::Pointer, PrimitiveType::Pointer, PrimitiveType::U64});
 }
 
 std::optional<AST> Parser::parse(const std::span<Token>& tokens) {
@@ -1040,7 +1041,7 @@ bool Parser::parse_type_declaration(const std::span<Token>& tokens, std::span<To
             if(default_values[idx] || constructors[idx]) {
                 assert((default_values[idx] != nullptr) xor (constructors[idx] != nullptr));
                 std::unique_ptr<AST::BinaryOperator> member_access(new AST::BinaryOperator(Token(Token::Type::MemberAccess, *internalize_string("."), 0, 0)));
-                auto dereference = member_access->add_child(new AST::Node(AST::Node::Type::Dereference));
+                auto                                 dereference = member_access->add_child(new AST::Node(AST::Node::Type::Dereference));
                 dereference->type_id = this_base_type;
                 auto variable = dereference->add_child(new AST::Variable(this_token));
                 variable->type_id = this_declaration_node->type_id;
@@ -1066,7 +1067,8 @@ bool Parser::parse_type_declaration(const std::span<Token>& tokens, std::span<To
                     constructors[idx]->children.back()->children.pop_back();
                     constructors[idx]->children.back()->add_child(member_access.release());
                     function_body->add_child(constructors[idx]);
-                } else assert(false);
+                } else
+                    assert(false);
             }
         }
 

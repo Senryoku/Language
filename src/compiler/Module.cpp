@@ -342,6 +342,8 @@ llvm::Value* Module::codegen(const AST::Node* node) {
             auto function_call_node = dynamic_cast<const AST::FunctionCall*>(node);
             auto mangled_function_name = function_call_node->mangled_name();
             auto function = _llvm_module->getFunction(mangled_function_name);
+            if((function_call_node->flags & AST::FunctionDeclaration::Flag::BuiltIn) && _builtins.contains(mangled_function_name))
+                return _builtins.at(mangled_function_name)(node);
             if(!function)
                 throw Exception(fmt::format("[LLVMCodegen] Call to undeclared function '{}' (line {}).\n", mangled_function_name, function_call_node->token.line));
             // TODO: Handle default values.
@@ -690,4 +692,17 @@ llvm::Type* Module::get_llvm_type(TypeID type_id) const {
     if(!structType)
         throw Exception(fmt::format("[LLVMCodegen] Could not find struct with name '{}'.\n", type->designation));
     return structType;
+}
+
+llvm::Value* Module::intrinsic_memcpy(const AST::Node* node) {
+    auto function_call = dynamic_cast<const AST::FunctionCall*>(node);
+    auto dest = codegen(function_call->arguments()[0]);
+    dest = _llvm_ir_builder.CreateIntToPtr(dest, _llvm_ir_builder.getInt8PtrTy());
+    auto src = codegen(function_call->arguments()[1]);
+    src = _llvm_ir_builder.CreateIntToPtr(src, _llvm_ir_builder.getInt8PtrTy());
+    auto len = codegen(function_call->arguments()[2]);
+    auto is_volatile = llvm::ConstantInt::get(llvm::IntegerType::getInt1Ty(*_llvm_context), false);
+    auto llvm_memcpy = llvm::Intrinsic::getDeclaration(_llvm_module.get(), llvm::Intrinsic::memcpy,
+                                                       {_llvm_ir_builder.getInt8PtrTy(), _llvm_ir_builder.getInt8PtrTy(), _llvm_ir_builder.getInt64Ty()});
+    return _llvm_ir_builder.CreateCall(llvm_memcpy, {dest, src, len, is_volatile});
 }

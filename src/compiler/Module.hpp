@@ -21,6 +21,8 @@ class Module {
         // auto                     main_function = llvm::Function::Create(main_return_type, llvm::Function::ExternalLinkage, "main", _llvm_module.get());
         // auto*                    mainblock = llvm::BasicBlock::Create(*_llvm_context, "entrypoint", main_function);
         //_llvm_ir_builder.SetInsertPoint(mainblock);
+
+        _builtins["memcpy"] = std::bind(&Module::intrinsic_memcpy, this, std::placeholders::_1);
     }
 
     Scope& push_scope() {
@@ -102,10 +104,11 @@ class Module {
     }
 
   private:
-    std::vector<Scope>            _scopes{Scope{}};
-    llvm::LLVMContext*            _llvm_context;
-    std::unique_ptr<llvm::Module> _llvm_module;
-    llvm::IRBuilder<>             _llvm_ir_builder;
+    std::vector<Scope>                                                             _scopes{Scope{}};
+    llvm::LLVMContext*                                                             _llvm_context;
+    std::unique_ptr<llvm::Module>                                                  _llvm_module;
+    llvm::IRBuilder<>                                                              _llvm_ir_builder;
+    std::unordered_map<std::string, std::function<llvm::Value*(const AST::Node*)>> _builtins;
 
     bool _generated_return = false; // Tracks if the last node generated a return statement (FIXME: Remove?)
 
@@ -116,4 +119,6 @@ class Module {
     llvm::Value*    codegen(const AST::Node* node);
 
     llvm::Type* get_llvm_type(TypeID type_id) const;
+
+    llvm::Value* intrinsic_memcpy(const AST::Node* node);
 };
