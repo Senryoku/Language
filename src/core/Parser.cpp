@@ -101,29 +101,53 @@ void Parser::declare_builtins(AST::Scope* scope_node) {
 
     const auto register_builtin = [&](const std::string& name, TypeID type = PrimitiveType::Void, std::vector<std::string> args_names = {}, std::vector<TypeID> args_types = {},
                                       AST::FunctionDeclaration::Flag flags = AST::FunctionDeclaration::Flag::None) {
-        if(!s_builtins[name]) {
+        auto full_name = fmt::format("{}_{}", name, serialize_type_id(type));
+        for(auto arg_type : args_types)
+            full_name += "_" + serialize_type_id(arg_type);
+        if(!s_builtins[full_name]) {
             Token token;
             token.value = *internalize_string(name); // We have to provide a name via the token.
-            s_builtins[name].reset(new AST::FunctionDeclaration(token));
-            s_builtins[name]->type_id = type;
-            s_builtins[name]->flags = flags | AST::FunctionDeclaration::Flag::BuiltIn;
+            s_builtins[full_name].reset(new AST::FunctionDeclaration(token));
+            s_builtins[full_name]->type_id = type;
+            s_builtins[full_name]->flags = flags | AST::FunctionDeclaration::Flag::BuiltIn;
 
             for(size_t i = 0; i < args_names.size(); ++i) {
                 Token arg_token;
                 arg_token.value = *internalize_string(args_names[i]);
-                auto arg = s_builtins[name]->function_scope()->add_child(new AST::VariableDeclaration(arg_token));
+                auto arg = s_builtins[full_name]->function_scope()->add_child(new AST::VariableDeclaration(arg_token));
                 arg->type_id = args_types[i];
             }
         }
-        scope_node->declare_function(*s_builtins[name]);
-        return s_builtins[name].get();
+        scope_node->declare_function(*s_builtins[full_name]);
+        return s_builtins[full_name].get();
     };
 
     register_builtin("put", PrimitiveType::I32, {"character"}, {PrimitiveType::Char});
     register_builtin("printf", PrimitiveType::I32, {}, {}, AST::FunctionDeclaration::Flag::Variadic);
-    // register_builtin("malloc", PrimitiveType::Pointer, {"len"}, {PrimitiveType::U64});
-    // register_builtin("free", PrimitiveType::Void, {"ptr"}, {PrimitiveType::Pointer});
     register_builtin("memcpy", PrimitiveType::I32, {"dest", "src", "len"}, {PrimitiveType::Pointer, PrimitiveType::Pointer, PrimitiveType::U64});
+
+    for(auto type : {PrimitiveType::I8, PrimitiveType::I16, PrimitiveType::I32, PrimitiveType::I64, PrimitiveType::U8, PrimitiveType::U16, PrimitiveType::U32, PrimitiveType::U64,
+                     PrimitiveType::Float, PrimitiveType::Double}) {
+        register_builtin("min", type, {"lhs", "rhs"}, {type, type});
+        register_builtin("max", type, {"lhs", "rhs"}, {type, type});
+        register_builtin("pow", PrimitiveType::Float, {"val", "exp"}, {PrimitiveType::Float, type});
+        register_builtin("pow", PrimitiveType::Double, {"val", "exp"}, {PrimitiveType::Double, type});
+        register_builtin("abs", type, {"val"}, {type});
+    }
+    for(auto type : {PrimitiveType::Float, PrimitiveType::Double}) {
+        register_builtin("sin", type, {"val"}, {type});
+        register_builtin("cos", type, {"val"}, {type});
+        register_builtin("sqrt", type, {"val"}, {type});
+        register_builtin("exp", type, {"val"}, {type});
+        register_builtin("exp2", type, {"val"}, {type});
+        register_builtin("log", type, {"val"}, {type});
+        register_builtin("log2", type, {"val"}, {type});
+        register_builtin("log10", type, {"val"}, {type});
+        register_builtin("floor", type, {"val"}, {type});
+        register_builtin("ceil", type, {"val"}, {type});
+        register_builtin("trunc", type, {"val"}, {type});
+        register_builtin("round", type, {"val"}, {type});
+    }
 }
 
 std::optional<AST> Parser::parse(const std::span<Token>& tokens) {
@@ -954,7 +978,8 @@ bool Parser::parse_type_declaration(const std::span<Token>& tokens, std::span<To
         throw Exception(fmt::format("Expected '{{' after type declaration, got {}.\n", it->value), point_error(*it));
     ++it;
 
-    // This is kinda weird, basically it's here to be able to re-use 'parse_variable_declaration', but I'm not even sure I really want to use this syntax ('let' is redundant here).
+    // This is kinda weird, basically it's here to be able to re-use 'parse_variable_declaration', but I'm not even sure I really want to use this syntax ('let' is redundant
+    // here).
     auto scope = type_node->add_child(new AST::Scope());
 
     std::vector<AST::Node*> default_values;
@@ -1280,8 +1305,8 @@ const AST::FunctionDeclaration* Parser::resolve_or_instanciate_function(const st
                 auto specialized = candidate->body() ? candidate->clone() : GlobalTemplateCache::instance().get_function(std::string(candidate->token.value))->clone();
 
                 auto parent = candidate->parent ? candidate->parent : get_hoisted_declarations_node(curr_node);
-                // FIXME: Should be after because specialize can create more function specialization that this function will depend on, but it also need to be in the AST to access
-                // scope data.
+                // FIXME: Should be after because specialize can create more function specialization that this function will depend on, but it also need to be in the AST to
+                // access scope data.
                 if(candidate->parent)
                     parent->add_child_after(specialized, candidate);
                 else
@@ -1860,7 +1885,8 @@ TypeID Parser::parse_type(const std::span<Token>& tokens, std::span<Token>::iter
         // This will generate this type specialization if we never encountered it before (across modules)
         scoped_type_id = GlobalTypeRegistry::instance().get_specialized_type(scoped_type_id, type_parameters);
         // We still have to generate a local type declaration since each module need to know the layout of the type.
-        // FIXME: We could rewrite the Module to use Type objects to generate the LLVM struct, removing the need to generate and hoist these nodes (as it would be easy to generate
+        // FIXME: We could rewrite the Module to use Type objects to generate the LLVM struct, removing the need to generate and hoist these nodes (as it would be easy to
+        // generate
         //        missing specializations on the fly), but the current shape of TemplatedStruct makes it a little awkward (we still have to
         //        access the underlying StructType to get the member types).
         // FIXME: Search if this type is already declared locally, this could be done much more efficiently.
@@ -1896,7 +1922,8 @@ TypeID Parser::parse_type(const std::span<Token>& tokens, std::span<Token>::iter
                 // Declare early
                 get_hoisted_declarations_node(curr_node)->add_child(type_declaration_node);
                 // FIXME: Systematically exports nexly generated template specializations.
-                //        Ideally we'd want to export only the specializations that are part of some form of interface (parameters/return types of exported functions, for example)
+                //        Ideally we'd want to export only the specializations that are part of some form of interface (parameters/return types of exported functions, for
+                //        example)
                 _module_interface.type_exports.push_back(type_declaration_node);
             }
         }
@@ -2122,8 +2149,8 @@ void Parser::specialize(AST::Node* node, const std::vector<TypeID>& parameters) 
                 auto maybe_variable = node->get_scope()->get_variable(node->token.value);
                 if(maybe_variable)
                     node->type_id = maybe_variable->type_id;
-                // FIXME: The 'Variable' node type is used for function calls (holds the function name)... This should be an error, but because of that, we have to ignore it for
-                // now.
+                // FIXME: The 'Variable' node type is used for function calls (holds the function name)... This should be an error, but because of that, we have to ignore it
+                // for now.
                 //   else throw Exception(fmt::format("[Parser] Specialization cannot deduce type of variable '{}'.\n{}\n", node->token.value, point_error(node->token)));
             }
             break;

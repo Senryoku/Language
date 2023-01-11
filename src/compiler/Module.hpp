@@ -14,6 +14,25 @@ class Module {
 
     Module(const std::string& name, llvm::LLVMContext* context) : _llvm_context(context), _llvm_module(new llvm::Module{name, *context}), _llvm_ir_builder{*context} {
         _builtins["memcpy"] = std::bind(&Module::intrinsic_memcpy, this, std::placeholders::_1);
+        _builtins["min"] = std::bind(&Module::intrinsic_min, this, std::placeholders::_1);
+        _builtins["max"] = std::bind(&Module::intrinsic_max, this, std::placeholders::_1);
+        _builtins["abs"] = std::bind(&Module::intrinsic_abs, this, std::placeholders::_1);
+
+        _builtins["pow"] = std::bind(&Module::intrinsic_pow, this, std::placeholders::_1);
+
+        _builtins["sqrt"] = std::bind(&Module::intrinsic_unary, this, llvm::Intrinsic::IndependentIntrinsics::sqrt, std::placeholders::_1);
+        _builtins["sin"] = std::bind(&Module::intrinsic_unary, this, llvm::Intrinsic::IndependentIntrinsics::sin, std::placeholders::_1);
+        _builtins["cos"] = std::bind(&Module::intrinsic_unary, this, llvm::Intrinsic::IndependentIntrinsics::cos, std::placeholders::_1);
+        _builtins["exp"] = std::bind(&Module::intrinsic_unary, this, llvm::Intrinsic::IndependentIntrinsics::exp, std::placeholders::_1);
+        _builtins["exp2"] = std::bind(&Module::intrinsic_unary, this, llvm::Intrinsic::IndependentIntrinsics::exp2, std::placeholders::_1);
+        _builtins["log"] = std::bind(&Module::intrinsic_unary, this, llvm::Intrinsic::IndependentIntrinsics::log, std::placeholders::_1);
+        _builtins["log10"] = std::bind(&Module::intrinsic_unary, this, llvm::Intrinsic::IndependentIntrinsics::log10, std::placeholders::_1);
+        _builtins["log2"] = std::bind(&Module::intrinsic_unary, this, llvm::Intrinsic::IndependentIntrinsics::log2, std::placeholders::_1);
+
+        _builtins["floor"] = std::bind(&Module::intrinsic_unary, this, llvm::Intrinsic::IndependentIntrinsics::floor, std::placeholders::_1);
+        _builtins["ceil"] = std::bind(&Module::intrinsic_unary, this, llvm::Intrinsic::IndependentIntrinsics::ceil, std::placeholders::_1);
+        _builtins["trunc"] = std::bind(&Module::intrinsic_unary, this, llvm::Intrinsic::IndependentIntrinsics::trunc, std::placeholders::_1);
+        _builtins["round"] = std::bind(&Module::intrinsic_unary, this, llvm::Intrinsic::IndependentIntrinsics::round, std::placeholders::_1);
     }
 
     Scope& push_scope() {
@@ -113,4 +132,9 @@ class Module {
     llvm::Type* get_llvm_type(TypeID type_id) const;
 
     llvm::Value* intrinsic_memcpy(const AST::Node* node);
+    llvm::Value* intrinsic_min(const AST::Node* node);
+    llvm::Value* intrinsic_max(const AST::Node* node);
+    llvm::Value* intrinsic_abs(const AST::Node* node);
+    llvm::Value* intrinsic_pow(const AST::Node* node);
+    llvm::Value* intrinsic_unary(llvm::Intrinsic::IndependentIntrinsics intrinsic, const AST::Node* node);
 };

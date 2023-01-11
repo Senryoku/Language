@@ -706,3 +706,59 @@ llvm::Value* Module::intrinsic_memcpy(const AST::Node* node) {
                                                        {_llvm_ir_builder.getInt8PtrTy(), _llvm_ir_builder.getInt8PtrTy(), _llvm_ir_builder.getInt64Ty()});
     return _llvm_ir_builder.CreateCall(llvm_memcpy, {dest, src, len, is_volatile});
 }
+
+llvm::Value* Module::intrinsic_min(const AST::Node* node) {
+    auto function_call = dynamic_cast<const AST::FunctionCall*>(node);
+    auto lhs = codegen(function_call->arguments()[0]);
+    auto rhs = codegen(function_call->arguments()[1]);
+    auto intrinsic = llvm::Intrinsic::smin;
+    if(is_floating_point(function_call->arguments()[0]->type_id))
+        intrinsic = llvm::Intrinsic::minimum;
+    else if(is_unsigned(function_call->arguments()[0]->type_id))
+        intrinsic = llvm::Intrinsic::umin;
+    auto llvm_min = llvm::Intrinsic::getDeclaration(_llvm_module.get(), intrinsic, {get_llvm_type(function_call->arguments()[0]->type_id)});
+    return _llvm_ir_builder.CreateCall(llvm_min, {lhs, rhs});
+}
+
+llvm::Value* Module::intrinsic_max(const AST::Node* node) {
+    auto function_call = dynamic_cast<const AST::FunctionCall*>(node);
+    auto lhs = codegen(function_call->arguments()[0]);
+    auto rhs = codegen(function_call->arguments()[1]);
+    auto intrinsic = llvm::Intrinsic::smax;
+    if(is_floating_point(function_call->arguments()[0]->type_id))
+        intrinsic = llvm::Intrinsic::maximum;
+    else if(is_unsigned(function_call->arguments()[0]->type_id))
+        intrinsic = llvm::Intrinsic::umax;
+    auto llvm_max = llvm::Intrinsic::getDeclaration(_llvm_module.get(), intrinsic, {get_llvm_type(function_call->arguments()[0]->type_id)});
+    return _llvm_ir_builder.CreateCall(llvm_max, {lhs, rhs});
+}
+
+llvm::Value* Module::intrinsic_abs(const AST::Node* node) {
+    auto function_call = dynamic_cast<const AST::FunctionCall*>(node);
+    auto val = codegen(function_call->arguments()[0]);
+    if(is_floating_point(function_call->arguments()[0]->type_id)) {
+        auto llvm_fabs = llvm::Intrinsic::getDeclaration(_llvm_module.get(), llvm::Intrinsic::fabs, {get_llvm_type(function_call->arguments()[0]->type_id)});
+        return _llvm_ir_builder.CreateCall(llvm_fabs, {val});
+    }
+    auto is_int_min_poison = llvm::ConstantInt::get(llvm::IntegerType::getInt1Ty(*_llvm_context), false);
+    auto llvm_abs = llvm::Intrinsic::getDeclaration(_llvm_module.get(), llvm::Intrinsic::abs, {get_llvm_type(function_call->arguments()[0]->type_id)});
+    return _llvm_ir_builder.CreateCall(llvm_abs, {val, is_int_min_poison});
+}
+
+llvm::Value* Module::intrinsic_pow(const AST::Node* node) {
+    auto function_call = dynamic_cast<const AST::FunctionCall*>(node);
+    auto lhs = codegen(function_call->arguments()[0]);
+    auto rhs = codegen(function_call->arguments()[1]);
+    auto llvm_pow = is_floating_point(function_call->arguments()[1]->type_id)
+                        ? llvm::Intrinsic::getDeclaration(_llvm_module.get(), llvm::Intrinsic::pow, {get_llvm_type(function_call->arguments()[0]->type_id)})
+                        : llvm::Intrinsic::getDeclaration(_llvm_module.get(), llvm::Intrinsic::powi,
+                                                          {get_llvm_type(function_call->arguments()[0]->type_id), get_llvm_type(function_call->arguments()[1]->type_id)});
+    return _llvm_ir_builder.CreateCall(llvm_pow, {lhs, rhs});
+}
+
+llvm::Value* Module::intrinsic_unary(llvm::Intrinsic::IndependentIntrinsics intrinsic, const AST::Node* node) {
+    auto function_call = dynamic_cast<const AST::FunctionCall*>(node);
+    auto val = codegen(function_call->arguments()[0]);
+    auto llvm_intrinsic = llvm::Intrinsic::getDeclaration(_llvm_module.get(), intrinsic, {get_llvm_type(function_call->arguments()[0]->type_id)});
+    return _llvm_ir_builder.CreateCall(llvm_intrinsic, {val});
+}

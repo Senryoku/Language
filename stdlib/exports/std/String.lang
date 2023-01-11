@@ -66,12 +66,8 @@ export function reserve(this: StringBuilder*, size : u64) : void {
 }
 
 export function append(this: StringBuilder*, c: char) : void {
-	if(.capacity <= .length + 1u64) {
-		if(.capacity <= 128u64)
-			.reserve(128u64);
-		else
-			.reserve(.capacity * 2u64);
-	}
+	if(.capacity <= .length + 1u64)
+		.reserve(max(128u64, .capacity * 2u64));
 	
 	.ptr[.length] = c;
 	.length = .length + 1u64;
