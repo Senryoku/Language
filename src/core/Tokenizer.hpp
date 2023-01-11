@@ -77,27 +77,12 @@ class Tokenizer {
     };
 
     const het_unordered_map<Token::Type> keywords{
-        {"function", Token::Type::Function},
-        {"let", Token::Type::Let},
-        {"return", Token::Type::Return},
-        {"if", Token::Type::If},
-        {"else", Token::Type::Else},
-        {"while", Token::Type::While},
-        {"for", Token::Type::For},
-        {"bool", Token::Type::Identifier},
-        {"int", Token::Type::Identifier},
-        {"float", Token::Type::Identifier},
-        {"char", Token::Type::Identifier},
-        {"string", Token::Type::Identifier},
-        {"true", Token::Type::Boolean},
-        {"false", Token::Type::Boolean},
-        {"const", Token::Type::Const},
-        {"import", Token::Type::Import},
-        {"export", Token::Type::Export},
-        {"extern", Token::Type::Extern},
-        {"type", Token::Type::Type},
-        {"and", Token::Type::And},
-        {"or", Token::Type::Or},
+        {"function", Token::Type::Function}, {"let", Token::Type::Let},          {"return", Token::Type::Return},   {"if", Token::Type::If},
+        {"else", Token::Type::Else},         {"while", Token::Type::While},      {"for", Token::Type::For},         {"bool", Token::Type::Identifier},
+        {"int", Token::Type::Identifier},    {"float", Token::Type::Identifier}, {"char", Token::Type::Identifier}, {"true", Token::Type::Boolean},
+        {"false", Token::Type::Boolean},     {"const", Token::Type::Const},      {"import", Token::Type::Import},   {"export", Token::Type::Export},
+        {"extern", Token::Type::Extern},     {"type", Token::Type::Type},        {"and", Token::Type::And},         {"or", Token::Type::Or},
+        {"sizeof", Token::Type::Sizeof},
     };
 
     const std::string& _source;

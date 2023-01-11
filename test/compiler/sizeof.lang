@@ -32,5 +32,6 @@ function main() {
 	print_size_of_template(str);
 	let val : Type128;
 	print_size_of_template(val);
+	
     return 0;
 }

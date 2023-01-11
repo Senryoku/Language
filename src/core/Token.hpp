@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cassert>
+
 #include <fmt/color.h>
 #include <fmt/core.h>
 #include <fmt/format.h>
@@ -56,6 +58,7 @@ struct Token {
         Function,
         Return,
         Const,
+        Sizeof,
 
         Comment,
 
@@ -132,14 +135,17 @@ struct fmt::formatter<Token::Type> {
             OP(OpenSubscript);
             OP(CloseSubscript);
             OP(MemberAccess);
+            OP(Sizeof);
             case Token::Type::Function: return fmt::format_to(ctx.out(), fg(fmt::color::orchid), "{:12}", "Function");
             case Token::Type::While: return fmt::format_to(ctx.out(), fg(fmt::color::orchid), "{:12}", "While");
             case Token::Type::If: return fmt::format_to(ctx.out(), fg(fmt::color::orchid), "{:12}", "If");
             case Token::Type::Else: return fmt::format_to(ctx.out(), fg(fmt::color::orchid), "{:12}", "Else");
             case Token::Type::Identifier: return fmt::format_to(ctx.out(), fg(fmt::color::light_blue), "{:12}", "Identifier");
+            case Token::Type::StringLiteral: return fmt::format_to(ctx.out(), fg(fmt::color::burly_wood), "{:12}", "StrLiteral");
+            case Token::Type::Return: return fmt::format_to(ctx.out(), fg(fmt::color::orchid), "{:12}", "Return");
 #undef OP
-            default:
             case Token::Type::Unknown: return fmt::format_to(ctx.out(), "{:12}", "Unknown");
+            default: assert(false); return fmt::format_to(ctx.out(), "{:12}", "Invalid");
         }
     }
 };

@@ -33,6 +33,7 @@ class AST {
             FunctionDeclaration, // First n children : Arguments, Last child: Function Body, Name stored in token, Flags in value.as_int
             FunctionCall,
             TypeDeclaration,
+            TypeIdentifier,
             MemberIdentifier,
             Cast,
             LValueToRValue,

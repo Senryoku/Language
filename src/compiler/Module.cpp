@@ -694,6 +694,14 @@ llvm::Type* Module::get_llvm_type(TypeID type_id) const {
     return structType;
 }
 
+llvm::Value* Module::builtin_sizeof(const AST::Node* node) {
+    static llvm::DataLayout data_layout("");
+
+    auto function_call = dynamic_cast<const AST::FunctionCall*>(node);
+    auto type = get_llvm_type(function_call->arguments()[0]->type_id);
+    return llvm::ConstantInt::get(llvm::IntegerType::getInt64Ty(*_llvm_context), data_layout.getTypeAllocSize(type));
+}
+
 llvm::Value* Module::intrinsic_memcpy(const AST::Node* node) {
     auto function_call = dynamic_cast<const AST::FunctionCall*>(node);
     auto dest = codegen(function_call->arguments()[0]);

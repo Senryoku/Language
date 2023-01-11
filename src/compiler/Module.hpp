@@ -13,7 +13,10 @@ class Module {
     using Scope = het_unordered_map<llvm::AllocaInst*>;
 
     Module(const std::string& name, llvm::LLVMContext* context) : _llvm_context(context), _llvm_module(new llvm::Module{name, *context}), _llvm_ir_builder{*context} {
+        _builtins["sizeof"] = std::bind(&Module::builtin_sizeof, this, std::placeholders::_1);
+
         _builtins["memcpy"] = std::bind(&Module::intrinsic_memcpy, this, std::placeholders::_1);
+
         _builtins["min"] = std::bind(&Module::intrinsic_min, this, std::placeholders::_1);
         _builtins["max"] = std::bind(&Module::intrinsic_max, this, std::placeholders::_1);
         _builtins["abs"] = std::bind(&Module::intrinsic_abs, this, std::placeholders::_1);
@@ -130,6 +133,8 @@ class Module {
     llvm::Value*    codegen(const AST::Node* node);
 
     llvm::Type* get_llvm_type(TypeID type_id) const;
+
+    llvm::Value* builtin_sizeof(const AST::Node* node);
 
     llvm::Value* intrinsic_memcpy(const AST::Node* node);
     llvm::Value* intrinsic_min(const AST::Node* node);

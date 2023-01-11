@@ -76,18 +76,16 @@ export function append(this: StringBuilder*, c: char) : void {
 export function append(this: StringBuilder*, str: cstr) : void {
 	const cstr_len : u64 = strlen(str);
 	
-	if(.capacity <= .length + cstr_len) {
-		.reserve((.capacity + cstr_len) * 2u64);
-	}
+	if(.capacity <= .length + cstr_len)
+		.reserve(max(128u64, (.capacity + cstr_len) * 2u64));
 	
 	memcpy(.ptr, str, cstr_len);
 	.length = .length + cstr_len;
 }
 
 export function append(this: StringBuilder*, str: String) : void {
-	if(.capacity <= .length + str.length) {
-		.reserve((.capacity + str.length) * 2u64);
-	}
+	if(.capacity <= .length + str.length)
+		.reserve(max(128u64, (.capacity + str.length) * 2u64));
 	
 	memcpy(.ptr, str.ptr, str.length);
 	.length = .length + str.length;

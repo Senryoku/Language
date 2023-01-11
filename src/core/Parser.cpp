@@ -122,6 +122,10 @@ void Parser::declare_builtins(AST::Scope* scope_node) {
         return s_builtins[full_name].get();
     };
 
+    // FIXME: Hackish. Marking it as variadic allow us to skip some checks, but its arity is actually well defined (1).
+    //        Will go away if we get some proper support for Type as parameters, or a way to call a specialized function explicitly (sizeof<T>()).
+    register_builtin("sizeof", PrimitiveType::U64, {}, {}, AST::FunctionDeclaration::Flag::Variadic);
+
     register_builtin("put", PrimitiveType::I32, {"character"}, {PrimitiveType::Char});
     register_builtin("printf", PrimitiveType::I32, {}, {}, AST::FunctionDeclaration::Flag::Variadic);
     register_builtin("memcpy", PrimitiveType::I32, {"dest", "src", "len"}, {PrimitiveType::Pointer, PrimitiveType::Pointer, PrimitiveType::U64});
@@ -512,6 +516,10 @@ bool Parser::parse(const std::span<Token>& tokens, AST::Node* curr_node) {
                 }
                 break;
             }
+            case Token::Type::Sizeof: {
+                parse_sizeof(tokens, it, curr_node);
+                break;
+            }
             case Token::Type::Comment: ++it; break;
             default:
                 warn("[Parser] Unused token: {}.\n", *it);
@@ -690,11 +698,12 @@ bool Parser::parse_next_expression(const std::span<Token>& tokens, std::span<Tok
                 }
                 break;
             }
-            default: {
-                warn("[parse_next_expression] Unexpected Token Type '{}' ({}).\n", it->type, *it);
-                delete curr_node->pop_child();
-                return false;
+            case Token::Type::Sizeof: {
+                parse_sizeof(tokens, it, exprNode);
                 break;
+            }
+            default: {
+                throw Exception(fmt::format("[parse_next_expression] Unexpected Token Type '{}' ({}).\n", it->type, *it), point_error(*it));
             }
         }
     }
@@ -1951,6 +1960,21 @@ TypeID Parser::parse_type(const std::span<Token>& tokens, std::span<Token>::iter
     }
 
     return scoped_type_id;
+}
+
+// Since sizeof takes a type as parameter, we have to handle it separatly. Maybe at some point this may become a language feature?
+void Parser::parse_sizeof(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node) {
+    auto size_of_token = *it;
+    ++it;
+    expect(tokens, it, Token::Type::OpenParenthesis);
+    auto type_id = parse_type(tokens, it, curr_node);
+    auto function_call = curr_node->add_child(new AST::FunctionCall(size_of_token));
+    function_call->flags |= AST::FunctionDeclaration::Flag::BuiltIn;
+    function_call->add_child(new AST::Variable(size_of_token));
+    auto type_identifier_node = function_call->add_child(new AST::Node(AST::Node::Type::TypeIdentifier));
+    function_call->type_id = PrimitiveType::U64;
+    type_identifier_node->type_id = type_id;
+    expect(tokens, it, Token::Type::CloseParenthesis);
 }
 
 bool Parser::write_export_interface(const std::filesystem::path& path) const {

@@ -91,6 +91,7 @@ class Parser {
     bool                     parse_operator(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
     bool                     parse_import(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
     bool parse_variable_declaration(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node, bool is_const = false, bool allow_construtor = true);
+    void parse_sizeof(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node);
 
     template<typename T>
     [[nodiscard]] AST::Node* gen_integer_literal_node(const Token& token, uint64_t value, PrimitiveType type) {
