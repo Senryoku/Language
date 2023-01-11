@@ -711,8 +711,7 @@ bool Parser::parse_identifier(const std::span<Token>& tokens, std::span<Token>::
         throw Exception(fmt::format("[Parser] Syntax Error: Variable '{}' has not been declared.\n", it->value), point_error(*it));
     const auto& variable = *maybe_variable;
 
-    auto variable_node = new AST::Variable(*it);
-    curr_node->add_child(variable_node);
+    auto variable_node = curr_node->add_child(new AST::Variable(*it));
     variable_node->type_id = variable.type_id;
 
     if(peek(tokens, it, Token::Type::OpenSubscript)) { // Array accessor
@@ -732,8 +731,7 @@ bool Parser::parse_identifier(const std::span<Token>& tokens, std::span<Token>::
         else // FIXME: Won't work for string. But we'll probably get rid of it anyway.
             access_operator_node->type_id = dynamic_cast<const ArrayType*>(type)->element_type;
 
-        auto ltor = new AST::Node(AST::Node::Type::LValueToRValue);
-        access_operator_node->add_child(ltor);
+        auto ltor = access_operator_node->add_child(new AST::Node(AST::Node::Type::LValueToRValue));
 
         it += 2;
         // Get the index and add it as a child.
@@ -1041,25 +1039,23 @@ bool Parser::parse_type_declaration(const std::span<Token>& tokens, std::span<To
         for(auto idx = 0; idx < type->members.size(); ++idx) {
             if(default_values[idx] || constructors[idx]) {
                 assert((default_values[idx] != nullptr) xor (constructors[idx] != nullptr));
-                auto member_access = new AST::BinaryOperator(Token(Token::Type::MemberAccess, *internalize_string("."), 0, 0));
-                auto dereference = new AST::Node(AST::Node::Type::Dereference);
-                member_access->add_child(dereference);
+                std::unique_ptr<AST::BinaryOperator> member_access(new AST::BinaryOperator(Token(Token::Type::MemberAccess, *internalize_string("."), 0, 0)));
+                auto dereference = member_access->add_child(new AST::Node(AST::Node::Type::Dereference));
                 dereference->type_id = this_base_type;
                 auto variable = dereference->add_child(new AST::Variable(this_token));
                 variable->type_id = this_declaration_node->type_id;
-                auto member_identifier = new AST::MemberIdentifier(Token(Token::Type::Identifier, *internalize_string(std::string(type_node->members()[idx]->token.value)), 0, 0));
-                member_access->add_child(member_identifier);
+                auto member_identifier = member_access->add_child(
+                    new AST::MemberIdentifier(Token(Token::Type::Identifier, *internalize_string(std::string(type_node->members()[idx]->token.value)), 0, 0)));
                 member_identifier->index = idx;
                 member_identifier->type_id = type_node->members()[idx]->type_id;
-                resolve_operator_type(member_access);
+                resolve_operator_type(member_access.get());
                 if(default_values[idx]) {
                     auto assignment = function_body->add_child(new AST::BinaryOperator(Token(Token::Type::Assignment, *internalize_string("="), 0, 0)));
-                    assignment->add_child(member_access);
+                    assignment->add_child(member_access.release());
                     assignment->add_child(default_values[idx]);
                     resolve_operator_type(assignment);
                     type_check_assignment(assignment);
-                }
-                if(constructors[idx]) {
+                } else if(constructors[idx]) {
                     // Patch the variable access with our member access
                     // FIXME: Once again, this is kinda hackish.
                     //        Some asserts on the function call structure, in case we end up changing it.
@@ -1068,9 +1064,9 @@ bool Parser::parse_type_declaration(const std::span<Token>& tokens, std::span<To
                     assert(constructors[idx]->children.back()->children[0]->type == AST::Node::Type::Variable);
                     delete constructors[idx]->children.back()->children[0];
                     constructors[idx]->children.back()->children.pop_back();
-                    constructors[idx]->children.back()->add_child(member_access);
+                    constructors[idx]->children.back()->add_child(member_access.release());
                     function_body->add_child(constructors[idx]);
-                }
+                } else assert(false);
             }
         }
 
@@ -1085,8 +1081,7 @@ bool Parser::parse_type_declaration(const std::span<Token>& tokens, std::span<To
 }
 
 AST::BoolLiteral* Parser::parse_boolean(const std::span<Token>&, std::span<Token>::iterator& it, AST::Node* curr_node) {
-    auto boolNode = new AST::BoolLiteral(*it);
-    curr_node->add_child(boolNode);
+    auto boolNode = curr_node->add_child(new AST::BoolLiteral(*it));
     boolNode->value = it->value == "true";
     ++it;
     return boolNode;
@@ -1159,8 +1154,7 @@ AST::Node* Parser::parse_digits(const std::span<Token>&, std::span<Token>::itera
 }
 
 AST::FloatLiteral* Parser::parse_float(const std::span<Token>&, std::span<Token>::iterator& it, AST::Node* curr_node) {
-    auto floatNode = new AST::FloatLiteral(*it);
-    curr_node->add_child(floatNode);
+    auto floatNode = curr_node->add_child(new AST::FloatLiteral(*it));
     auto [ptr, error_code] = std::from_chars(&*(it->value.begin()), &*(it->value.begin()) + it->value.length(), floatNode->value);
     if(error_code == std::errc::invalid_argument)
         throw Exception("[Parser::parse_float] std::from_chars returned invalid_argument.\n", point_error(*it));
@@ -1171,16 +1165,14 @@ AST::FloatLiteral* Parser::parse_float(const std::span<Token>&, std::span<Token>
 }
 
 AST::CharLiteral* Parser::parse_char(const std::span<Token>&, std::span<Token>::iterator& it, AST::Node* curr_node) {
-    auto strNode = new AST::CharLiteral(*it);
-    curr_node->add_child(strNode);
+    auto strNode = curr_node->add_child(new AST::CharLiteral(*it));
     strNode->value = it->value[0];
     ++it;
     return strNode;
 }
 
 bool Parser::parse_string(const std::span<Token>&, std::span<Token>::iterator& it, AST::Node* curr_node) {
-    auto strNode = new AST::StringLiteral(*it);
-    curr_node->add_child(strNode);
+    auto strNode = curr_node->add_child(new AST::StringLiteral(*it));
 
     if(it->value.find('\\') != it->value.npos) {
         std::string str;
@@ -1437,9 +1429,8 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
     auto operator_type = it->type;
     // Unary operators
     if(is_unary_operator(operator_type) && curr_node->children.empty()) {
-        auto unary_operator_node = new AST::UnaryOperator(*it);
+        auto unary_operator_node = curr_node->add_child(new AST::UnaryOperator(*it));
         unary_operator_node->flags |= AST::UnaryOperator::Flag::Prefix;
-        curr_node->add_child(unary_operator_node);
         auto precedence = operator_precedence.at(operator_type);
         ++it;
         parse_next_expression(tokens, it, unary_operator_node, precedence);
@@ -1449,9 +1440,8 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
 
     if((operator_type == Token::Type::Increment || operator_type == Token::Type::Decrement) && !curr_node->children.empty()) {
         auto prev_node = curr_node->pop_child();
-        auto unary_operator_node = new AST::UnaryOperator(*it);
+        auto unary_operator_node = curr_node->add_child(new AST::UnaryOperator(*it));
         unary_operator_node->flags |= AST::UnaryOperator::Flag::Postfix;
-        curr_node->add_child(unary_operator_node);
         // auto   precedence = operator_precedence.at(std::string(it->value));
         // FIXME: How do we use the precedence here?
         unary_operator_node->add_child(prev_node);
@@ -1509,9 +1499,8 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
             throw Exception(fmt::format("[Parser] Syntax error: Implicit 'this' access, but 'this' is not defined here.\n", *it), point_error(*it));
         Token token = *it;
         token.value = *internalize_string("this");
-        auto this_node = new AST::Variable(token);
+        auto this_node = curr_node->add_child(new AST::Variable(token));
         this_node->type_id = t->type_id;
-        curr_node->add_child(this_node);
 
         auto type = GlobalTypeRegistry::instance().get_type(t->type_id);
         // Allow using the dot operator on pointers and directly on an object
@@ -1527,9 +1516,7 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
 
     AST::Node* prev_expr = curr_node->pop_child();
     // TODO: Test type of previous node! (Must be an expression resolving to something operable)
-    auto binary_operator_node = new AST::BinaryOperator(*it);
-    curr_node->add_child(binary_operator_node);
-
+    auto binary_operator_node = curr_node->add_child(new AST::BinaryOperator(*it));
     binary_operator_node->add_child(prev_expr);
 
     auto precedence = operator_precedence.at(operator_type);
@@ -1553,10 +1540,9 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
             auto binary_node = curr_node->pop_child();
             auto first_argument = binary_node->pop_child();
             delete binary_node;
-            auto call_node = new AST::FunctionCall(*it);
-            curr_node->add_child(call_node);
-            auto function_node = new AST::Variable(*it);
-            call_node->add_child(function_node);
+            auto call_node = curr_node->add_child(new AST::FunctionCall(*it));
+            // Reference to the function as the first child (here, just its name.)
+            call_node->add_child(new AST::Variable(*it));
             ++it;
 
             call_node->add_child(first_argument);
@@ -1593,8 +1579,7 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
             check_function_call(call_node, method);
             return true;
         } else {
-            auto member_identifier_node = new AST::MemberIdentifier(*it);
-            binary_operator_node->add_child(member_identifier_node);
+            auto member_identifier_node = binary_operator_node->add_child(new AST::MemberIdentifier(*it));
             // TODO: Handle non-specialized templated types. We have to delay the MemberIdentifier creation afters specialization (member index cannot be known at this time,
             //       unless we have constraint on the placeholder, like contracts/traits, but we have nothing like that right now :) )
             if(is_placeholder(base_type->type_id)) {
@@ -1640,6 +1625,15 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
 
     if(operator_type == Token::Type::Assignment) {
         type_check_assignment(binary_operator_node);
+        // When replacing a non-moved value, we should call its destructor first.
+        // FIXME: We need a more generic solution for this.
+        if(binary_operator_node->children[0]->type == AST::Node::Type::Variable) {
+            if(insert_destructor_call(binary_operator_node->get_scope()->get_variable(binary_operator_node->children[0]->token.value), curr_node)) {
+                // Move destructor call before the assignment.
+                auto destructor_call = curr_node->pop_child();
+                curr_node->add_child_before(destructor_call, binary_operator_node);
+            }
+        }
     } else {
         // Make sure both sides of the operator are of the same type for comparisons and arithmetic operations.
         if(operator_type >= Token::Type::Xor && operator_type <= Token::Type::GreaterOrEqual) {
@@ -1755,8 +1749,7 @@ void Parser::revolve_member_identifier(const Type* base_type, AST::MemberIdentif
 bool Parser::parse_variable_declaration(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node, bool is_const, bool allow_construtor) {
     auto identifier = expect(tokens, it, Token::Type::Identifier);
 
-    auto var_declaration_node = new AST::VariableDeclaration(identifier);
-    curr_node->add_child(var_declaration_node);
+    auto var_declaration_node = curr_node->add_child(new AST::VariableDeclaration(identifier));
 
     if(it->type == Token::Type::Colon) {
         ++it;
@@ -1796,12 +1789,9 @@ bool Parser::parse_variable_declaration(const std::span<Token>& tokens, std::spa
         auto constructor = resolve_or_instanciate_function("constructor", span, var_declaration_node);
         auto fake_token = Token(Token::Type::Identifier, *internalize_string("constructor"), var_declaration_node->token.line, var_declaration_node->token.column);
         if(constructor) {
-            auto call_node = new AST::FunctionCall(fake_token);
-
-            var_declaration_node->add_child(call_node);
+            auto call_node = var_declaration_node->add_child(new AST::FunctionCall(fake_token));
             // Constructor method designation
-            auto constructor_node = new AST::Variable(fake_token); // FIXME: Still using the token to get the function...
-            call_node->add_child(constructor_node);
+            call_node->add_child(new AST::Variable(fake_token)); // FIXME: Still using the token to get the function...
             // Constructor argument (pointer to the object)
             auto get_pointer_node = call_node->add_child(new AST::Node(AST::Node::Type::GetPointer, var_declaration_node->token));
             get_pointer_node->type_id = GlobalTypeRegistry::instance().get_pointer_to(var_declaration_node->type_id);
@@ -1986,36 +1976,39 @@ void Parser::insert_defer_node(const AST::Scope& scope, AST::Node* curr_node) {
         auto dec = ordered_variable_declarations.top();
         ordered_variable_declarations.pop();
 
-        if(dec->flags & AST::VariableDeclaration::Flag::Moved)
-            continue;
-
-        // FIXME: Final type isn't known yet, we have to delay destructor insertion...
-        //        Right now it will never be inserted!
-        if(dec->type_id == InvalidTypeID)
-            continue;
-
-        std::vector<TypeID> span;
-        span.push_back(GlobalTypeRegistry::instance().get_pointer_to(dec->type_id));
-        auto destructor = resolve_or_instanciate_function("destructor", span, dec);
-        if(destructor) {
-            Token destructor_token;
-            destructor_token.type = Token::Type::Identifier;
-            destructor_token.value = *internalize_string("destructor");
-            auto call_node = new AST::FunctionCall(destructor_token);
-
-            curr_node->add_child(call_node);
-            // Destructor method designation
-            auto destructor_node = new AST::Variable(destructor_token); // FIXME: Still using the token to get the function...
-            call_node->add_child(destructor_node);
-            // Destructor argument (pointer to the object)
-            auto get_pointer_node = call_node->add_child(new AST::Node(AST::Node::Type::GetPointer, dec->token));
-            get_pointer_node->type_id = GlobalTypeRegistry::instance().get_pointer_to(dec->type_id);
-            auto var_node = get_pointer_node->add_child(new AST::Variable(dec->token));
-            var_node->type_id = dec->type_id;
-
-            check_function_call(call_node, destructor);
-        }
+        insert_destructor_call(dec, curr_node);
     }
+}
+
+bool Parser::insert_destructor_call(const AST::VariableDeclaration* dec, AST::Node* curr_node) {
+    if(dec->flags & AST::VariableDeclaration::Flag::Moved)
+        return false;
+
+    // FIXME: Final type isn't known yet, we have to delay destructor insertion...
+    //        Right now it will never be inserted!
+    if(dec->type_id == InvalidTypeID)
+        return false;
+
+    std::vector<TypeID> span;
+    span.push_back(GlobalTypeRegistry::instance().get_pointer_to(dec->type_id));
+    auto destructor = resolve_or_instanciate_function("destructor", span, curr_node);
+    if(destructor) {
+        Token destructor_token;
+        destructor_token.type = Token::Type::Identifier;
+        destructor_token.value = *internalize_string("destructor");
+        auto call_node = curr_node->add_child(new AST::FunctionCall(destructor_token));
+        // Destructor method designation
+        auto destructor_node = call_node->add_child(new AST::Variable(destructor_token)); // FIXME: Still using the token to get the function...
+        // Destructor argument (pointer to the object)
+        auto get_pointer_node = call_node->add_child(new AST::Node(AST::Node::Type::GetPointer, dec->token));
+        get_pointer_node->type_id = GlobalTypeRegistry::instance().get_pointer_to(dec->type_id);
+        auto var_node = get_pointer_node->add_child(new AST::Variable(dec->token));
+        var_node->type_id = dec->type_id;
+
+        check_function_call(call_node, destructor);
+        return true;
+    }
+    return false;
 }
 
 TypeID Parser::specialize(TypeID type_id, const std::vector<TypeID>& parameters) {

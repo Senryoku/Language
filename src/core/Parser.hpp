@@ -93,7 +93,7 @@ class Parser {
     bool parse_variable_declaration(const std::span<Token>& tokens, std::span<Token>::iterator& it, AST::Node* curr_node, bool is_const = false, bool allow_construtor = true);
 
     template<typename T>
-    AST::Node* gen_integer_literal_node(const Token& token, uint64_t value, PrimitiveType type) {
+    [[nodiscard]] AST::Node* gen_integer_literal_node(const Token& token, uint64_t value, PrimitiveType type) {
         if constexpr(std::is_unsigned<T>()) {
             if(static_cast<uintmax_t>(value) < std::numeric_limits<T>::min() || static_cast<uintmax_t>(value) > std::numeric_limits<T>::max())
                 throw Exception(fmt::format("Error parsing integer for target type {}: value '{}' out-of-bounds (range: [{}, {}]).", type_id_to_string(type), value,
@@ -167,6 +167,7 @@ class Parser {
     void revolve_member_identifier(const Type* base_type, AST::MemberIdentifier* member_identifier_node);
 
     void   insert_defer_node(const AST::Scope& scope, AST::Node* curr_node);
+    bool   insert_destructor_call(const AST::VariableDeclaration* dec, AST::Node* curr_node);
     void   specialize(AST::Node* node, const std::vector<TypeID>& parameters);
     TypeID specialize(TypeID type_id, const std::vector<TypeID>& parameters);
 

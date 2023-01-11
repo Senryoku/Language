@@ -23,6 +23,13 @@ AST::Node* AST::Node::add_child_after(Node* n, const Node* prev) {
     return n;
 }
 
+AST::Node* AST::Node::add_child_before(Node* n, const Node* next) {
+    assert(n->parent == nullptr);
+    children.insert(std::find(children.begin(), children.end(), next), n);
+    n->parent = this;
+    return n;
+}
+
 AST::Node* AST::Node::pop_child() {
     AST::Node* c = children.back();
     children.pop_back();

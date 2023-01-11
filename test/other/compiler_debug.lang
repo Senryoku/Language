@@ -1,25 +1,15 @@
-// RET: 0
+// PASS: return 0;
 
-type AType {
-	let val : i32;
-}
-
-function member_func(this: AType*) : i32 {
-	return .val;
-}
-
-function templated_function_call<Ty>(this : Ty*) {
-	return .member_func();
-}
-
-function templated_member_access<Ty>(this : Ty*) {
-	return .val;
-}
+import "std/File"
 
 function main() {
-	let my_obj : AType;
-	my_obj.val = 123456789;
-	if(my_obj.templated_function_call() == my_obj.templated_member_access())
-		return 0;
-	return -1;
+	let file = TextFile("../../../test/compiler/print_text_file.lang", "r");
+	let str = file.read_until('\n'); // Skip first line
+	str = file.read_until('\n'); // FIXME: This should call the String destructor on the previous value
+	while(str.length > 0) {
+		for(let i : u64 = 0; i < str.length; ++i)
+			printf("%c", str.ptr[i]);
+		str = file.read_until('\n');  // FIXME: This should call the String destructor on the previous value
+	}
+	return 0;
 }

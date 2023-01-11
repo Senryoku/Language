@@ -95,6 +95,7 @@ class AST {
         }
         Node* add_child_front(Node* n);
         Node* add_child_after(Node* n, const Node* prev);
+        Node* add_child_before(Node* n, const Node* next);
         Node* pop_child();
         // Insert a node between this and its nth child
         Node* insert_between(size_t n, Node* node);

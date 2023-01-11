@@ -1,8 +1,6 @@
 // PASS: return 0;
 
 import "std/File"
-import "std/memory" // This should not be neccesary
-import "std/Array" // This should not be neccesary
 
 function main() {
 	let file = TextFile("../test/compiler/print_text_file.lang", "r");
