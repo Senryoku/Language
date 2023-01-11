@@ -10,8 +10,6 @@ export function reserve<T>(this: Array<T>*, size: u64) : void {
 	if(size <= .capacity)
 		return;
 	
-	// FIXME: Yeah, we don't have "sizeof" yet.
-	// let ptr : T* = malloc(size * sizeof(T));
 	let ptr : T* = malloc(size * sizeof(T));
 	
 	for(let idx : u64 = 0; idx < .length; ++idx) {
