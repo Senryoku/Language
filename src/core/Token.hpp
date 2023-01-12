@@ -137,10 +137,12 @@ struct fmt::formatter<Token::Type> {
             OP(MemberAccess);
             OP(Sizeof);
             case Token::Type::Function: return fmt::format_to(ctx.out(), fg(fmt::color::orchid), "{:12}", "Function");
+            case Token::Type::For: return fmt::format_to(ctx.out(), fg(fmt::color::orchid), "{:12}", "While");
             case Token::Type::While: return fmt::format_to(ctx.out(), fg(fmt::color::orchid), "{:12}", "While");
             case Token::Type::If: return fmt::format_to(ctx.out(), fg(fmt::color::orchid), "{:12}", "If");
             case Token::Type::Else: return fmt::format_to(ctx.out(), fg(fmt::color::orchid), "{:12}", "Else");
             case Token::Type::Identifier: return fmt::format_to(ctx.out(), fg(fmt::color::light_blue), "{:12}", "Identifier");
+            case Token::Type::CharLiteral: return fmt::format_to(ctx.out(), fg(fmt::color::burly_wood), "{:12}", "CharLiteral");
             case Token::Type::StringLiteral: return fmt::format_to(ctx.out(), fg(fmt::color::burly_wood), "{:12}", "StrLiteral");
             case Token::Type::Return: return fmt::format_to(ctx.out(), fg(fmt::color::orchid), "{:12}", "Return");
 #undef OP
