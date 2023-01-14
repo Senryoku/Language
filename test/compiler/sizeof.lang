@@ -1,4 +1,4 @@
-// PASS: sizeof\(Type128\)\s+= 16
+// PASS: sizeof\(Type128\)    = 16
 // RET : 0
 
 type StructType {
