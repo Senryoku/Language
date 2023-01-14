@@ -1,0 +1,26 @@
+// PASS: Destructor called: .ptr = 1337
+// RET : 1337
+
+import "std/memory"
+
+type Templated<T> {
+	let ptr : T*;
+}
+
+function Templated(val : T) : Templated<T> {
+	let r : Templated<T>;
+	r.ptr = malloc(sizeof(T));
+	r.ptr[0] = val;
+	return r;
+}
+
+function destructor(this: Templated<T>*) : void {
+	printf("Destructor called: .ptr = %d\n", .ptr[0]);
+	free(.ptr);
+	.ptr = null_pointer();
+}	
+
+function main() {
+	let r = Templated(1337);
+	return r.ptr[0];
+}
