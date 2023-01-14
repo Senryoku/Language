@@ -170,7 +170,9 @@ class Parser {
     void   insert_defer_node(const AST::Scope& scope, AST::Node* curr_node);
     bool   insert_destructor_call(const AST::VariableDeclaration* dec, AST::Node* curr_node);
     void   specialize(AST::Node* node, const std::vector<TypeID>& parameters);
-    TypeID specialize(TypeID type_id, const std::vector<TypeID>& parameters);
+    TypeID specialize(TypeID type_id, const std::vector<TypeID>& parameters, AST::Node* curr_node);
+
+    void declare_specialized_type(TypeID specialized_type_id, const std::vector<TypeID>& type_parameters, AST::Node* curr_node);
 
     bool                deduce_placeholder_types(const Type* call_node, const Type* function_node, std::vector<TypeID>& deduced_types);
     std::vector<TypeID> deduce_placeholder_types(const std::span<TypeID>& arguments, const AST::FunctionDeclaration* function_node);

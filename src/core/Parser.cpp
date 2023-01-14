@@ -1067,6 +1067,7 @@ bool Parser::parse_type_declaration(const std::span<Token>& tokens, std::span<To
             for(auto i = 0; i < template_typenames.size(); ++i)
                 placeholder_types.push_back(PlaceholderTypeID_Min + i);
             this_base_type = GlobalTypeRegistry::instance().get_specialized_type(type_node->type_id, placeholder_types);
+            declare_specialized_type(this_base_type, placeholder_types, curr_node);
         }
         this_declaration_node->type_id = GlobalTypeRegistry::instance().get_pointer_to(this_base_type);
         auto function_body = function_scope->add_child(new AST::Scope());
@@ -1776,7 +1777,7 @@ void Parser::revolve_member_identifier(const Type* base_type, AST::MemberIdentif
     if(member_it != as_struct_type->members.end()) {
         member_identifier_node->index = member_it->second.index;
         if(base_type->is_templated())
-            member_identifier_node->type_id = specialize(member_it->second.type_id, dynamic_cast<const TemplatedType*>(base_type)->parameters);
+            member_identifier_node->type_id = specialize(member_it->second.type_id, dynamic_cast<const TemplatedType*>(base_type)->parameters, member_identifier_node);
         else
             member_identifier_node->type_id = member_it->second.type_id;
     } else
@@ -1820,23 +1821,25 @@ bool Parser::parse_variable_declaration(const std::span<Token>& tokens, std::spa
                 assignment_node->insert_between(assignment_node->children.size() - 1, new AST::Cast(var_declaration_node->type_id));
             }
         }
-    } else if(auto type = GlobalTypeRegistry::instance().get_type(var_declaration_node->type_id); allow_construtor && (type->is_struct() || type->is_templated())) {
-        // Search for a default constructor and add a call to it if it exists
-        std::vector<TypeID> span;
-        span.push_back(GlobalTypeRegistry::instance().get_pointer_to(var_declaration_node->type_id));
-        auto constructor = resolve_or_instanciate_function("constructor", span, var_declaration_node);
-        auto fake_token = Token(Token::Type::Identifier, *internalize_string("constructor"), var_declaration_node->token.line, var_declaration_node->token.column);
-        if(constructor) {
-            auto call_node = var_declaration_node->add_child(new AST::FunctionCall(fake_token));
-            // Constructor method designation
-            call_node->add_child(new AST::Variable(fake_token)); // FIXME: Still using the token to get the function...
-            // Constructor argument (pointer to the object)
-            auto get_pointer_node = call_node->add_child(new AST::Node(AST::Node::Type::GetPointer, var_declaration_node->token));
-            get_pointer_node->type_id = GlobalTypeRegistry::instance().get_pointer_to(var_declaration_node->type_id);
-            auto var_node = get_pointer_node->add_child(new AST::Variable(var_declaration_node->token));
-            var_node->type_id = var_declaration_node->type_id;
+    } else if(allow_construtor && var_declaration_node->type_id != InvalidTypeID) {
+        if(auto type = GlobalTypeRegistry::instance().get_type(var_declaration_node->type_id); (type->is_struct() || type->is_templated())) {
+            // Search for a default constructor and add a call to it if it exists
+            std::vector<TypeID> span;
+            span.push_back(GlobalTypeRegistry::instance().get_pointer_to(var_declaration_node->type_id));
+            auto constructor = resolve_or_instanciate_function("constructor", span, var_declaration_node);
+            auto fake_token = Token(Token::Type::Identifier, *internalize_string("constructor"), var_declaration_node->token.line, var_declaration_node->token.column);
+            if(constructor) {
+                auto call_node = var_declaration_node->add_child(new AST::FunctionCall(fake_token));
+                // Constructor method designation
+                call_node->add_child(new AST::Variable(fake_token)); // FIXME: Still using the token to get the function...
+                // Constructor argument (pointer to the object)
+                auto get_pointer_node = call_node->add_child(new AST::Node(AST::Node::Type::GetPointer, var_declaration_node->token));
+                get_pointer_node->type_id = GlobalTypeRegistry::instance().get_pointer_to(var_declaration_node->type_id);
+                auto var_node = get_pointer_node->add_child(new AST::Variable(var_declaration_node->token));
+                var_node->type_id = var_declaration_node->type_id;
 
-            check_function_call(call_node, constructor);
+                check_function_call(call_node, constructor);
+            }
         }
     }
 
@@ -1893,49 +1896,7 @@ TypeID Parser::parse_type(const std::span<Token>& tokens, std::span<Token>::iter
         auto type_parameters = parse_template_types(tokens, it, curr_node);
         // This will generate this type specialization if we never encountered it before (across modules)
         scoped_type_id = GlobalTypeRegistry::instance().get_specialized_type(scoped_type_id, type_parameters);
-        // We still have to generate a local type declaration since each module need to know the layout of the type.
-        // FIXME: We could rewrite the Module to use Type objects to generate the LLVM struct, removing the need to generate and hoist these nodes (as it would be easy to
-        // generate
-        //        missing specializations on the fly), but the current shape of TemplatedStruct makes it a little awkward (we still have to
-        //        access the underlying StructType to get the member types).
-        // FIXME: Search if this type is already declared locally, this could be done much more efficiently.
-        bool already_declared = false;
-        for(const auto& child : get_hoisted_declarations_node(curr_node)->children) {
-            if(child->type == AST::Node::Type::TypeDeclaration && child->type_id == scoped_type_id) {
-                already_declared = true;
-                break;
-            }
-        }
-        if(!already_declared) {
-            auto type = GlobalTypeRegistry::instance().get_type(scoped_type_id);
-            assert(type->is_templated());
-            if(!type->is_placeholder()) {
-                auto templated_type = dynamic_cast<const TemplatedType*>(type);
-                auto underlying_type = GlobalTypeRegistry::instance().get_type(templated_type->template_type_id);
-                assert(underlying_type->is_struct());
-                auto struct_type = dynamic_cast<const StructType*>(underlying_type);
-
-                AST::TypeDeclaration* type_declaration_node = new AST::TypeDeclaration(Token(Token::Type::Identifier, templated_type->designation, 0, 0));
-                type_declaration_node->type_id = scoped_type_id;
-                auto type_scope = type_declaration_node->add_child(new AST::Scope());
-                // Insert specialized members in the same order as the original declaration
-                std::vector<const StructType::Member*> members;
-                members.resize(struct_type->members.size());
-                for(const auto& [name, member] : struct_type->members)
-                    members[member.index] = &member;
-                for(const auto& member : members) {
-                    auto mem = type_scope->add_child(new AST::VariableDeclaration(Token(Token::Type::Identifier, member->name, 0, 0)));
-                    mem->type_id = member->type_id;
-                }
-                specialize(type_declaration_node, type_parameters);
-                // Declare early
-                get_hoisted_declarations_node(curr_node)->add_child(type_declaration_node);
-                // FIXME: Systematically exports nexly generated template specializations.
-                //        Ideally we'd want to export only the specializations that are part of some form of interface (parameters/return types of exported functions, for
-                //        example)
-                _module_interface.type_exports.push_back(type_declaration_node);
-            }
-        }
+        declare_specialized_type(scoped_type_id, type_parameters, curr_node);
     }
 
     if(it == tokens.end())
@@ -2066,7 +2027,7 @@ bool Parser::insert_destructor_call(const AST::VariableDeclaration* dec, AST::No
     return false;
 }
 
-TypeID Parser::specialize(TypeID type_id, const std::vector<TypeID>& parameters) {
+TypeID Parser::specialize(TypeID type_id, const std::vector<TypeID>& parameters, AST::Node* curr_node) {
     auto r = type_id;
     auto type = GlobalTypeRegistry::instance().get_type(r);
     if(type->is_placeholder()) {
@@ -2081,6 +2042,7 @@ TypeID Parser::specialize(TypeID type_id, const std::vector<TypeID>& parameters)
         if(type->is_templated()) {
             auto templated_type = dynamic_cast<const TemplatedType*>(type);
             auto specialized_type_id = GlobalTypeRegistry::instance().get_specialized_type(templated_type->template_type_id, parameters);
+            declare_specialized_type(specialized_type_id, parameters, curr_node);
             r = specialized_type_id;
         } else
             r = parameters[type->type_id - PlaceholderTypeID_Min];
@@ -2089,6 +2051,53 @@ TypeID Parser::specialize(TypeID type_id, const std::vector<TypeID>& parameters)
             r = GlobalTypeRegistry::instance().get_pointer_to(r);
     }
     return r;
+}
+
+
+// FIXME: Get rid of this somehow.
+void Parser::declare_specialized_type(TypeID specialized_type_id, const std::vector<TypeID>& type_parameters, AST::Node* curr_node) {
+    // We still have to generate a local type declaration since each module need to know the layout of the type.
+    // FIXME: We could rewrite the Module to use Type objects to generate the LLVM struct, removing the need to generate and hoist these nodes (as it would be easy to
+    //        generate missing specializations on the fly), but the current shape of TemplatedStruct makes it a little awkward (we still have to
+    //        access the underlying StructType to get the member types).
+    // FIXME: Search if this type is already declared locally, this could be done much more efficiently.
+    bool already_declared = false;
+    for(const auto& child : get_hoisted_declarations_node(curr_node)->children) {
+        if(child->type == AST::Node::Type::TypeDeclaration && child->type_id == specialized_type_id) {
+            already_declared = true;
+            break;
+        }
+    }
+    if(!already_declared) {
+        auto type = GlobalTypeRegistry::instance().get_type(specialized_type_id);
+        assert(type->is_templated());
+        if(!type->is_placeholder()) {
+            auto templated_type = dynamic_cast<const TemplatedType*>(type);
+            auto underlying_type = GlobalTypeRegistry::instance().get_type(templated_type->template_type_id);
+            assert(underlying_type->is_struct());
+            auto struct_type = dynamic_cast<const StructType*>(underlying_type);
+
+            AST::TypeDeclaration* type_declaration_node = new AST::TypeDeclaration(Token(Token::Type::Identifier, templated_type->designation, 0, 0));
+            type_declaration_node->type_id = specialized_type_id;
+            auto type_scope = type_declaration_node->add_child(new AST::Scope());
+            // Insert specialized members in the same order as the original declaration
+            std::vector<const StructType::Member*> members;
+            members.resize(struct_type->members.size());
+            for(const auto& [name, member] : struct_type->members)
+                members[member.index] = &member;
+            for(const auto& member : members) {
+                auto mem = type_scope->add_child(new AST::VariableDeclaration(Token(Token::Type::Identifier, member->name, 0, 0)));
+                mem->type_id = member->type_id;
+            }
+            specialize(type_declaration_node, type_parameters);
+            // Declare early
+            get_hoisted_declarations_node(curr_node)->add_child(type_declaration_node);
+            // FIXME: Systematically exports nexly generated template specializations.
+            //        Ideally we'd want to export only the specializations that are part of some form of interface (parameters/return types of exported functions, for
+            //        example)
+            _module_interface.type_exports.push_back(type_declaration_node);
+        }
+    }
 }
 
 void Parser::check_function_return_type(AST::FunctionDeclaration* function_node) {
@@ -2111,7 +2120,7 @@ void Parser::specialize(AST::Node* node, const std::vector<TypeID>& parameters) 
     for(auto c : node->children)
         specialize(c, parameters);
     if(node->type_id != InvalidTypeID)
-        node->type_id = specialize(node->type_id, parameters);
+        node->type_id = specialize(node->type_id, parameters, node);
 
     // Verify the updated node.
     // FIXME: We also need to update/propagate a lot of types.

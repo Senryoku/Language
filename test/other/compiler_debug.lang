@@ -1,26 +1,23 @@
-import "std/Socket"
+import "std/memory"
 
-type HTTPServer {
-	let socket: Socket;
+type Templated<T> {
+	let ptr : T*;
 }
 
-function listen(this: HTTPServer*, addr: String, port: i32) {
-	.socket.create();
-	.socket.bind(addr, port);
-	.socket.listen();
+function Templated(val : T) : Templated<T> {
+	let r : Templated<T>;
+	r.ptr = malloc(sizeof(T));
+	r.ptr[0] = val;
+	return r;
+}
+
+function destructor(this: Templated<T>*) : void {
+	printf("Destructor called: .ptr = %d\n", .ptr[0]);
+	free(.ptr);
+	.ptr = null_pointer();
 }	
 
 function main() {
-	let http_server : HTTPServer;
-
-	http_server.listen(String("127.0.0.1"), 12345);
-	
-	while(true) {
-		let client = http_server.socket.accept();
-		let received = client.recv();
-		printf("Received: %s\n", received.data);
-		client.send("HTTP/1.1 200 OK\nServer: LangServer (Win64)\nContent-Length: 52\nContent-Type: text/html\nConnection: Closed\n\n<html>\n<body>\n<h1>Hello, World!</h1>\n</body>\n</html>\n");
-	}
-	
-	return 0;
+	let r = Templated(1337);
+	return r.ptr[0];
 }
