@@ -1,36 +1,26 @@
-// PASS: sizeof\(Type128\)\s+= 16
-// RET : 0
+import "std/Socket"
 
-type StructType {
-	let a: u8;
-	let b: u16;
-	let c: u32;
+type HTTPServer {
+	let socket: Socket;
 }
 
-type Type128 {
-	let a: u64;
-	let b: i64;
-}
-
-function print_size_of_template<T>(val: T) {
-    printf("sizeof(T)          = %llu\n", sizeof(T));
-}
+function listen(this: HTTPServer*, addr: String, port: i32) {
+	.socket.create();
+	.socket.bind(addr, port);
+	.socket.listen();
+}	
 
 function main() {
-    printf("sizeof(u8)         = %llu\n", sizeof(u8));
-    printf("sizeof(u16)        = %llu\n", sizeof(u16));
-    printf("sizeof(u32)        = %llu\n", sizeof(u32));
-    printf("sizeof(u64)        = %llu\n", sizeof(u64));
-    printf("sizeof(StructType) = %llu\n", sizeof(StructType));
-    printf("sizeof(Type128)    = %llu\n", sizeof(Type128));
+	let http_server : HTTPServer;
+
+	http_server.listen(String("127.0.0.1"), 12345);
 	
-	print_size_of_template(0u8);
-	print_size_of_template(0u16);
-	print_size_of_template(0u32);
-	print_size_of_template(0u64);
-	let str : StructType;
-	print_size_of_template(str);
-	let val : Type128;
-	print_size_of_template(val);
-    return 0;
+	while(true) {
+		let client = http_server.socket.accept();
+		let received = client.recv();
+		printf("Received: %s\n", received.data);
+		client.send("HTTP/1.1 200 OK\nServer: LangServer (Win64)\nContent-Length: 52\nContent-Type: text/html\nConnection: Closed\n\n<html>\n<body>\n<h1>Hello, World!</h1>\n</body>\n</html>\n");
+	}
+	
+	return 0;
 }

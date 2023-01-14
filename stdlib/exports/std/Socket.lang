@@ -34,7 +34,7 @@ export function send(this: Socket*, data: cstr) {
 // FIXME: Should return an array of bytes, or something.
 export function recv(this: Socket*) : Array<u8> {
 	let r : Array<u8>;
-	r.reserve(2048u64);
+	r.reserve(4096u64);
 	let bytes_read = __socket_recv(.fd, r.data, r.capacity);
 	return r;
 }
