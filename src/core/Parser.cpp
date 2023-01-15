@@ -2128,8 +2128,12 @@ void Parser::specialize(AST::Node* node, const std::vector<TypeID>& parameters) 
         case AST::Node::Type::FunctionCall: {
             auto function_call_node = dynamic_cast<AST::FunctionCall*>(node);
             auto function = resolve_or_instanciate_function(function_call_node);
-            if(!function)
-                throw Exception(fmt::format("[Parser] Could not find specialized function for:\n{}\n", *node));
+            if(!function) {
+                std::vector<TypeID> arguments;
+                for(auto arg : function_call_node->arguments())
+                    arguments.push_back(arg->type_id);
+                throw_unresolved_function(function_call_node->token, arguments, node);
+            }
             check_function_call(function_call_node, function);
             break;
         }

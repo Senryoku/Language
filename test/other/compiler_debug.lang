@@ -1,23 +1,37 @@
 import "std/memory"
+import "std/String"
+import "std/Array"
 
-type Templated<T> {
-	let ptr : T*;
+type Pair<KeyType, ValueType> {
+	let key   : KeyType;
+	let value : ValueType;
 }
 
-function Templated(val : T) : Templated<T> {
-	let r : Templated<T>;
-	r.ptr = malloc(sizeof(T));
-	r.ptr[0] = val;
-	return r;
+function Pair<KeyType, ValueType>(key: KeyType, value: ValueType) {
+	let pair : Pair<KeyType, ValueType>;
+	pair.key = key;
+	pair.value = value;
+	return pair;
 }
 
-function destructor(this: Templated<T>*) : void {
-	printf("Destructor called: .ptr = %d\n", .ptr[0]);
-	free(.ptr);
-	.ptr = null_pointer();
-}	
+type HashTableBucket<KeyType, ValueType> {
+	
+}
+
+type HashTable<KeyType, ValueType> {
+	let buckets : Array<Pair<KeyType,  ValueType>>; // FIXME: This type isn't parsed correctly.
+}
+
+function set<KeyType, ValueType>(this: HashTable<KeyType, ValueType>*, key: KeyType, value: ValueType) : void {
+	.buckets.push_back(Pair(key, value));
+}
+
+//function get<KeyType, ValueType>(this: HashTable<KeyType, ValueType>*, key: KeyType) : ValueType {
+//	return .buckets.get(0).value;
+//}
 
 function main() {
-	let r = Templated(1337);
-	return r.ptr[0];
+	let hash_table : HashTable<String, i32>;
+	hash_table.set(String("Hi."), 1337);
+	return 0;
 }
