@@ -1,6 +1,7 @@
 import "std/memory"
 import "std/String"
 import "std/Array"
+import "std/print"
 
 type Pair<KeyType, ValueType> {
 	let key: KeyType;
@@ -27,8 +28,8 @@ function set<KeyType, ValueType>(this: HashTable<KeyType, ValueType>*, key: KeyT
 	.buckets.push_back(Pair(key, value));
 }
 
-//function get<KeyType, ValueType>(this: HashTable<KeyType, ValueType>*, key: KeyType) : ValueType {
-//	return .buckets.get(0).value;
+//function get<KeyType, ValueType>(this: HashTable<KeyType, ValueType>*, key: KeyType): ValueType {
+//    return .buckets.get(0).value;  // Doesn't compile yet
 //}
 
 function main() {
@@ -37,6 +38,7 @@ function main() {
     hash_table.buckets = arr; // FIXME: This should be automatically called by the HashTable constructor.
     hash_table.set(String("Hi."), 1337);
     let pair = hash_table.buckets.get(0u64);
-    printf("%s: %u\n", pair.key, pair.value); // Aaaaaand it's a crash!
+    print(pair.key)
+    printf(": %u\n", pair.value);
     return 0;
 }

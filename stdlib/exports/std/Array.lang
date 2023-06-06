@@ -1,42 +1,42 @@
 import "std/memory"
 
 export type Array<T> {
-	let capacity : u64 = 0;
-	let length : u64 = 0;
-	let data : T* = null_pointer();
+	let capacity: u64 = 0;
+let length: u64 = 0;
+let data: T* = null_pointer();
 }
 
-export function reserve<T>(this: Array<T>*, size: u64) : void {
-	if(size <= .capacity)
-		return;
-	
-	let ptr : T* = malloc(size * sizeof(T));
-	
-	for(let idx : u64 = 0; idx < .length; ++idx) {
-		ptr[idx] = .data[idx];
-	}
-	if(.capacity > 0u64)
-		free(.data);
+export function reserve<T>(this: Array<T>*, size: u64): void {
+    if (size <= .capacity)
+        return;
+
+    let ptr: T* = malloc(size * sizeof(T));
+
+    for (let idx: u64 = 0; idx < .length; ++idx) {
+        ptr[idx] = .data[idx];
+    }
+    if (.capacity > 0u64)
+    free(.data);
 	
 	.capacity = size;
 	.data = ptr;
 }
 
-export function push_back<T>(this: Array<T>*, value: T) : u64 {
-	if(.capacity <= .length) 
+export function push_back<T>(this: Array<T>*, value: T): u64 {
+    if (.capacity <= .length) 
 		.reserve(max(32u64, .capacity * 2u64));
 	
 	.data[.length] = value;
-	++.length;
-	return .length;
+    ++.length;
+    return .length;
 }
 
-export function get<T>(this: Array<T>*, index: u64) : T {
-	return .data[index];
+export function get<T>(this: Array<T>*, index: u64): T {
+    return .data[index];
 }
 
-export function destructor<T>(this: Array<T>*) : void {
-	free(.data);
+export function destructor<T>(this: Array<T>*): void {
+    free(.data);
 	.length = 0;
 	.capacity = 0;
 }
