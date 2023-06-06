@@ -31,7 +31,7 @@ class Parser {
     // Append to an existing AST and return the added children
     AST::Node* parse(const std::span<Token>& tokens, AST& ast);
 
-    AST::Node* parse_type(const std::span<Token>& tokens, AST& ast);
+    AST::Node* parse_type_from_interface(const std::span<Token>& tokens, AST& ast);
 
     std::vector<std::string> parse_dependencies(const std::span<Token>& tokens);
 

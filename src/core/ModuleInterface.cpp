@@ -37,7 +37,7 @@ std::tuple<bool, std::span<AST::TypeDeclaration*>, std::span<AST::FunctionDeclar
                 root_node = type_parser.parse(tokens, type_ast);
             } else {
                 // Template specializations
-                root_node = type_parser.parse_type(tokens, type_ast);
+                root_node = type_parser.parse_type_from_interface(tokens, type_ast);
             }
             // Remove superfluous nodes
             auto type_node = root_node;

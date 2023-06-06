@@ -185,7 +185,7 @@ AST::Node* Parser::parse(const std::span<Token>& tokens, AST& ast) {
     return root;
 }
 
-AST::Node* Parser::parse_type(const std::span<Token>& tokens, AST& ast) {
+AST::Node* Parser::parse_type_from_interface(const std::span<Token>& tokens, AST& ast) {
     auto root = ast.get_root().add_child(new AST::Scope());
     declare_builtins(root);
     auto it = tokens.begin();
@@ -2061,42 +2061,38 @@ void Parser::declare_specialized_type(TypeID specialized_type_id, const std::vec
     //        generate missing specializations on the fly), but the current shape of TemplatedStruct makes it a little awkward (we still have to
     //        access the underlying StructType to get the member types).
     // FIXME: Search if this type is already declared locally, this could be done much more efficiently.
-    bool already_declared = false;
-    for(const auto& child : get_hoisted_declarations_node(curr_node)->children) {
-        if(child->type == AST::Node::Type::TypeDeclaration && child->type_id == specialized_type_id) {
-            already_declared = true;
-            break;
-        }
-    }
-    if(!already_declared) {
-        auto type = GlobalTypeRegistry::instance().get_type(specialized_type_id);
-        assert(type->is_templated());
-        if(!type->is_placeholder()) {
-            auto templated_type = dynamic_cast<const TemplatedType*>(type);
-            auto underlying_type = GlobalTypeRegistry::instance().get_type(templated_type->template_type_id);
-            assert(underlying_type->is_struct());
-            auto struct_type = dynamic_cast<const StructType*>(underlying_type);
 
-            AST::TypeDeclaration* type_declaration_node = new AST::TypeDeclaration(Token(Token::Type::Identifier, templated_type->designation, 0, 0));
-            type_declaration_node->type_id = specialized_type_id;
-            auto type_scope = type_declaration_node->add_child(new AST::Scope());
-            // Insert specialized members in the same order as the original declaration
-            std::vector<const StructType::Member*> members;
-            members.resize(struct_type->members.size());
-            for(const auto& [name, member] : struct_type->members)
-                members[member.index] = &member;
-            for(const auto& member : members) {
-                auto mem = type_scope->add_child(new AST::VariableDeclaration(Token(Token::Type::Identifier, member->name, 0, 0)));
-                mem->type_id = member->type_id;
-            }
-            specialize(type_declaration_node, type_parameters);
-            // Declare early
-            get_hoisted_declarations_node(curr_node)->add_child(type_declaration_node);
-            // FIXME: Systematically exports nexly generated template specializations.
-            //        Ideally we'd want to export only the specializations that are part of some form of interface (parameters/return types of exported functions, for
-            //        example)
-            _module_interface.type_exports.push_back(type_declaration_node);
+    for(const auto& child : get_hoisted_declarations_node(curr_node)->children) {
+        if(child->type == AST::Node::Type::TypeDeclaration && child->type_id == specialized_type_id)
+            return; // Already declared, bail out.
+    }
+    auto type = GlobalTypeRegistry::instance().get_type(specialized_type_id);
+    assert(type->is_templated());
+    if(!type->is_placeholder()) {
+        auto templated_type = dynamic_cast<const TemplatedType*>(type);
+        auto underlying_type = GlobalTypeRegistry::instance().get_type(templated_type->template_type_id);
+        assert(underlying_type->is_struct());
+        auto struct_type = dynamic_cast<const StructType*>(underlying_type);
+
+        AST::TypeDeclaration* type_declaration_node = new AST::TypeDeclaration(Token(Token::Type::Identifier, templated_type->designation, 0, 0));
+        type_declaration_node->type_id = specialized_type_id;
+        auto type_scope = type_declaration_node->add_child(new AST::Scope());
+        // Insert specialized members in the same order as the original declaration
+        std::vector<const StructType::Member*> members;
+        members.resize(struct_type->members.size());
+        for(const auto& [name, member] : struct_type->members)
+            members[member.index] = &member;
+        for(const auto& member : members) {
+            auto mem = type_scope->add_child(new AST::VariableDeclaration(Token(Token::Type::Identifier, member->name, 0, 0)));
+            mem->type_id = member->type_id;
         }
+        specialize(type_declaration_node, type_parameters);
+        // Declare early
+        get_hoisted_declarations_node(curr_node)->add_child(type_declaration_node);
+        // FIXME: Systematically exports nexly generated template specializations.
+        //        Ideally we'd want to export only the specializations that are part of some form of interface (parameters/return types of exported functions, for
+        //        example)
+        _module_interface.type_exports.push_back(type_declaration_node);
     }
 }
 

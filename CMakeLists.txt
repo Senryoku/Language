@@ -90,6 +90,7 @@ endif()
 
 # Compile standard library
 set(STDLIB_PATH ${CMAKE_SOURCE_DIR}/build/stdlib.o)
+set(CLANG_PATH "C:/Program Files/LLVM/bin/clang++")
 file(GLOB STDLIB_SOURCES "./stdlib/*.cpp" "./stdlib/**/*.cpp")
 string(REGEX REPLACE ".cpp" ".o" STDLIB_OBJECTS "${STDLIB_SOURCES}")
 string(REGEX REPLACE "stdlib/" "build/stdlib/" STDLIB_OBJECTS "${STDLIB_OBJECTS}")
@@ -97,7 +98,7 @@ foreach(src obj IN ZIP_LISTS STDLIB_SOURCES STDLIB_OBJECTS)
     add_custom_command( 
         OUTPUT ${obj} 
         DEPENDS ${src} 
-        COMMAND clang++ -c ${src} -o ${obj} -std=c++20
+        COMMAND ${CLANG_PATH} -c ${src} -o ${obj} -std=c++20
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
     )
 endforeach()

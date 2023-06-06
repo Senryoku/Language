@@ -19,7 +19,7 @@ type HashTableBucket<KeyType, ValueType> {
 }
 
 type HashTable<KeyType, ValueType> {
-	let buckets : Array<Pair<KeyType,  ValueType>>; // FIXME: This type isn't parsed correctly.
+	let buckets : Array<Pair<KeyType,  ValueType>>; // FIXME: This type isn't specialized correctly.
 }
 
 function set<KeyType, ValueType>(this: HashTable<KeyType, ValueType>*, key: KeyType, value: ValueType) : void {
