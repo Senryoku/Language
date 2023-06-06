@@ -362,7 +362,7 @@ bool Parser::parse(const std::span<Token>& tokens, AST::Node* curr_node) {
                     //   let #__return_expression_result_XX:YY = our_return_value;
                     const auto& var_name = *internalize_string(fmt::format("#return_expression_result_{}:{}", return_node->token.line, return_node->token.column));
                     auto        var_dec = curr_node->add_child(
-                               new AST::VariableDeclaration(Token(Token::Type::Identifier, var_name, return_node->token.line, return_node->token.column), to_rvalue->type_id));
+                        new AST::VariableDeclaration(Token(Token::Type::Identifier, var_name, return_node->token.line, return_node->token.column), to_rvalue->type_id));
                     var_dec->flags = AST::VariableDeclaration::Flag::Moved; // Declare it as moved immediatly.
                     auto assignment = var_dec->add_child(new AST::BinaryOperator(Token(Token::Type::Assignment, *internalize_string("="), 0, 0)));
                     assignment->type_id = var_dec->type_id;
@@ -764,7 +764,7 @@ bool Parser::parse_identifier(const std::span<Token>& tokens, std::span<Token>::
             access_operator_node->type_id = PrimitiveType::Char;
         else if(type->is_pointer()) // FIXME: Won't work for string. But we'll probably get rid of it anyway.
             access_operator_node->type_id = dynamic_cast<const PointerType*>(type)->pointee_type;
-        else // FIXME: Won't work for string. But we'll probably get rid of it anyway.
+        else                        // FIXME: Won't work for string. But we'll probably get rid of it anyway.
             access_operator_node->type_id = dynamic_cast<const ArrayType*>(type)->element_type;
 
         auto ltor = access_operator_node->add_child(new AST::Node(AST::Node::Type::LValueToRValue));
@@ -2030,6 +2030,7 @@ bool Parser::insert_destructor_call(const AST::VariableDeclaration* dec, AST::No
 TypeID Parser::specialize(TypeID type_id, const std::vector<TypeID>& parameters, AST::Node* curr_node) {
     auto r = type_id;
     auto type = GlobalTypeRegistry::instance().get_type(r);
+
     if(type->is_placeholder()) {
         // FIXME: Feels hackish, as always.
         size_t indirection_count = 0;
@@ -2041,8 +2042,16 @@ TypeID Parser::specialize(TypeID type_id, const std::vector<TypeID>& parameters,
 
         if(type->is_templated()) {
             auto templated_type = dynamic_cast<const TemplatedType*>(type);
-            auto specialized_type_id = GlobalTypeRegistry::instance().get_specialized_type(templated_type->template_type_id, parameters);
-            declare_specialized_type(specialized_type_id, parameters, curr_node);
+
+            // Specialize parameters, if necessary.
+            auto inner_parameters = templated_type->parameters;
+            for(int i = 0; i < inner_parameters.size(); ++i)
+                if(GlobalTypeRegistry::instance().get_type(inner_parameters[i])->is_placeholder())
+                    inner_parameters[i] = specialize(inner_parameters[i], parameters, curr_node);
+
+            auto specialized_type_id = GlobalTypeRegistry::instance().get_specialized_type(templated_type->template_type_id, inner_parameters);
+
+            declare_specialized_type(specialized_type_id, inner_parameters, curr_node);
             r = specialized_type_id;
         } else
             r = parameters[type->type_id - PlaceholderTypeID_Min];
@@ -2052,7 +2061,6 @@ TypeID Parser::specialize(TypeID type_id, const std::vector<TypeID>& parameters,
     }
     return r;
 }
-
 
 // FIXME: Get rid of this somehow.
 void Parser::declare_specialized_type(TypeID specialized_type_id, const std::vector<TypeID>& type_parameters, AST::Node* curr_node) {

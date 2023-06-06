@@ -3,26 +3,27 @@ import "std/String"
 import "std/Array"
 
 type Pair<KeyType, ValueType> {
-	let key   : KeyType;
-	let value : ValueType;
+	let key: KeyType;
+let value: ValueType;
 }
 
 function Pair<KeyType, ValueType>(key: KeyType, value: ValueType) {
-	let pair : Pair<KeyType, ValueType>;
-	pair.key = key;
-	pair.value = value;
-	return pair;
+    let pair: Pair<KeyType, ValueType>;
+    pair.key = key;
+    pair.value = value;
+    return pair;
 }
 
 type HashTableBucket<KeyType, ValueType> {
-	
+
 }
 
 type HashTable<KeyType, ValueType> {
-	let buckets : Array<Pair<KeyType,  ValueType>>; // FIXME: This type isn't specialized correctly.
+	let buckets: Array<Pair<KeyType, ValueType>>;
 }
 
-function set<KeyType, ValueType>(this: HashTable<KeyType, ValueType>*, key: KeyType, value: ValueType) : void {
+
+function set<KeyType, ValueType>(this: HashTable<KeyType, ValueType>*, key: KeyType, value: ValueType): void {
 	.buckets.push_back(Pair(key, value));
 }
 
@@ -31,7 +32,11 @@ function set<KeyType, ValueType>(this: HashTable<KeyType, ValueType>*, key: KeyT
 //}
 
 function main() {
-	let hash_table : HashTable<String, i32>;
-	hash_table.set(String("Hi."), 1337);
-	return 0;
+    let hash_table: HashTable<String, i32>;
+    let arr: Array<Pair<String, i32>>;
+    hash_table.buckets = arr; // FIXME: This should be automatically called by the HashTable constructor.
+    hash_table.set(String("Hi."), 1337);
+    let pair = hash_table.buckets.get(0u64);
+    printf("%s: %u\n", pair.key, pair.value); // Aaaaaand it's a crash!
+    return 0;
 }
