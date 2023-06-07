@@ -18,9 +18,9 @@ function Pair<T0, T1>(key: T0, value: T1) {
 function main() {
     let arr: Array<Pair<i32, i32>>;
     arr.push_back(Pair(64, 1337));
-    let pair = arr.get(0u64);
     // FIXME: This doesn't work yet: We can't use the return value of a function directly.
     // arr.get(0u64).lhs
+    let pair = arr.get(0u64);
     printf("%d\n", pair.lhs)
     return pair.rhs;
 }

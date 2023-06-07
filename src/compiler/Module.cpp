@@ -531,6 +531,14 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                     return lhs;
                 }
                 case Token::Type::MemberAccess: {
+                    // Create temporary store for return values
+                    // FIXME: Not sure if this is a good way to handle this...
+                    if(node->children[0]->type == AST::Node::Type::FunctionCall) {
+                        auto allocaInst = create_entry_block_alloca(_llvm_ir_builder.GetInsertBlock()->getParent(), get_llvm_type(node->children[0]->type_id), "tmp_ret");
+                        _llvm_ir_builder.CreateStore(lhs, allocaInst);
+                        lhs = allocaInst;
+                    }
+
                     return _llvm_ir_builder.CreateGEP(get_llvm_type(node->children[0]->type_id), lhs, {llvm::ConstantInt::get(*_llvm_context, llvm::APInt(32, 0)), rhs},
                                                       "memberptr");
                 }

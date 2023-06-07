@@ -1,0 +1,22 @@
+// PASS: LHS: 64, RHS: 1337
+// RET:  0
+
+type Pair {
+	let lhs: i32;
+let rhs: i32;
+}
+
+function get() {
+    let p: Pair;
+    p.lhs = 64;
+    p.rhs = 1337;
+    return p;
+}
+
+function main() {
+    let p = get();
+    let v = p.rhs;
+    printf("LHS: %d, RHS: %d\n", get().lhs, get().rhs);
+    return 0;
+}
+
