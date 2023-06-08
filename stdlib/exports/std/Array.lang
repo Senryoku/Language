@@ -2,8 +2,8 @@ import "std/memory"
 
 export type Array<T> {
 	let capacity: u64 = 0;
-    let length: u64 = 0;
-    let data: T* = null_pointer();
+let length: u64 = 0;
+let data: T* = null_pointer();
 }
 
 export function reserve<T>(this: Array<T>*, size: u64): void {
@@ -22,6 +22,17 @@ export function reserve<T>(this: Array<T>*, size: u64): void {
 	.data = ptr;
 }
 
+
+export function resize<T>(this: Array<T>*, size: u64): void {
+    let v: T;
+    .resize(size, v);
+}
+
+export function resize<T>(this: Array<T>*, size: u64, value: T): void {
+    while (.length < size)
+       .push_back(value);
+}
+
 export function push_back<T>(this: Array<T>*, value: T): u64 {
     if (.capacity <= .length) 
 		.reserve(max(32u64, .capacity * 2u64));
@@ -33,6 +44,10 @@ export function push_back<T>(this: Array<T>*, value: T): u64 {
 
 export function get<T>(this: Array<T>*, index: u64): T {
     return .data[index];
+}
+
+export function set<T>(this: Array<T>*, index: u64, value: T): void {
+    .data[index] = value;
 }
 
 export function destructor<T>(this: Array<T>*): void {
