@@ -1310,7 +1310,7 @@ const AST::FunctionDeclaration* Parser::resolve_or_instanciate_function(const st
             if(candidate->is_templated() && candidate->arguments().size() == arguments.size()) {
                 std::vector<TypeID> deduced_types = deduce_placeholder_types(arguments, candidate);
                 if(deduced_types.empty()) // Argument types cannot match.
-                    break;
+                    continue;
 
                 auto specialized = candidate->body() ? candidate->clone() : GlobalTemplateCache::instance().get_function(std::string(candidate->token.value))->clone();
 

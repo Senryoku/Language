@@ -2,8 +2,8 @@ import "std/memory"
 
 export type Array<T> {
 	let capacity: u64 = 0;
-let length: u64 = 0;
-let data: T* = null_pointer();
+    let length: u64 = 0;
+    let data: T* = null_pointer();
 }
 
 export function reserve<T>(this: Array<T>*, size: u64): void {

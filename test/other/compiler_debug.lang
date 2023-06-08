@@ -34,8 +34,6 @@ function set<KeyType, ValueType>(this: HashTable<KeyType, ValueType>*, key: KeyT
 
 function main() {
     let hash_table: HashTable<String, i32>;
-    let arr: Array<Pair<String, i32>>;
-    hash_table.buckets = arr; // FIXME: This should be automatically called by the HashTable constructor.
     hash_table.set(String("Hi."), 1337);
     let pair = hash_table.buckets.get(0u64);
     print(pair.key)
