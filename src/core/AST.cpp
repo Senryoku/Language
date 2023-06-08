@@ -98,6 +98,18 @@ std::string AST::FunctionDeclaration::mangled_name() const {
     return mangle_name(token.value, arguments(), flags);
 }
 
+std::string AST::FunctionDeclaration::debug_name() const {
+    std::string r(name());
+    r += "(";
+    for(int i = 0; i < arguments().size(); ++i) {
+        r += GlobalTypeRegistry::instance().get_type(arguments()[i]->type_id)->designation;
+        if(i < arguments().size() - 1)
+            r += ", ";
+    }
+    r += ")";
+    return r;
+}
+
 bool AST::FunctionDeclaration::is_templated() const {
     if(type_id != InvalidTypeID && GlobalTypeRegistry::instance().get_type(type_id)->is_placeholder())
         return true;

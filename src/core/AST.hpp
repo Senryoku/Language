@@ -193,6 +193,7 @@ class AST {
         }
 
         std::string mangled_name() const;
+        std::string debug_name() const;
 
         bool is_templated() const;
 

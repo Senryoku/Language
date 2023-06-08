@@ -1167,7 +1167,7 @@ AST::Node* Parser::parse_digits(const std::span<Token>&, std::span<Token>::itera
         throw Exception("[Parser::parse_digits] std::from_chars returned result_out_of_range.\n", point_error(*it));
     AST::Node* integer = nullptr;
     if(type == PrimitiveType::Void) {
-        if(value > std::numeric_limits<int64_t>::max())
+        if(value > static_cast<uint64_t>(std::numeric_limits<int64_t>::max()))
             type = PrimitiveType::U64;
         else if(value > std::numeric_limits<uint32_t>::max())
             type = PrimitiveType::I64;
@@ -2014,7 +2014,7 @@ bool Parser::insert_destructor_call(const AST::VariableDeclaration* dec, AST::No
         destructor_token.value = *internalize_string("destructor");
         auto call_node = curr_node->add_child(new AST::FunctionCall(destructor_token));
         // Destructor method designation
-        auto destructor_node = call_node->add_child(new AST::Variable(destructor_token)); // FIXME: Still using the token to get the function...
+        call_node->add_child(new AST::Variable(destructor_token)); // FIXME: Still using the token to get the function...
         // Destructor argument (pointer to the object)
         auto get_pointer_node = call_node->add_child(new AST::Node(AST::Node::Type::GetPointer, dec->token));
         get_pointer_node->type_id = GlobalTypeRegistry::instance().get_pointer_to(dec->type_id);
