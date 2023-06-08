@@ -36,26 +36,26 @@ static std::unordered_map<Token::Type, std::unordered_map<PrimitiveType, std::fu
 
 static std::unordered_map<Token::Type, std::unordered_map<PrimitiveType, std::function<llvm::Value*(llvm::IRBuilder<>&, llvm::Value*, llvm::Value*)>>> binary_ops = {
     {Token::Type::Addition,
-     {OP(I32, return ir_builder.CreateAdd(lhs, rhs, "add");), OP(U8, return ir_builder.CreateAdd(lhs, rhs, "add");), OP(U16, return ir_builder.CreateAdd(lhs, rhs, "add");),
-      OP(U32, return ir_builder.CreateAdd(lhs, rhs, "add");), OP(U64, return ir_builder.CreateAdd(lhs, rhs, "add");), OP(I8, return ir_builder.CreateAdd(lhs, rhs, "add");),
-      OP(I16, return ir_builder.CreateAdd(lhs, rhs, "add");), OP(I32, return ir_builder.CreateAdd(lhs, rhs, "add");), OP(I64, return ir_builder.CreateAdd(lhs, rhs, "add");),
-      OP(Float, return ir_builder.CreateFAdd(lhs, rhs, "fadd");)}},
+     {OP(U8, return ir_builder.CreateAdd(lhs, rhs, "add");), OP(U16, return ir_builder.CreateAdd(lhs, rhs, "add");), OP(U32, return ir_builder.CreateAdd(lhs, rhs, "add");),
+      OP(U64, return ir_builder.CreateAdd(lhs, rhs, "add");), OP(I8, return ir_builder.CreateAdd(lhs, rhs, "add");), OP(I16, return ir_builder.CreateAdd(lhs, rhs, "add");),
+      OP(I32, return ir_builder.CreateAdd(lhs, rhs, "add");), OP(I64, return ir_builder.CreateAdd(lhs, rhs, "add");), OP(Float, return ir_builder.CreateFAdd(lhs, rhs, "fadd");)}},
     {Token::Type::Substraction,
-     {OP(I32, return ir_builder.CreateSub(lhs, rhs, "sub");), OP(U8, return ir_builder.CreateSub(lhs, rhs, "sub");), OP(U16, return ir_builder.CreateSub(lhs, rhs, "sub");),
-      OP(U32, return ir_builder.CreateSub(lhs, rhs, "sub");), OP(U64, return ir_builder.CreateSub(lhs, rhs, "sub");), OP(I8, return ir_builder.CreateSub(lhs, rhs, "sub");),
-      OP(I16, return ir_builder.CreateSub(lhs, rhs, "sub");), OP(I32, return ir_builder.CreateSub(lhs, rhs, "sub");), OP(I64, return ir_builder.CreateSub(lhs, rhs, "sub");),
-      OP(Float, return ir_builder.CreateFSub(lhs, rhs, "fsub");)}},
+     {OP(U8, return ir_builder.CreateSub(lhs, rhs, "sub");), OP(U16, return ir_builder.CreateSub(lhs, rhs, "sub");), OP(U32, return ir_builder.CreateSub(lhs, rhs, "sub");),
+      OP(U64, return ir_builder.CreateSub(lhs, rhs, "sub");), OP(I8, return ir_builder.CreateSub(lhs, rhs, "sub");), OP(I16, return ir_builder.CreateSub(lhs, rhs, "sub");),
+      OP(I32, return ir_builder.CreateSub(lhs, rhs, "sub");), OP(I64, return ir_builder.CreateSub(lhs, rhs, "sub");), OP(Float, return ir_builder.CreateFSub(lhs, rhs, "fsub");)}},
     {Token::Type::Multiplication,
-     {OP(I32, return ir_builder.CreateMul(lhs, rhs, "mul");), OP(U8, return ir_builder.CreateMul(lhs, rhs, "mul");), OP(U16, return ir_builder.CreateMul(lhs, rhs, "mul");),
-      OP(U32, return ir_builder.CreateMul(lhs, rhs, "mul");), OP(U64, return ir_builder.CreateMul(lhs, rhs, "mul");), OP(I8, return ir_builder.CreateMul(lhs, rhs, "mul");),
-      OP(I16, return ir_builder.CreateMul(lhs, rhs, "mul");), OP(I32, return ir_builder.CreateMul(lhs, rhs, "mul");), OP(I64, return ir_builder.CreateMul(lhs, rhs, "mul");),
-      OP(Float, return ir_builder.CreateFMul(lhs, rhs, "fmul");)}},
+     {OP(U8, return ir_builder.CreateMul(lhs, rhs, "mul");), OP(U16, return ir_builder.CreateMul(lhs, rhs, "mul");), OP(U32, return ir_builder.CreateMul(lhs, rhs, "mul");),
+      OP(U64, return ir_builder.CreateMul(lhs, rhs, "mul");), OP(I8, return ir_builder.CreateMul(lhs, rhs, "mul");), OP(I16, return ir_builder.CreateMul(lhs, rhs, "mul");),
+      OP(I32, return ir_builder.CreateMul(lhs, rhs, "mul");), OP(I64, return ir_builder.CreateMul(lhs, rhs, "mul");), OP(Float, return ir_builder.CreateFMul(lhs, rhs, "fmul");)}},
     {Token::Type::Division,
-     {OP(I32, return ir_builder.CreateSDiv(lhs, rhs, "div");), OP(I8, return ir_builder.CreateSDiv(lhs, rhs, "div");), OP(I16, return ir_builder.CreateSDiv(lhs, rhs, "div");),
-      OP(I32, return ir_builder.CreateSDiv(lhs, rhs, "div");), OP(I64, return ir_builder.CreateSDiv(lhs, rhs, "div");), OP(U8, return ir_builder.CreateUDiv(lhs, rhs, "div");),
-      OP(U16, return ir_builder.CreateUDiv(lhs, rhs, "div");), OP(U32, return ir_builder.CreateUDiv(lhs, rhs, "div");), OP(U64, return ir_builder.CreateUDiv(lhs, rhs, "div");),
-
+     {OP(I8, return ir_builder.CreateSDiv(lhs, rhs, "div");), OP(I16, return ir_builder.CreateSDiv(lhs, rhs, "div");), OP(I32, return ir_builder.CreateSDiv(lhs, rhs, "div");),
+      OP(I64, return ir_builder.CreateSDiv(lhs, rhs, "div");), OP(U8, return ir_builder.CreateUDiv(lhs, rhs, "div");), OP(U16, return ir_builder.CreateUDiv(lhs, rhs, "div");),
+      OP(U32, return ir_builder.CreateUDiv(lhs, rhs, "div");), OP(U64, return ir_builder.CreateUDiv(lhs, rhs, "div");),
       OP(Float, return ir_builder.CreateFDiv(lhs, rhs, "fdiv");)}},
+    {Token::Type::Xor,
+     {OP(I8, return ir_builder.CreateXor(lhs, rhs, "xor");), OP(I16, return ir_builder.CreateXor(lhs, rhs, "xor");), OP(I32, return ir_builder.CreateXor(lhs, rhs, "xor");),
+      OP(I64, return ir_builder.CreateXor(lhs, rhs, "xor");), OP(U8, return ir_builder.CreateXor(lhs, rhs, "xor");), OP(U16, return ir_builder.CreateXor(lhs, rhs, "xor");),
+      OP(U32, return ir_builder.CreateXor(lhs, rhs, "xor");), OP(U64, return ir_builder.CreateXor(lhs, rhs, "xor");), OP(Float, return ir_builder.CreateXor(lhs, rhs, "xor");)}},
     {Token::Type::Modulus, {OP(I32, return ir_builder.CreateSRem(lhs, rhs, "srem");)}},
     // Comparisons
     {Token::Type::Equal,
@@ -485,6 +485,7 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                 throw Exception(fmt::format("[LLVMCodegen] Invalid BinaryOperator node:\n{}\n", *node));
             // TODO: Overloads.
             switch(node->token.type) {
+                case Token::Type::Xor: [[fallthrough]];
                 case Token::Type::Addition: [[fallthrough]];
                 case Token::Type::Substraction: [[fallthrough]];
                 case Token::Type::Multiplication: [[fallthrough]];

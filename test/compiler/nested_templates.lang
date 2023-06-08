@@ -4,7 +4,7 @@ import "std/Array"
 
 type Pair<T0, T1> {
 	let lhs: T0;
-let rhs: T1;
+    let rhs: T1;
 }
 
 

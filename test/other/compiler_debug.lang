@@ -3,6 +3,17 @@ import "std/String"
 import "std/Array"
 import "std/print"
 
+function hash(this: String*): u64 {
+    // Fowler–Noll–Vo hash function
+    let h: u64 = 14695981039346656037; // FNV_offset_basis
+    for (let i = 0u64; i < .length; ++i) {
+        //const c: u64 = str.ptr[i];
+        h = h ^ .ptr[i];
+        h = h * 1099511628211; // FNV_prime
+    }
+    return h;
+}
+
 type Pair<KeyType, ValueType> {
 	let key: KeyType;
 let value: ValueType;
@@ -38,5 +49,6 @@ function main() {
     let pair = hash_table.buckets.get(0u64);
     print(pair.key)
     printf(": %u\n", pair.value);
+    printf("%u\n", pair.key.hash());
     return 0;
 }
