@@ -1520,8 +1520,28 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
         for(const auto& c : call_node->arguments())
             arguments_types.push_back(c->type_id);
         auto resolved_function = resolve_or_instanciate_function(function_name, arguments_types, call_node);
-        if(!resolved_function)
+        if(!resolved_function) {
+            // Delay Type Checking if necessary
+            for(const auto arg_type_id : arguments_types)
+                if(GlobalTypeRegistry::instance().get_type(arg_type_id)->is_placeholder()) {
+                    auto candidates = curr_node->get_scope()->get_functions(function_name);
+                    if(candidates.size() == 0)
+                        return true;
+
+                    // Try to deduce return type immediately
+                    auto return_type = candidates[0]->type_id;
+                    for(const auto& candidate : candidates)
+                        if(return_type != candidate->type_id) {
+                            return_type = InvalidTypeID;
+                            break;
+                        }
+                    call_node->type_id = return_type;
+
+                    return true;
+                }
+
             throw_unresolved_function(call_node->token, arguments_types, curr_node);
+        }
 
         call_node->type_id = resolved_function->type_id;
         call_node->flags = resolved_function->flags;

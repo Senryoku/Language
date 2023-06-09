@@ -13,8 +13,15 @@ function hash(this: String*): u64 {
     return h;
 }
 
-function string_equals(lhs: String, rhs: String): bool {
+
+//function equals<T>(lhs: T, rhs: T): bool {
+//    return false;
+//}
+
+function equals(lhs: String, rhs: String): bool {
+    printf("EQUALS? %d, %d, %d\n", lhs.length, rhs.length, lhs.length != rhs.length);
     if (lhs.length != rhs.length) return false;
+    printf("EQUALS? %d, %d, %d: SAME LENGTH.\n", lhs.length, rhs.length, lhs.length != rhs.length);
     for (let i = 0; i < lhs.length; ++i) if (lhs.ptr[i] != rhs.ptr[i]) return false;
     return true;
 }
@@ -39,6 +46,7 @@ let size: u64 = 0;
 }
 
 function set<KeyType, ValueType>(this: HashTable<KeyType, ValueType>*, key: KeyType, value: ValueType): void {
+    printf("SET CALLED WITH: %d\n", key.length);
     let target_size: u64 = max(32u64, .buckets.length);
     if (.size > .buckets.length / 2) target_size = 2u64 * target_size;
     if (.buckets.length < target_size)
@@ -46,19 +54,30 @@ function set<KeyType, ValueType>(this: HashTable<KeyType, ValueType>*, key: KeyT
     const h: u64 = key.hash();
     const index = h % .buckets.length;
     let prev_value = .buckets.get(index);
+    printf("SET PREV_VALUE: %d\n", prev_value.key.length);
     // Linear probing for collisions
-    while (prev_value.used && !string_equals(prev_value.key, key)) { // FIXME: Doesn't find string_equals
-        ++index;
+    while (prev_value.used && !equals(prev_value.key, key)) {
+        index = (index + 1) % .buckets.length;
         prev_value = .buckets.get(index);
+        printf("set: Trying %u\n", index);
     }
+    printf("AFTER LINEAR PROBING\n");
     .buckets.set(index, HashTableBucket(key, value));
+    printf("VALUE SET\n");
     ++.size;
 }
 
 function get<KeyType, ValueType>(this: HashTable<KeyType, ValueType>*, key: KeyType): ValueType {
     const h: u64 = key.hash();
-    const index: u64 = h % .buckets.length;
-    // TODO: Handle collisions
+    let index: u64 = h % .buckets.length;
+    let prev_value = .buckets.get(index);
+    printf("GET PREV_VALUE: %d\n", prev_value.key.length);
+    // Linear probing for collisions
+    while (index < .buckets.length - 1 && prev_value.used && !equals(prev_value.key, key)) {
+        index = (index + 1) % .buckets.length;
+        prev_value = .buckets.get(index);
+        printf("get: Trying %u\n", index);
+    }
     return .buckets.get(index).value;
 }
 
