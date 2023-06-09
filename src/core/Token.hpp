@@ -112,6 +112,7 @@ struct fmt::formatter<Token::Type> {
             OP(OpenScope);
             OP(CloseScope);
             OP(Digits);
+            OP(Float);
             OP(Boolean);
             OP(Assignment);
             OP(Xor);

@@ -25,7 +25,9 @@ export function reserve<T>(this: Array<T>*, size: u64): void {
 
 export function resize<T>(this: Array<T>*, size: u64): void {
     let v: T;
-    .resize(size, v);
+    //.resize(size, v); // FIXME: This currectly causes a infinitely recursive attempt at sepcializing. I'm not sure why since both overload don't have the same number of arguments...
+    while (.length < size)
+       .push_back(v);
 }
 
 export function resize<T>(this: Array<T>*, size: u64, value: T): void {

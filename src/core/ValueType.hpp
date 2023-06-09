@@ -12,6 +12,7 @@ class Type {
 
     std::string designation;
     TypeID      type_id = InvalidTypeID;
+    bool        is_mutable = false;
 
     virtual bool is_array() const { return false; }
     virtual bool is_pointer() const { return false; }

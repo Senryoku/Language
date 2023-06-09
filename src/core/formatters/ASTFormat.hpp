@@ -110,6 +110,7 @@ struct fmt::formatter<AST::Node::Type> {
             case AST::Node::Type::VariableDeclaration: return fmt::format_to(ctx.out(), fg(fmt::color::light_blue), "{}", "VariableDeclaration");
             case AST::Node::Type::FunctionDeclaration: return fmt::format_to(ctx.out(), fg(fmt::color::light_yellow), "{}", "FunctionDeclaration");
             case AST::Node::Type::FunctionCall: return fmt::format_to(ctx.out(), fg(fmt::color::light_yellow), "{}", "FunctionCall");
+            case AST::Node::Type::FunctionIdentifier: return fmt::format_to(ctx.out(), fg(fmt::color::light_yellow), "{}", "FunctionIdentifier");
             case AST::Node::Type::TypeDeclaration: return fmt::format_to(ctx.out(), fg(fmt::color::light_yellow), "{}", "TypeDeclaration");
             case AST::Node::Type::TypeIdentifier: return fmt::format_to(ctx.out(), fg(fmt::color::light_yellow), "{}", "TypeIdentifier");
             case AST::Node::Type::MemberIdentifier: return fmt::format_to(ctx.out(), fg(fmt::color::light_yellow), "{}", "MemberIdentifier");

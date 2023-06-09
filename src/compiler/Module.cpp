@@ -56,7 +56,10 @@ static std::unordered_map<Token::Type, std::unordered_map<PrimitiveType, std::fu
      {OP(I8, return ir_builder.CreateXor(lhs, rhs, "xor");), OP(I16, return ir_builder.CreateXor(lhs, rhs, "xor");), OP(I32, return ir_builder.CreateXor(lhs, rhs, "xor");),
       OP(I64, return ir_builder.CreateXor(lhs, rhs, "xor");), OP(U8, return ir_builder.CreateXor(lhs, rhs, "xor");), OP(U16, return ir_builder.CreateXor(lhs, rhs, "xor");),
       OP(U32, return ir_builder.CreateXor(lhs, rhs, "xor");), OP(U64, return ir_builder.CreateXor(lhs, rhs, "xor");), OP(Float, return ir_builder.CreateXor(lhs, rhs, "xor");)}},
-    {Token::Type::Modulus, {OP(I32, return ir_builder.CreateSRem(lhs, rhs, "srem");)}},
+    {Token::Type::Modulus,
+     {OP(I8, return ir_builder.CreateSRem(lhs, rhs, "srem");), OP(I16, return ir_builder.CreateSRem(lhs, rhs, "srem");), OP(I32, return ir_builder.CreateSRem(lhs, rhs, "srem");),
+      OP(I64, return ir_builder.CreateSRem(lhs, rhs, "srem");), OP(U8, return ir_builder.CreateSRem(lhs, rhs, "srem");), OP(U16, return ir_builder.CreateSRem(lhs, rhs, "srem");),
+      OP(U32, return ir_builder.CreateSRem(lhs, rhs, "srem");), OP(U64, return ir_builder.CreateSRem(lhs, rhs, "srem");)}},
     // Comparisons
     {Token::Type::Equal,
      {OP(Char, return ir_builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_EQ, lhs, rhs, "ICMP_EQ");),

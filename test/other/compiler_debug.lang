@@ -35,10 +35,10 @@ let size: u64 = 0;
 
 function set<KeyType, ValueType>(this: HashTable<KeyType, ValueType>*, key: KeyType, value: ValueType): void {
     let target_size: u64 = max(32u64, .buckets.length);
-    if (.size > 0.5 * .buckets.length) target_size = 2u64 * target_size;
+    if (.size > .buckets.length / 2) target_size = 2u64 * target_size;
     if (.buckets.length < target_size)
         .buckets.resize(target_size);
-    const h: u64 = key.hash(); // FIXME: Doesn't compile, we need to delay type checking here.
+    const h: u64 = key.hash();
     const index = h % .buckets.length;
     // TODO: Handle collisions
 	.buckets.set(index, HashTableBucket(key, value));
@@ -46,10 +46,10 @@ function set<KeyType, ValueType>(this: HashTable<KeyType, ValueType>*, key: KeyT
 }
 
 function get<KeyType, ValueType>(this: HashTable<KeyType, ValueType>*, key: KeyType): ValueType {
-    const h = key.hash();
-    const index = h % .buckets.length;
+    const h: u64 = key.hash();
+    const index: u64 = h % .buckets.length;
     // TODO: Handle collisions
-    return .buckets.get(index).value;
+    return .buckets.get(index).value; // FIXME: Doesn't seem to be parsed correctly.
 }
 
 function main() {

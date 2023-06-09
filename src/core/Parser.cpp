@@ -737,7 +737,7 @@ bool Parser::parse_identifier(const std::span<Token>& tokens, std::span<Token>::
     //        Or realise that this is a function, somehow (keep track of declaration).
     if(peek(tokens, it, Token::Type::OpenParenthesis)) {
         // TODO: Check if the function has been declared (or is a built-in?) & Fetch corresponding FunctionDeclaration Node.
-        curr_node->add_child(new AST::Node(AST::Node::Type::Variable, *it)); // FIXME: Use another node type
+        curr_node->add_child(new AST::Node(AST::Node::Type::FunctionIdentifier, *it));
         ++it;
         return true;
     }
@@ -1249,7 +1249,8 @@ bool Parser::parse_function_arguments(const std::span<Token>& tokens, std::span<
     while(it != tokens.end() && it->type != Token::Type::CloseParenthesis) {
         auto arg_index = curr_node->children.size();
         parse_next_expression(tokens, it, curr_node);
-        mark_variable_as_moved(curr_node->children[arg_index]);
+        // FIXME: Disabled for now 'cause we still have no concept of const parameters...
+        // mark_variable_as_moved(curr_node->children[arg_index]);
         auto to_rvalue = curr_node->insert_between(arg_index, new AST::Node(AST::Node::Type::LValueToRValue, curr_node->token));
         to_rvalue->type_id = to_rvalue->children[0]->type_id;
         skip(tokens, it, Token::Type::Comma);
@@ -1501,11 +1502,12 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
     if(operator_type == Token::Type::OpenParenthesis) {
         auto function_node = curr_node->pop_child();
         auto call_node = curr_node->add_child(new AST::FunctionCall(function_node->token));
-        call_node->add_child(function_node);
 
         // TODO: Check type of function_node (is it actually callable?)
-        if(function_node->type != AST::Node::Type::Variable)
+        if(function_node->type != AST::Node::Type::FunctionIdentifier)
             throw Exception(fmt::format("[Parser] '{}' doesn't seem to be callable (may be a missing implementation).\n", function_node->token.value), point_error(*it));
+
+        call_node->add_child(function_node);
 
         // FIXME: FunctionCall uses its token for now to get the function name, but this in incorrect, it should look at the
         // first child and execute it to get a reference to the function. Using the function name token as a temporary workaround.
@@ -1531,6 +1533,8 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
     // Implicit 'this'
     // FIXME: This probably shouldn't work this way.
     //        We have to check the return type of the last child node to not try to apply the MemberAccess operator to a Statement, for example, which is pretty wack.
+    if(!curr_node->children.empty())
+        fmt::print("{}, {}, {}\n", curr_node->children.back()->type, curr_node->children.back()->type_id == InvalidTypeID, *curr_node->children.back());
     if((curr_node->children.empty() || curr_node->children.back()->type_id == InvalidTypeID || curr_node->children.back()->type_id == Void) &&
        operator_type == Token::Type::MemberAccess) {
         auto t = curr_node->get_scope()->get_this(); // FIXME: Replace by a get_variable("this") and make "this" a reserved identifier?
@@ -1609,8 +1613,13 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
                     break;
                 }
             // Delay checking until specialization
-            if(has_placeholder)
+            if(has_placeholder) {
+                // Narrow down return type if possible.
+                auto method = resolve_or_instanciate_function(call_node->token.value, arg_types, call_node);
+                if(method)
+                    call_node->type_id = method->type_id;
                 return true;
+            }
 
             auto method = resolve_or_instanciate_function(call_node->token.value, arg_types, call_node);
             if(!method)
@@ -1762,6 +1771,7 @@ void Parser::type_check_assignment(AST::BinaryOperator* binary_operator_node) {
     // Make sure both sides of the assignment are of the same type.
     // FIXME: Do better (in regards to placeholders at least).
     if(!is_placeholder(binary_operator_node->children[0]->type_id) && !is_placeholder(binary_operator_node->children[1]->type_id) &&
+       binary_operator_node->children[1]->type_id != InvalidTypeID && // FIXME: Workaround for non-resolved templated types.
        binary_operator_node->children[0]->type_id != binary_operator_node->children[1]->type_id)
         throw Exception(fmt::format("[Parser] Cannot assign value of type {} to variable '{}' of type {}.\n", type_id_to_string(binary_operator_node->children[1]->type_id),
                                     binary_operator_node->children[0]->token.value, type_id_to_string(binary_operator_node->children[0]->type_id)),
@@ -1931,7 +1941,7 @@ void Parser::parse_sizeof(const std::span<Token>& tokens, std::span<Token>::iter
     auto type_id = parse_type(tokens, it, curr_node);
     auto function_call = curr_node->add_child(new AST::FunctionCall(size_of_token));
     function_call->flags |= AST::FunctionDeclaration::Flag::BuiltIn;
-    function_call->add_child(new AST::Variable(size_of_token));
+    function_call->add_child(new AST::Node(AST::Node::Type::FunctionIdentifier, size_of_token));
     auto type_identifier_node = function_call->add_child(new AST::Node(AST::Node::Type::TypeIdentifier));
     function_call->type_id = PrimitiveType::U64;
     type_identifier_node->type_id = type_id;
@@ -1979,6 +1989,11 @@ void Parser::resolve_operator_type(AST::BinaryOperator* op_node) {
             op_node->children[0]->type_id = rhs;
             op_node->type_id = rhs;
         } else {
+            // Delay type checking after specialization.
+            if(op_node->children[0]->type_id == InvalidTypeID || op_node->children[1]->type_id == InvalidTypeID) {
+                op_node->type_id = InvalidTypeID;
+                return;
+            }
             error("[Parser] Couldn't resolve binary operator return type (Missing impl.) on line {}. Node:\n", op_node->token.line);
             fmt::print("{}\n", *static_cast<AST::Node*>(op_node));
             throw Exception(fmt::format("[Parser] Couldn't resolve binary operator return type (Missing impl.) on line {}.\n", op_node->token.line));
@@ -2109,7 +2124,7 @@ void Parser::check_function_return_type(AST::FunctionDeclaration* function_node)
     auto return_type = function_node->body()->type_id;
 
     if(function_node->is_templated() && return_type == InvalidTypeID && function_node->type_id == InvalidTypeID)
-        return; // We cannot determine the return type yet, delay type checking on template spacialization.
+        return; // We cannot determine the return type yet, delay type checking on template specialization.
 
     if(return_type == InvalidTypeID)
         return_type = PrimitiveType::Void;
@@ -2202,7 +2217,8 @@ void Parser::specialize(AST::Node* node, const std::vector<TypeID>& parameters) 
 }
 
 AST::VariableDeclaration* Parser::mark_variable_as_moved(AST::Node* variable_node) {
-    if(variable_node->type == AST::Node::Type::Variable) {
+    //                                                     Non-specialized, delay.
+    if(variable_node->type == AST::Node::Type::Variable && variable_node->type_id != InvalidTypeID) {
         auto ret_type = GlobalTypeRegistry::instance().get_type(variable_node->type_id);
         // FIXME: Introduce some sort of 'CanBeTriviallyCopied'? Which will be true for all primitive types, except pointers, and transitive.
         if(ret_type->is_struct() ||
