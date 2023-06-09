@@ -22,6 +22,7 @@ struct Token {
         Boolean,
         // Operators
         Assignment,
+        Not,
         Xor,
         Or,
         And,
@@ -115,6 +116,7 @@ struct fmt::formatter<Token::Type> {
             OP(Float);
             OP(Boolean);
             OP(Assignment);
+            OP(Not);
             OP(Xor);
             OP(Or);
             OP(And);

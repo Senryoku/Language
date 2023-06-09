@@ -4,13 +4,13 @@
 #include <Parser.hpp>
 #include <Tokenizer.hpp>
 
-void DependencyTree::construct(const std::filesystem::path& path) {
+bool DependencyTree::construct(const std::filesystem::path& path) {
     const auto abs_path = std::filesystem::absolute(path).lexically_normal();
     _roots.insert(abs_path);
-    construct(abs_path, nullptr);
+    return construct(abs_path, nullptr);
 }
 
-void DependencyTree::construct(const std::filesystem::path& path, const File* from) {
+bool DependencyTree::construct(const std::filesystem::path& path, const File* from) {
     File& current_file = _files[path];
     current_file.path = path.lexically_normal();
     if(from)
@@ -19,14 +19,21 @@ void DependencyTree::construct(const std::filesystem::path& path, const File* fr
     std ::ifstream input_file(path);
     if(!input_file) {
         error("[DependencyTree::construct] Couldn't open file '{}' (Running from {}).\n", path.string(), std::filesystem::current_path().string());
-        return;
+        return false;
     }
     std::string source{(std::istreambuf_iterator<char>(input_file)), std::istreambuf_iterator<char>()};
 
     std::vector<Token> tokens;
-    Tokenizer          tokenizer(source);
-    while(tokenizer.has_more())
-        tokens.push_back(tokenizer.consume());
+    try {
+        Tokenizer tokenizer(source);
+        while(tokenizer.has_more())
+            tokens.push_back(tokenizer.consume());
+    } catch(const Exception& e) {
+        error("[DependencyTree::construct] Error tokenizing '{}':\n", path.string());
+        e.display();
+        return false;
+    }
+
     Parser parser;
     parser.set_source(source);
     auto dependencies = parser.parse_dependencies(tokens);
@@ -34,8 +41,11 @@ void DependencyTree::construct(const std::filesystem::path& path, const File* fr
     for(const auto& dep : dependencies) {
         auto resolved_path = resolve_dependency(current_file.path.parent_path(), dep);
         current_file.depends_on.insert(resolved_path);
-        construct(resolved_path, &current_file);
+        if(!construct(resolved_path, &current_file))
+            return false;
     }
+
+    return true;
 }
 
 // Note: Could be easily optimized.

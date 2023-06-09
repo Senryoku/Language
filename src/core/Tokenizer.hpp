@@ -59,6 +59,7 @@ class Tokenizer {
         {"^", Token::Type::Xor},
         {"==", Token::Type::Equal},
         {"!=", Token::Type::Different},
+        {"!", Token::Type::Not},
         {">", Token::Type::Greater},
         {"<", Token::Type::Lesser},
         {">=", Token::Type::GreaterOrEqual},

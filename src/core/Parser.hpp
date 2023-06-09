@@ -138,18 +138,33 @@ class Parser {
     static const uint32_t max_precedence = static_cast<uint32_t>(-1);
     // FIXME: Pre and postfix versions of --/++ should have different precedences
     inline static const std::unordered_map<Token::Type, uint32_t> operator_precedence{
-        {Token::Type::Assignment, 16u},    {Token::Type::Or, 15u},          {Token::Type::And, 14u},
-        {Token::Type::Xor, 12u},           {Token::Type::Equal, 10u},       {Token::Type::Different, 10u},
-        {Token::Type::Greater, 9u},        {Token::Type::Lesser, 9u},       {Token::Type::GreaterOrEqual, 9u},
-        {Token::Type::LesserOrEqual, 9u},  {Token::Type::Substraction, 6u}, {Token::Type::Addition, 6u},
-        {Token::Type::Multiplication, 5u}, {Token::Type::Division, 5u},     {Token::Type::Modulus, 5u},
-        {Token::Type::Increment, 3u},      {Token::Type::Decrement, 3u},    {Token::Type::OpenParenthesis, 2u},
-        {Token::Type::OpenSubscript, 2u},  {Token::Type::MemberAccess, 2u}, {Token::Type::CloseParenthesis, 2u},
+        {Token::Type::Assignment, 16u},
+        {Token::Type::Or, 15u},
+        {Token::Type::And, 14u},
+        {Token::Type::Xor, 12u},
+        {Token::Type::Equal, 10u},
+        {Token::Type::Different, 10u},
+        {Token::Type::Greater, 9u},
+        {Token::Type::Lesser, 9u},
+        {Token::Type::GreaterOrEqual, 9u},
+        {Token::Type::LesserOrEqual, 9u},
+        {Token::Type::Substraction, 6u},
+        {Token::Type::Addition, 6u},
+        {Token::Type::Multiplication, 5u},
+        {Token::Type::Division, 5u},
+        {Token::Type::Modulus, 5u},
+        {Token::Type::Increment, 3u},
+        {Token::Type::Decrement, 3u},
+        {Token::Type::Not, 3u},
+        {Token::Type::OpenParenthesis, 2u},
+        {Token::Type::OpenSubscript, 2u},
+        {Token::Type::MemberAccess, 2u},
+        {Token::Type::CloseParenthesis, 2u},
         {Token::Type::CloseSubscript, 2u},
     };
 
     bool is_unary_operator(Token::Type type) {
-        return type == Token::Type::Addition || type == Token::Type::Substraction || type == Token::Type::Increment || type == Token::Type::Decrement;
+        return type == Token::Type::Not || type == Token::Type::Addition || type == Token::Type::Substraction || type == Token::Type::Increment || type == Token::Type::Decrement;
     }
 
     static TypeID resolve_operator_type(Token::Type op, TypeID lhs, TypeID rhs);

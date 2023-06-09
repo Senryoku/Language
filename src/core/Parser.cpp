@@ -668,6 +668,7 @@ bool Parser::parse_next_expression(const std::span<Token>& tokens, std::span<Tok
             case CloseParenthesis: [[fallthrough]];
             case CloseSubscript: stop = true; break;
             case Assignment: [[fallthrough]];
+            case Not: [[fallthrough]];
             case Xor: [[fallthrough]];
             case Or: [[fallthrough]];
             case And: [[fallthrough]];
@@ -1533,8 +1534,6 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
     // Implicit 'this'
     // FIXME: This probably shouldn't work this way.
     //        We have to check the return type of the last child node to not try to apply the MemberAccess operator to a Statement, for example, which is pretty wack.
-    if(!curr_node->children.empty())
-        fmt::print("{}, {}, {}\n", curr_node->children.back()->type, curr_node->children.back()->type_id == InvalidTypeID, *curr_node->children.back());
     if((curr_node->children.empty() || curr_node->children.back()->type_id == InvalidTypeID || curr_node->children.back()->type_id == Void) &&
        operator_type == Token::Type::MemberAccess) {
         auto t = curr_node->get_scope()->get_this(); // FIXME: Replace by a get_variable("this") and make "this" a reserved identifier?

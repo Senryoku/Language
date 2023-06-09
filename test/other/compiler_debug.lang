@@ -13,6 +13,12 @@ function hash(this: String*): u64 {
     return h;
 }
 
+function string_equals(lhs: String, rhs: String): bool {
+    if (lhs.length != rhs.length) return false;
+    for (let i = 0; i < lhs.length; ++i) if (lhs.ptr[i] != rhs.ptr[i]) return false;
+    return true;
+}
+
 type HashTableBucket<KeyType, ValueType> {
     let used: bool = false;
 let key: KeyType;
@@ -32,7 +38,6 @@ type HashTable<KeyType, ValueType> {
 let size: u64 = 0;
 }
 
-
 function set<KeyType, ValueType>(this: HashTable<KeyType, ValueType>*, key: KeyType, value: ValueType): void {
     let target_size: u64 = max(32u64, .buckets.length);
     if (.size > .buckets.length / 2) target_size = 2u64 * target_size;
@@ -40,8 +45,13 @@ function set<KeyType, ValueType>(this: HashTable<KeyType, ValueType>*, key: KeyT
         .buckets.resize(target_size);
     const h: u64 = key.hash();
     const index = h % .buckets.length;
-    // TODO: Handle collisions
-	.buckets.set(index, HashTableBucket(key, value));
+    let prev_value = .buckets.get(index);
+    // Linear probing for collisions
+    while (prev_value.used && !string_equals(prev_value.key, key)) { // FIXME: Doesn't find string_equals
+        ++index;
+        prev_value = .buckets.get(index);
+    }
+    .buckets.set(index, HashTableBucket(key, value));
     ++.size;
 }
 
@@ -49,7 +59,7 @@ function get<KeyType, ValueType>(this: HashTable<KeyType, ValueType>*, key: KeyT
     const h: u64 = key.hash();
     const index: u64 = h % .buckets.length;
     // TODO: Handle collisions
-    return .buckets.get(index).value; // FIXME: Doesn't seem to be parsed correctly.
+    return .buckets.get(index).value;
 }
 
 function main() {

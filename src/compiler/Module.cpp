@@ -26,6 +26,7 @@ static std::unordered_map<Token::Type, std::unordered_map<PrimitiveType, std::fu
       OP(I32, return ir_builder.CreateNeg(val, "neg");), OP(I64, return ir_builder.CreateNeg(val, "neg");), OP(U8, return ir_builder.CreateNeg(val, "neg");),
       OP(U16, return ir_builder.CreateNeg(val, "neg");), OP(U32, return ir_builder.CreateNeg(val, "neg");), OP(U64, return ir_builder.CreateNeg(val, "neg");),
       OP(Float, return ir_builder.CreateFNeg(val, "fneg");)}},
+    {Token::Type::Not, {OP(Boolean, return ir_builder.CreateNot(val, "not");)}},
 };
 #undef OP
 

@@ -38,8 +38,8 @@
 CLIArg args;
 
 const std::filesystem::path     cache_folder("./lang_cache/");
-std::set<std::filesystem::path> input_files;  // Original files passed to the CLI.
-std::set<std::filesystem::path> object_files; // List of all generated object files for linking.
+std::set<std::filesystem::path> input_files;     // Original files passed to the CLI.
+std::set<std::filesystem::path> object_files;    // List of all generated object files for linking.
 
 std::set<std::filesystem::path> processed_files; // Cleared at the start of a run, makes sure we don't end up in a loop. FIXME: Shouldn't be useful anymore.
 
@@ -282,7 +282,8 @@ bool handle_all() {
 
     DependencyTree dependency_tree;
     for(const auto& path : input_files)
-        dependency_tree.construct(path);
+        if(!dependency_tree.construct(path))
+            return false;
 
     auto processing_stages_or_error = dependency_tree.generate_processing_stages();
     if(processing_stages_or_error.is_error()) {

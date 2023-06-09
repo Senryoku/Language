@@ -63,7 +63,8 @@ Token Tokenizer::search_next() {
                         throw Exception(fmt::format("[Tokenizer] Error: Reached end of file without matching ' on line {}.", _current_line),
                                         point_error(_current_column, _current_line));
                     advance(); // Skip '
-                    return Token{type, std::string_view{_source.begin() + begin + 1, _source.begin() + (_current_pos - 1)}, _current_line, _current_column - ((_current_pos - 1) - (begin + 1))};
+                    return Token{type, std::string_view{_source.begin() + begin + 1, _source.begin() + (_current_pos - 1)}, _current_line,
+                                 _current_column - ((_current_pos - 1) - (begin + 1))};
                 }
                 break;
             }
@@ -84,7 +85,8 @@ Token Tokenizer::search_next() {
                                     point_error(_current_column, _current_line));
                 advance(); // Skip '"'
                 type = Token::Type::StringLiteral;
-                return Token{type, std::string_view{_source.begin() + begin + 1, _source.begin() + (_current_pos - 1)}, _current_line, _current_column - ((_current_pos - 1) - (begin + 1))};
+                return Token{type, std::string_view{_source.begin() + begin + 1, _source.begin() + (_current_pos - 1)}, _current_line,
+                             _current_column - ((_current_pos - 1) - (begin + 1))};
             }
             case ',': type = Token::Type::Comma; break;
             case ';': type = Token::Type::EndStatement; break;
