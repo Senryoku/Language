@@ -203,4 +203,5 @@ class Parser {
 
     // FIXME: This is probably not what we want to do.
     AST::VariableDeclaration* mark_variable_as_moved(AST::Node* variable_node);
+    AST::VariableDeclaration* mark_argument_as_non_moved(AST::Node* variable_node);
 };

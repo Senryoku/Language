@@ -1250,8 +1250,8 @@ bool Parser::parse_function_arguments(const std::span<Token>& tokens, std::span<
     while(it != tokens.end() && it->type != Token::Type::CloseParenthesis) {
         auto arg_index = curr_node->children.size();
         parse_next_expression(tokens, it, curr_node);
-        // FIXME: Disabled for now 'cause we still have no concept of const parameters...
-        // mark_variable_as_moved(curr_node->children[arg_index]);
+        // Mark as moved so the function doesn't call its argument destructors.
+        mark_variable_as_moved(curr_node->children[arg_index]);
         auto to_rvalue = curr_node->insert_between(arg_index, new AST::Node(AST::Node::Type::LValueToRValue, curr_node->token));
         to_rvalue->type_id = to_rvalue->children[0]->type_id;
         skip(tokens, it, Token::Type::Comma);
@@ -1402,6 +1402,11 @@ void Parser::check_function_call(AST::FunctionCall* call_node, const AST::Functi
             cast_node->type_id = function->arguments()[i]->type_id;
             call_node->insert_before_argument(i, cast_node);
         }
+    }
+
+    // FIXME: Here, we assume all arguments are 'returned' without being destroyed.
+    for(auto i = 0; i < std::min(call_node->arguments().size(), function->arguments().size()); ++i) {
+        mark_argument_as_non_moved(call_node->arguments()[i]);
     }
 
     // Type Check
@@ -2252,6 +2257,27 @@ AST::VariableDeclaration* Parser::mark_variable_as_moved(AST::Node* variable_nod
                     throw Exception(fmt::format("[Parser] Returning variable '{}' which was already moved!\n", var->token.value), point_error(variable_node->token));
 
                 var->flags |= AST::VariableDeclaration::Flag::Moved;
+                return var;
+            }
+        }
+    }
+    return nullptr;
+}
+
+AST::VariableDeclaration* Parser::mark_argument_as_non_moved(AST::Node* variable_node) {
+    while(variable_node->type != AST::Node::Type::Variable && variable_node->children.size() == 1)
+        variable_node = variable_node->children[0];
+    //                                                     Non-specialized, delay.
+    if(variable_node->type == AST::Node::Type::Variable && variable_node->type_id != InvalidTypeID) {
+        auto ret_type = GlobalTypeRegistry::instance().get_type(variable_node->type_id);
+        if(ret_type->is_struct() ||
+           (ret_type->is_templated() && GlobalTypeRegistry::instance().get_type(dynamic_cast<const TemplatedType*>(ret_type)->template_type_id)->is_struct())) {
+            auto var = variable_node->get_scope()->get_variable(variable_node->token.value);
+            if(!var) {
+                warn("[Parser] Uh?! Moving a non-existant variable '{}' ?\n", variable_node->token.value);
+                return nullptr;
+            } else {
+                var->flags &= ~AST::VariableDeclaration::Flag::Moved;
                 return var;
             }
         }

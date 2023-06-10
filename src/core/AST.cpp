@@ -43,6 +43,7 @@ AST::Node* AST::Node::insert_between(size_t n, Node* node) {
     children[n]->parent = nullptr;
     node->add_child(children[n]);
     children[n] = node;
+    node->parent = this;
     return node;
 }
 
