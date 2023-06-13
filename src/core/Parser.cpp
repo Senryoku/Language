@@ -1565,6 +1565,7 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
         if(!t)
             throw Exception(fmt::format("[Parser] Syntax error: Implicit 'this' access, but 'this' is not defined here.\n", *it), point_error(*it));
         Token token = *it;
+        token.type = Token::Type::Identifier;
         token.value = *internalize_string("this");
         auto this_node = curr_node->add_child(new AST::Variable(token));
         this_node->type_id = t->type_id;
