@@ -1,4 +1,5 @@
 extern function __itoa(value: i32): cstr;
+extern function __print(str: cstr, size: u64): void;
 
 import "std/memory"
 import "std/cstr"
@@ -79,7 +80,7 @@ export function append(this: StringBuilder*, c: char): void {
 		.reserve(max(128u64, .capacity * 2u64));
 	
 	.ptr[.length] = c;
-	.length = .length + 1u64;
+    ++.length;
 }
 
 export function append(this: StringBuilder*, str: cstr): void {
@@ -88,15 +89,22 @@ export function append(this: StringBuilder*, str: cstr): void {
     if (.capacity <= .length + cstr_len)
 		.reserve(max(128u64, (.capacity + cstr_len) * 2u64));
 
-    memcpy(.ptr, str, cstr_len);
+    memcpy(.ptr + .length, str, cstr_len);
 	.length = .length + cstr_len;
 }
 
-export function append(this: StringBuilder*, str: String): void {
+export function append(this: StringBuilder*, str: String*): void {
+    //printf("StringBuilder.append %d %d\n", .length, str.length);
+    //__print("TEST: ", 6);
+    //__print(.ptr, .length);
+    //__print(", ", 2);
+    //__print(str.ptr, str.length);
+    //__print("\n", 1);
+
     if (.capacity <= .length + str.length)
 		.reserve(max(128u64, (.capacity + str.length) * 2u64));
 
-    memcpy(.ptr, str.ptr, str.length);
+    memcpy(.ptr + .length, str.ptr, str.length);
 	.length = .length + str.length;
 }
 

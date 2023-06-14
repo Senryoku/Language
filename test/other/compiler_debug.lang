@@ -86,7 +86,7 @@ function main() {
     const key = String("MyKey");
     hash_table.set(key, 1337);
     let v = hash_table.get(key);
-    //print(key);
-    printf("%s: %u\n", key.ptr, v);
+    print(key);
+    printf(": %u\n", v);
     return 0;
 }

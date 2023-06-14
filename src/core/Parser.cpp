@@ -235,6 +235,14 @@ TypeID Parser::resolve_operator_type(Token::Type op, TypeID lhs, TypeID rhs) {
             return dynamic_cast<const PointerType*>(lhs_type)->pointee_type;
     }
 
+    // Allow some pointer arithmetics
+    if((op == Addition || op == Substraction) && is_integer(rhs)) {
+        if(lhs == PrimitiveType::CString)
+            return PrimitiveType::CString;
+        if(lhs == PrimitiveType::Pointer)
+            return PrimitiveType::Pointer;
+    }
+
     // Promote to int for intermediary results, unless it doesn't fit.
     if(is_integer(lhs) && is_integer(rhs)) {
         // Keep the signed nature of the expression

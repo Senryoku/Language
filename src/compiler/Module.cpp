@@ -460,7 +460,17 @@ llvm::Value* Module::codegen(const AST::Node* node) {
         }
         case AST::Node::Type::GetPointer: {
             // FIXME: Our only case is actually already handled by the MemberAccess node.
-            return codegen(node->children[0]);
+            const auto child = codegen(node->children[0]);
+            // FIXME: GetPointer is inconsistent in the AST
+            if(child->getType()->isPointerTy())
+                return child;
+            else {
+                // FIXME: We actually need it to store temp result in function calls.
+                // Create temp. store
+                auto allocaInst = create_entry_block_alloca(_llvm_ir_builder.GetInsertBlock()->getParent(), get_llvm_type(node->children[0]->type_id), "tmp_ret");
+                auto stored = _llvm_ir_builder.CreateStore(child, allocaInst);
+                return allocaInst;
+            }
         }
         case AST::Node::Type::UnaryOperator: {
             auto val = codegen(node->children[0]);
@@ -493,12 +503,20 @@ llvm::Value* Module::codegen(const AST::Node* node) {
                 throw Exception(fmt::format("[LLVMCodegen] Invalid BinaryOperator node:\n{}\n", *node));
             // TODO: Overloads.
             switch(node->token.type) {
-                case Token::Type::Xor: [[fallthrough]];
-                case Token::Type::Addition: [[fallthrough]];
-                case Token::Type::Substraction: [[fallthrough]];
+                case Token::Type::Addition: {
+                    if((node->children[0]->type_id == PrimitiveType::Pointer || node->children[0]->type_id == PrimitiveType::CString) && is_integer(node->children[1]->type_id))
+                        return _llvm_ir_builder.CreateGEP(llvm::Type::getInt8Ty(*_llvm_context), lhs, rhs, "ptr_add");
+                    [[fallthrough]];
+                }
+                case Token::Type::Substraction: {
+                    if((node->children[0]->type_id == PrimitiveType::Pointer || node->children[0]->type_id == PrimitiveType::CString) && is_integer(node->children[1]->type_id))
+                        throw Exception(fmt::format("[LLVMCodegen] Substraction for pointer not implemented.\n"));
+                    [[fallthrough]];
+                }
                 case Token::Type::Multiplication: [[fallthrough]];
                 case Token::Type::Division: [[fallthrough]];
                 case Token::Type::Modulus: [[fallthrough]];
+                case Token::Type::Xor: [[fallthrough]];
                 case Token::Type::Equal: [[fallthrough]];
                 case Token::Type::Different: [[fallthrough]];
                 case Token::Type::Lesser: [[fallthrough]];
@@ -720,15 +738,18 @@ llvm::Value* Module::builtin_sizeof(const AST::Node* node) {
 }
 
 llvm::Value* Module::intrinsic_memcpy(const AST::Node* node) {
-    auto function_call = dynamic_cast<const AST::FunctionCall*>(node);
-    auto dest = codegen(function_call->arguments()[0]);
+    const auto function_call = dynamic_cast<const AST::FunctionCall*>(node);
+
+    auto       dest = codegen(function_call->arguments()[0]);
+    auto       src = codegen(function_call->arguments()[1]);
+    const auto len = codegen(function_call->arguments()[2]);
+
     dest = _llvm_ir_builder.CreateIntToPtr(dest, _llvm_ir_builder.getInt8PtrTy());
-    auto src = codegen(function_call->arguments()[1]);
     src = _llvm_ir_builder.CreateIntToPtr(src, _llvm_ir_builder.getInt8PtrTy());
-    auto len = codegen(function_call->arguments()[2]);
-    auto is_volatile = llvm::ConstantInt::get(llvm::IntegerType::getInt1Ty(*_llvm_context), false);
-    auto llvm_memcpy = llvm::Intrinsic::getDeclaration(_llvm_module.get(), llvm::Intrinsic::memcpy,
-                                                       {_llvm_ir_builder.getInt8PtrTy(), _llvm_ir_builder.getInt8PtrTy(), _llvm_ir_builder.getInt64Ty()});
+
+    const auto is_volatile = llvm::ConstantInt::get(llvm::IntegerType::getInt1Ty(*_llvm_context), false);
+    const auto llvm_memcpy = llvm::Intrinsic::getDeclaration(_llvm_module.get(), llvm::Intrinsic::memcpy,
+                                                             {_llvm_ir_builder.getInt8PtrTy(), _llvm_ir_builder.getInt8PtrTy(), _llvm_ir_builder.getInt64Ty()});
     return _llvm_ir_builder.CreateCall(llvm_memcpy, {dest, src, len, is_volatile});
 }
 

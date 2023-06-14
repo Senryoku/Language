@@ -1,11 +1,11 @@
-extern function __print(str: cstr, size: u64) : void;
+extern function __print(str: cstr, size: u64): void;
 
 import "std/String"
 
-export function print(format : String) {
-	__print(format.ptr, format.length);
+export function print(format: String*) {
+    __print(format.ptr, format.length);
 }
 
-export function print(format : cstr) {
-	__print(format, strlen(format));
+export function print(format: cstr) {
+    __print(format, strlen(format));
 }
