@@ -103,12 +103,33 @@ export function function_name() : MyType {
 
 // Exporting variables/values is not supported yet.
 ```
+  - Templates (Generics)
+```c
+// On types
+type Pair<T0, T1> {
+    let lhs: T0;
+    let rhs: T1;
+}
+// On functions
+function Pair<T0, T1>(key: T0, value: T1) {
+    let pair: Pair<T0, T1>;
+    pair.lhs = key;
+    pair.rhs = value;
+    return pair;
+}
+```
 
 ## Todo
  - Everything
  - Design
    - Handle const-ness: Default to const for struct passed to functions, add a way to opt-in for mutability (espacially for 'member functions').
-   - Should we have constructors (other than the default one that is currently not implemented :)) )? And copy/move constructors? Can we get away with some sort of 'always move', and providing standardized clone/copy functions?
+     Should it be part of the type system, C++ style? I'm used to it, but it seems pretty hard to implement (at least given the current type system implementation, which is probably far from optimal). I'm leaning to "Yes", just have to do it...
+   - Rework function arguments and return values:
+     Structs should be passed as const reference (i.e. a simple pointer) by default instead of "moved", unless they're explicitly marked as mutable (so this is kinda dependent on solving const-correctness first...). This will also remove the need of passing pointers for "this", it should 
+     just be a reference, like all other arguments (no need for a syntatic marker, let the compiler handle this transparently), optionally mutable.
+     Structs returned from functions are currently broken. I have to flip the responsability (in the LLVM codegen): Let the caller allocate memory on the stack and pass an additional, hidden, pointer to it to the function which will use it to store its return value. 
+     This will simplify a lot of lifetime management.
+   - Should we have constructors (other than the default one that is currently not implemented :))? Currently I use function with the same new as the type as a convention. And copy/move constructors? Can we get away with some sort of 'always move', and providing standardized clone/copy functions?
      - Currently variables are marked as 'moved' when returned from a function to avoid calling their destructors. This is obviously not enough, we'll need a more general mechanism to handle marking object as moved. There is also a problem with actually retrieving value returned by functions: Nothing prevents the called to ignore the return value and currently I'm pretty sure the destructor will never be called in this case. We need a better model for this, but I think I'm not the right track (It looks like the idea of 'always move unless explicitly cloning' is pretty much what Rust does, but I need to read more about that.)
      - In summary: I have to come up with a good ownership/lifetime model.
    - Heap allocation?
