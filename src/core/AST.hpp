@@ -230,11 +230,7 @@ class AST {
         }
 
         AST::Node* insert_before_argument(size_t idx, AST::Node* node) {
-            assert(node->children.size() == 0);
-            children[idx + 1]->parent = nullptr;
-            node->add_child(children[idx + 1]);
-            children[idx + 1] = node;
-            return node;
+            return insert_between(idx + 1, node);
         }
 
         std::string mangled_name() const;

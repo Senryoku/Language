@@ -214,6 +214,10 @@ llvm::Value* Module::codegen(const AST::Node* node) {
         case AST::Node::Type::Cast: {
             assert(node->children.size() == 1);
             auto child = codegen(node->children[0]);
+            if(node->type_id == node->children[0]->type_id) {
+                warn("[LLVM Codegen] Warning: Redundant Cast node for {}.\n", type_id_to_string(node->type_id));
+                return child;
+            }
             // TODO: Handle child's type.
             if(is_primitive(node->type_id)) {
                 switch(node->type_id) {

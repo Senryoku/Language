@@ -1,4 +1,4 @@
-extern function __itoa(value: i32) : cstr;
+extern function __itoa(value: i32): cstr;
 
 import "std/memory"
 import "std/cstr"
@@ -6,122 +6,131 @@ import "std/cstr"
 // TODO: Evolve to use UTF-8 internally
 export type String {
 	let length: u64 = 0; // TODO: Rename to byte_length
-	let ptr: char*;
+let ptr: char*;
 }
 
-export function clear(this: String*) : void {
-	if(.length > 0u64) {
+export function clear(this: String*): void {
+    if (.length > 0u64) {
 		.length = 0u64;
-		free(.ptr);
+        free(.ptr);
 		.ptr = null_pointer();
-	}
+    }
 }
 
 // Set this String as the owner to the supplied CString
 // After this call, the lifetime of 'value' is assumed to be managed by this String instance, and no one else.
 // Useful to handle raw cstr returned by C API without creating a copy, or managing the cstr lifetime manually.
-export function adopt_c_string(this: String*, value: cstr) : void {
+export function adopt_c_string(this: String*, value: cstr): void {
 	.length = strlen(value);
 	.ptr = value;
 }
 
 // Create a String from a CString
 // This creates a copy of the supplied CString
-export function from_c_string(this: String*, value: cstr) : void {
+export function from_c_string(this: String*, value: cstr): void {
 	.clear();
 	.length = strlen(value);
 	.ptr = malloc(.length);
-	memcpy(.ptr, value, .length);
+    memcpy(.ptr, value, .length);
 }
 
 export function String(c_str: cstr) {
-	let r : String;
-	r.from_c_string(c_str);
-	return r;
+    let r: String;
+    r.from_c_string(c_str);
+    return r;
 }
 
-export function destructor(this: String*) : void {
+
+export function destructor(this: String*): void {
 	.clear();
+}
+
+export function clone(this: String*): String {
+    let s: String;
+    s.length = s.length;
+    s.ptr = malloc(s.length);
+    memcpy(s.ptr, .ptr, .length);
+    return s;
 }
 
 // String Builder
 
 export type StringBuilder {
 	let length: u64 = 0u64;
-	let capacity: u64 = 0u64;
-	let ptr: char* = null_pointer();
+let capacity: u64 = 0u64;
+let ptr: char* = null_pointer();
 }
 
-export function reserve(this: StringBuilder*, size : u64) : void {
-	if(size <= .capacity) return;
-		
-	let new_ptr : char* = malloc(size);
-	if(.capacity > 0u64) {
-		memcpy(new_ptr, .ptr, .length);
-		free(.ptr);
+export function reserve(this: StringBuilder*, size: u64): void {
+    if (size <= .capacity) return;
+
+    let new_ptr: char* = malloc(size);
+    if (.capacity > 0u64) {
+        memcpy(new_ptr, .ptr, .length);
+        free(.ptr);
 		.ptr = new_ptr;
-	}
+    }
 	.ptr = new_ptr;
 	.capacity = size;
 }
 
-export function append(this: StringBuilder*, c: char) : void {
-	if(.capacity <= .length + 1u64)
+export function append(this: StringBuilder*, c: char): void {
+    if (.capacity <= .length + 1u64)
 		.reserve(max(128u64, .capacity * 2u64));
 	
 	.ptr[.length] = c;
 	.length = .length + 1u64;
 }
 
-export function append(this: StringBuilder*, str: cstr) : void {
-	const cstr_len : u64 = strlen(str);
-	
-	if(.capacity <= .length + cstr_len)
+export function append(this: StringBuilder*, str: cstr): void {
+    const cstr_len: u64 = strlen(str);
+
+    if (.capacity <= .length + cstr_len)
 		.reserve(max(128u64, (.capacity + cstr_len) * 2u64));
-	
-	memcpy(.ptr, str, cstr_len);
+
+    memcpy(.ptr, str, cstr_len);
 	.length = .length + cstr_len;
 }
 
-export function append(this: StringBuilder*, str: String) : void {
-	if(.capacity <= .length + str.length)
+export function append(this: StringBuilder*, str: String): void {
+    if (.capacity <= .length + str.length)
 		.reserve(max(128u64, (.capacity + str.length) * 2u64));
-	
-	memcpy(.ptr, str.ptr, str.length);
+
+    memcpy(.ptr, str.ptr, str.length);
 	.length = .length + str.length;
 }
 
-export function to_string(this: StringBuilder*) : String {
-	// Transfer ownership to the String
-	let r : String;
-	r.length = .length;
-	r.ptr = .ptr; // Note: This is oversized
+export function to_string(this: StringBuilder*): String {
+    // Transfer ownership to the String
+    let r: String;
+    r.length = .length;
+    r.ptr = .ptr; // Note: This is oversized
 
 	// Invalidate StringBuilder
 	.length = 0;
 	.capacity = 0;
 	.ptr = null_pointer();
 
-	return r;
+    return r;
 }
 
-export function clear(this: StringBuilder*) : void {
-	if(.capacity > 0u64) {
+export function clear(this: StringBuilder*): void {
+    if (.capacity > 0u64) {
 		.length = 0;
 		.capacity = 0;
-		free(.ptr);
+        free(.ptr);
 		.ptr = null_pointer();
-	}
+    }
 }
 
-export function destructor(this: StringBuilder*) : void {
+export function destructor(this: StringBuilder*): void {
 	.clear();
 }
 
 // Misc. functions
 
-export function to_string(value: i32) : String {
-	let str : String;
-	str.adopt_c_string(__itoa(value));
-	return str;
+export function to_string(value: i32): String {
+    let str: String;
+    str.adopt_c_string(__itoa(value));
+    return str;
 }

@@ -1098,12 +1098,16 @@ bool Parser::parse_type_declaration(const std::span<Token>& tokens, std::span<To
                     // Patch the variable access with our member access
                     // FIXME: Once again, this is kinda hackish.
                     //        Some asserts on the function call structure, in case we end up changing it.
-                    assert(constructors[idx]->children.back()->type == AST::Node::Type::GetPointer);
+                    assert(constructors[idx]->children.back()->type_id == GlobalTypeRegistry::instance().get_pointer_to(member_access->type_id));
                     assert(constructors[idx]->children.back()->children.size() == 1);
-                    assert(constructors[idx]->children.back()->children[0]->type == AST::Node::Type::Variable);
                     delete constructors[idx]->children.back()->children[0];
+
+                    std::unique_ptr<AST::Node> get_ptr(new AST::Node(AST::Node::Type::GetPointer, curr_node->token));
+                    get_ptr->add_child(member_access.release());
+                    get_ptr->type_id = GlobalTypeRegistry::instance().get_pointer_to(get_ptr->children[0]->type_id);
+
                     constructors[idx]->children.back()->children.pop_back();
-                    constructors[idx]->children.back()->add_child(member_access.release());
+                    constructors[idx]->children.back()->add_child(get_ptr.release());
                     function_body->add_child(constructors[idx]);
                 } else
                     assert(false);
@@ -1252,8 +1256,10 @@ bool Parser::parse_function_arguments(const std::span<Token>& tokens, std::span<
         parse_next_expression(tokens, it, curr_node);
         // Mark as moved so the function doesn't call its argument destructors.
         mark_variable_as_moved(curr_node->children[arg_index]);
-        auto to_rvalue = curr_node->insert_between(arg_index, new AST::Node(AST::Node::Type::LValueToRValue, curr_node->token));
-        to_rvalue->type_id = to_rvalue->children[0]->type_id;
+        if(curr_node->children[arg_index]->type_id != InvalidTypeID && GlobalTypeRegistry::instance().get_type(curr_node->children[arg_index]->type_id)->is_struct()) {
+            auto get_ptr = curr_node->insert_between(arg_index, new AST::Node(AST::Node::Type::GetPointer, curr_node->token));
+            get_ptr->type_id = GlobalTypeRegistry::instance().get_pointer_to(get_ptr->children[0]->type_id);
+        }
         skip(tokens, it, Token::Type::Comma);
     }
     expect(tokens, it, Token::Type::CloseParenthesis);
@@ -1378,29 +1384,36 @@ void Parser::check_function_call(AST::FunctionCall* call_node, const AST::Functi
                         point_error(call_node->token));
     }
 
+    for(auto i = 0; i < call_node->arguments().size(); ++i) {
+        auto to_rvalue = call_node->insert_before_argument(i, new AST::Node(AST::Node::Type::LValueToRValue, call_node->token));
+        to_rvalue->type_id = to_rvalue->children[0]->type_id;
+    }
+
     // Some automatic casts
     for(auto i = 0; i < std::min(call_node->arguments().size(), function->arguments().size()); ++i) {
-        // Automatically cast any pointer to 'opaque' pointer type for interfacing with C++
-        if(function->arguments()[i]->type_id == PrimitiveType::Pointer && GlobalTypeRegistry::instance().get_type(call_node->arguments()[i]->type_id)->is_pointer()) {
-            auto cast_node = new AST::Node(AST::Node::Type::Cast);
-            cast_node->type_id = PrimitiveType::Pointer;
-            call_node->insert_before_argument(i, cast_node);
-        }
+        if(function->arguments()[i]->type_id != call_node->arguments()[i]->type_id) {
+            // Automatically cast any pointer to 'opaque' pointer type for interfacing with C++
+            if(function->arguments()[i]->type_id == PrimitiveType::Pointer && GlobalTypeRegistry::instance().get_type(call_node->arguments()[i]->type_id)->is_pointer()) {
+                auto cast_node = new AST::Node(AST::Node::Type::Cast);
+                cast_node->type_id = PrimitiveType::Pointer;
+                call_node->insert_before_argument(i, cast_node);
+            }
 
-        // Automatically cast to larger types (always safe)
-        if(is_safe_cast(function->arguments()[i]->type_id, call_node->arguments()[i]->type_id)) {
-            auto cast_node = new AST::Node(AST::Node::Type::Cast);
-            cast_node->type_id = function->arguments()[i]->type_id;
-            call_node->insert_before_argument(i, cast_node);
-        }
+            // Automatically cast to larger types (always safe)
+            if(is_safe_cast(function->arguments()[i]->type_id, call_node->arguments()[i]->type_id)) {
+                auto cast_node = new AST::Node(AST::Node::Type::Cast);
+                cast_node->type_id = function->arguments()[i]->type_id;
+                call_node->insert_before_argument(i, cast_node);
+            }
 
-        // Convenient auto casts that I'd want to remove.
-        if(is_allowed_but_unsafe_cast(function->arguments()[i]->type_id, call_node->arguments()[i]->type_id)) {
-            warn("[Parser] Warning: Unsafe cast from {} to {}:\n{}", type_id_to_string(call_node->arguments()[i]->type_id), type_id_to_string(function->arguments()[i]->type_id),
-                 point_error(call_node->arguments()[i]->token));
-            auto cast_node = new AST::Node(AST::Node::Type::Cast);
-            cast_node->type_id = function->arguments()[i]->type_id;
-            call_node->insert_before_argument(i, cast_node);
+            // Convenient auto casts that I'd want to remove.
+            if(is_allowed_but_unsafe_cast(function->arguments()[i]->type_id, call_node->arguments()[i]->type_id)) {
+                warn("[Parser] Warning: Unsafe cast from {} to {}:\n{}", type_id_to_string(call_node->arguments()[i]->type_id),
+                     type_id_to_string(function->arguments()[i]->type_id), point_error(call_node->arguments()[i]->token));
+                auto cast_node = new AST::Node(AST::Node::Type::Cast);
+                cast_node->type_id = function->arguments()[i]->type_id;
+                call_node->insert_before_argument(i, cast_node);
+            }
         }
     }
 
@@ -1652,6 +1665,14 @@ bool Parser::parse_operator(const std::span<Token>& tokens, std::span<Token>::it
             check_function_call(call_node, method);
             return true;
         } else {
+            auto lhs_type_id = binary_operator_node->children[0]->type_id;
+            auto lhs_type = GlobalTypeRegistry::instance().get_type(type_id);
+            if(lhs_type->is_pointer()) {
+                auto ltor = new AST::Node(AST::Node::Type::Dereference);
+                ltor->type_id = dynamic_cast<const PointerType*>(type)->pointee_type;
+                binary_operator_node->insert_between(0, ltor);
+            }
+
             auto member_identifier_node = binary_operator_node->add_child(new AST::MemberIdentifier(*it));
             // TODO: Handle non-specialized templated types. We have to delay the MemberIdentifier creation afters specialization (member index cannot be known at this time,
             //       unless we have constraint on the placeholder, like contracts/traits, but we have nothing like that right now :) )
@@ -2171,6 +2192,12 @@ void Parser::specialize(AST::Node* node, const std::vector<TypeID>& parameters) 
     switch(node->type) {
         case AST::Node::Type::FunctionCall: {
             auto function_call_node = dynamic_cast<AST::FunctionCall*>(node);
+            for(size_t i = 0; i < function_call_node->arguments().size(); ++i) {
+                if(GlobalTypeRegistry::instance().get_type(function_call_node->arguments()[i]->type_id)->is_struct()) {
+                    auto get_ptr = function_call_node->insert_before_argument(i, new AST::Node(AST::Node::Type::GetPointer, function_call_node->token));
+                    get_ptr->type_id = GlobalTypeRegistry::instance().get_pointer_to(get_ptr->children[0]->type_id);
+                }
+            }
             auto function = resolve_or_instanciate_function(function_call_node);
             if(!function) {
                 std::vector<TypeID> arguments;
@@ -2205,6 +2232,11 @@ void Parser::specialize(AST::Node* node, const std::vector<TypeID>& parameters) 
         case AST::Node::Type::MemberIdentifier: {
             auto member_identifier_node = dynamic_cast<AST::MemberIdentifier*>(node);
             assert(node->parent && node->parent->type == AST::Node::Type::BinaryOperator && node->parent->token.type == Token::Type::MemberAccess);
+            if(const auto type = GlobalTypeRegistry::instance().get_type(node->parent->children[0]->type_id); type->is_pointer()) {
+                auto ltor = new AST::Node(AST::Node::Type::Dereference);
+                ltor->type_id = dynamic_cast<const PointerType*>(type)->pointee_type;
+                node->parent->insert_between(0, ltor);
+            }
             revolve_member_identifier(GlobalTypeRegistry::instance().get_type(node->parent->children[0]->type_id), member_identifier_node);
             break;
         }

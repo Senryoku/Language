@@ -18,7 +18,7 @@ function hash(this: String*): u64 {
 //    return false;
 //}
 
-function equals(lhs: String, rhs: String): bool {
+function equals(lhs: String*, rhs: String*): bool {
     printf("EQUALS? %d, %d, %d\n", lhs.length, rhs.length, lhs.length != rhs.length);
     if (lhs.length != rhs.length) return false;
     printf("EQUALS? %d, %d, %d: SAME LENGTH.\n", lhs.length, rhs.length, lhs.length != rhs.length);
@@ -32,10 +32,10 @@ let key: KeyType;
 let value: ValueType;
 }
 
-function HashTableBucket<KeyType, ValueType>(key: KeyType, value: ValueType) {
+function HashTableBucket<KeyType, ValueType>(key: KeyType*, value: ValueType) {
     let r: HashTableBucket<KeyType, ValueType>;
     r.used = true;
-    r.key = key;
+    r.key = key.clone();
     r.value = value;
     return r;
 }
@@ -45,7 +45,7 @@ type HashTable<KeyType, ValueType> {
 let size: u64 = 0;
 }
 
-function set<KeyType, ValueType>(this: HashTable<KeyType, ValueType>*, key: KeyType, value: ValueType): void {
+function set<KeyType, ValueType>(this: HashTable<KeyType, ValueType>*, key: KeyType*, value: ValueType): void {
     printf("SET CALLED WITH: %d\n", key.length);
     let target_size: u64 = max(32u64, .buckets.length);
     if (.size > .buckets.length / 2) target_size = 2u64 * target_size;
@@ -67,7 +67,7 @@ function set<KeyType, ValueType>(this: HashTable<KeyType, ValueType>*, key: KeyT
     ++.size;
 }
 
-function get<KeyType, ValueType>(this: HashTable<KeyType, ValueType>*, key: KeyType): ValueType {
+function get<KeyType, ValueType>(this: HashTable<KeyType, ValueType>*, key: KeyType*): ValueType {
     const h: u64 = key.hash();
     let index: u64 = h % .buckets.length;
     let prev_value = .buckets.get(index);
@@ -86,7 +86,7 @@ function main() {
     const key = String("MyKey");
     hash_table.set(key, 1337);
     let v = hash_table.get(key);
-    print(key);
-    printf(": %u\n", v);
+    //print(key);
+    printf("%s: %u\n", key.ptr, v);
     return 0;
 }
